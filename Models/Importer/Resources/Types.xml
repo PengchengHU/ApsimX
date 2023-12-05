@@ -1450,12 +1450,17 @@
     <MetaData>
       <ShowInMainTree>Yes</ShowInMainTree>
     </MetaData>
+  </Type>
+  <Type name="FHDamageFunctions">
+    <MetaData>
+      <ShowInMainTree>Yes</ShowInMainTree>
+    </MetaData>
   </Type>  
   <Type name="Biomass">
     <MetaData>
       <ShowInMainTree>Yes</ShowInMainTree>
     </MetaData>
-  </Type>
+  </Type>  
   <Type name="CompositeBiomass">
     <MetaData>
       <ShowInMainTree>Yes</ShowInMainTree>
