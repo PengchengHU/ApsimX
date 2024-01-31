@@ -1451,7 +1451,7 @@
       <ShowInMainTree>Yes</ShowInMainTree>
     </MetaData>
   </Type>
-  <Type name="FHDamageFunctions">
+  <Type name="FrostHeatDamageFunctions">
     <MetaData>
       <ShowInMainTree>Yes</ShowInMainTree>
     </MetaData>
