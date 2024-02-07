@@ -137,8 +137,15 @@ namespace Models.Functions
         public double[] StressSurv { get; set; }
         /// <summary>Final multiplier of frost and heat damage.</summary>
         public double FinalStressMultiplier { get; set; }
+
+        /// <summary>Final multiplier of frost damage.</summary>
+        public double FinalFrostMultiplier { get; set; }
+
+        /// <summary>Final multiplier of heat damage.</summary>
+        public double FinalHeatMultiplier { get; set; }
+
         /// <summary>Frost- and heat-limiated yield.</summary>
-        /// [Units("kg/ha")]
+        /// [Units("g/m2")]
         public double FrostHeatYield { get; set; }
 
         /// <summary>Function for initialize arrary with the same value.</summary>
@@ -405,8 +412,10 @@ namespace Models.Functions
                 for (int i = 0; i < StressSurv.Length; i++)
                 {
                     FinalStressMultiplier = FinalStressMultiplier * StressSurv[i];
+                    FinalHeatMultiplier = FinalHeatMultiplier * (1 - (1 - HeatSurv[i]) * HeatSens[i]);
+                    FinalFrostMultiplier = FinalFrostMultiplier * (1 - (1 - FrostSurv[i]) * FrostSens[i]);
                 }
-                FrostHeatYield = organs.Wt * 10 * FinalStressMultiplier;
+                FrostHeatYield = organs.Wt * FinalStressMultiplier;
             }
         }
     }
