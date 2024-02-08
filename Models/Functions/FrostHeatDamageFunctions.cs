@@ -51,7 +51,7 @@ namespace Models.Functions
         [Description("Lower threshold of temperature for frost damage")] 
         public double FrostSurvLowT { get; set; }
 
-        /// <summary>Multiplier of lower threshold<</summary>
+        /// <summary>Multiplier of lower threshold</summary>
         [Description("Multiplier of frost damage for lower threshold of temperature")]
         public double FrostSurvLowR { get; set; }
 
@@ -74,7 +74,7 @@ namespace Models.Functions
         [Description("The second thermal time")] 
         public double FrostSensTT2 { get; set; }
 
-        /// <summary>The third thermal time/summary>
+        /// <summary>The third thermal time</summary>
         [Description("The third thermal time")] 
         public double FrostSensTT3 { get; set; }
 
