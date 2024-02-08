@@ -51,35 +51,35 @@ namespace Models.Functions
         [Description("Lower threshold of temperature for frost damage")] 
         public double FrostSurvLowT { get; set; }
 
-        /// <summary>Upper threshold damage</summary>
+        /// <summary>Multiplier of lower threshold<</summary>
         [Description("Multiplier of frost damage for lower threshold of temperature")]
         public double FrostSurvLowR { get; set; }
 
-        /// <summary>Multiplier of lower threshold</summary>
+        /// <summary>Upper threshold</summary>
         [Description("Upper threshold of temperature for frost damage")]
         public double FrostSurvUpT { get; set; }
 
-        /// <summary>Heat damage</summary>
+        /// <summary>Multiplier of upper threshold</summary>
         [Description("Multiplier of frost damage for upper threshold of temperature")]
         public double FrostSurvUpR { get; set; }
 
 
         /// <summary>Sensitivity period of frost damage</summary>
-        [Separator("Sensitivity period of frost damage")]
-        // <summary>Multiplier of lower threshold</summary>
-        [Description("Threshold #1 of thermal time for frost damage")]
+        [Separator("Accumulaitve thermal time around flowering to define sensitivity period of frost damage")]
+        // <summary>The first thermal time</summary>
+        [Description("The first thermal time")]
         public double FrostSensTT1 { get; set; }
 
-        /// <summary>Multiplier of lower threshold</summary>
-        [Description("Threshold #2 of thermal time for frost damage")] 
+        /// <summary>The second thermal time</summary>
+        [Description("The second thermal time")] 
         public double FrostSensTT2 { get; set; }
 
-        /// <summary>Multiplier of lower threshold</summary>
-        [Description("Threshold #3 of thermal time for frost damage")] 
+        /// <summary>The third thermal time/summary>
+        [Description("The third thermal time")] 
         public double FrostSensTT3 { get; set; }
 
-        /// <summary>Multiplier of lower threshold</summary>
-        [Description("Threshold #4 of thermal time for frost damage")] 
+        /// <summary>The fourth thermal time</summary>
+        [Description("The fourth thermal time")] 
         public double FrostSensTT4 { get; set; }
 
 
@@ -93,31 +93,31 @@ namespace Models.Functions
         [Description("Multiplier of heat damage for lower threshold of temperature")]
         public double HeatSurvLowR { get; set; }
 
-        /// <summary>Multiplier of lower threshold</summary>
+        /// <summary>Multiplier of upper threshold</summary>
         [Description("Upper threshold of temperature for heat damage")]
         public double HeatSurvUpT { get; set; }
 
-        /// <summary>Multiplier of lower threshold</summary>
-        [Description("Multiplier of heat damage for lower threshold of temperature")]
+        /// <summary>Multiplier of upper threshold</summary>
+        [Description("Multiplier of heat damage for upper threshold of temperature")]
         public double HeatSurvUpR { get; set; }
 
 
         /// <summary>Sensitivity period of heat damage</summary>
-        [Separator("Sensitivity period of heat damage")]
-        // <summary>Multiplier of lower threshold</summary>
-        [Description("Threshold #1 of thermal time for heat damage")]
+        [Separator("Accumulative thermal time around flowering to define sensitivity period of heat damage")]
+        // <summary>The first thermal time/summary>
+        [Description("The first thermal time")]
         public double HeatSensTT1 { get; set; }
 
-        /// <summary>Multiplier of lower threshold</summary>
-        [Description("Threshold #2 of thermal time for heat damage")]
+        /// <summary>The second thermal time</summary>
+        [Description("The second thermal time")]
         public double HeatSensTT2 { get; set; }
 
-        /// <summary>Multiplier of lower threshold</summary>
-        [Description("Threshold #3 of thermal time for heat damage")]
+        /// <summary>The third thermal time</summary>
+        [Description("The third thermal time")]
         public double HeatSensTT3 { get; set; }
 
-        /// <summary>Multiplier of lower threshold</summary>
-        [Description("Threshold #4 of thermal time for heat damage")]
+        /// <summary>The fourth thermal time</summary>
+        [Description("The fourth thermal time")]
         public double HeatSensTT4 { get; set; }
 
 
@@ -125,16 +125,22 @@ namespace Models.Functions
         /// <summary>Cumulative thermal time around flowering.</summary>
         /// [Units("oC d")]
         public double[] TTAroundFL { get; set; }
+
         /// <summary>Daily multiplier of frost damage.</summary>
         public double[] FrostSurv { get; set; }
+
         /// <summary>Daily sensitivity of frost stress.</summary>
         public double[] FrostSens { get; set; }
+
         /// <summary>Daily multiplier of heat damage.</summary>
         public double[] HeatSurv { get; set; }
+
         /// <summary>Daily sensitivity of heat stress.</summary>
         public double[] HeatSens { get; set; }
+
         /// <summary>Daily multiplier of frost and heat combined damage.</summary>
         public double[] StressSurv { get; set; }
+
         /// <summary>Final multiplier of frost and heat damage.</summary>
         public double FinalStressMultiplier { get; set; }
 
@@ -199,8 +205,7 @@ namespace Models.Functions
             {
                 ratio =
                     t * ((FrostSurvUpR - FrostSurvLowR) / (FrostSurvUpT - FrostSurvLowT))
-                    +
-                        (FrostSurvLowR * FrostSurvUpT - FrostSurvLowT * FrostSurvUpR)
+                    + (FrostSurvLowR * FrostSurvUpT - FrostSurvLowT * FrostSurvUpR)
                         / (FrostSurvUpT - FrostSurvLowT);
             }
             else if (t <= FrostSurvLowT)
@@ -255,8 +260,7 @@ namespace Models.Functions
             {
                 ratio =
                     t * ((HeatSurvUpR - HeatSurvLowR) / (HeatSurvUpT - HeatSurvLowT))
-                    +
-                        (HeatSurvLowR * HeatSurvUpT - HeatSurvLowT * HeatSurvUpR)
+                    + (HeatSurvLowR * HeatSurvUpT - HeatSurvLowT * HeatSurvUpR)
                         / (HeatSurvUpT - HeatSurvLowT);
             }
             else if (t >= HeatSurvUpT)
