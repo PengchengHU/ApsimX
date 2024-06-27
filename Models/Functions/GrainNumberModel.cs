@@ -14,6 +14,7 @@ using static Models.Core.AutoDocumentation;
 using DocumentFormat.OpenXml.ExtendedProperties;
 using Models.PostSimulationTools;
 using static ICSharpCode.SharpZipLib.Zip.ExtendedUnixData;
+using MathNet.Numerics;
 
 namespace Models.Functions
 {
@@ -264,6 +265,14 @@ namespace Models.Functions
             return DistrToday;
         }
 
+        /// <summary>Gamma distribution</summary>
+        private double GammaDistributor(double shape, double rate, double k)
+        {
+            var Distr = Gamma.WithShapeRate(shape, rate);
+            double DistrToday = Distr.Density(k);
+            return DistrToday;
+        }
+
         /// <summary>Normal distribution</summary>
         private double NormalDistributor(double mean, double stddev, double k)
         {
@@ -421,23 +430,32 @@ namespace Models.Functions
 
 
             // Calculating floret fertility in response to frost and heat event on meiotic phase 
-            // Step 1: Calculating the daily frequency of flag leaf fully emerged in a population
+            // Step 1: Calculating the daily frequency of flag leaf fully emerged in a population as meiosis occurs around flag leaf fully emerged ro early booting
             // Step 2: Calculating the frequency of florets reached the meiotic pahse on a spike
             // Step 3: Calculating the frequency of florets reached the meiotic phase in the population
             // Step 4: Calculating the probability of florets to be fertile in response to heat and cold degree hour
             // Step 5: Calculating the floret fertility in the population 
-            if (phen.Stage >= 6 && phen.Stage <= 7)
+            if (phen.Zadok >= 33 && phen.Zadok <= 50)
             {
-                // Probability of flag leaf fully emerged (liguale appears) of shoots/ spikes at the day in a population
-                DailyFlagLeafEmergedFreq = PoissionDistributor(LambdaFlagLeaf, DaysAfterFlagLeafTip);
+                // Probability of flag leaf fully emerged (liguale appears) of shoots/ spikes at the day in a population,
+                // which is a right-skewed Gamma distribution of Zadok stage from 33 (3rd node detectable) to 50 (first spikelet of spike just visible),
+                // with the cumulative probability at ZS39 or ZS40 (50% of plants with fully emerged flag leaf) is 50%.
+                // In APSIM, ZS is respectively interpolated based on the growth phases. For stages from ZS33 to ZS39, which are interpolated from GS5.9 (for ZS33) and GS6 (for ZS39).
+                // For stages from ZS39 to ZS55, which are interpoloated from from GS6 (for ZS39) and GS7 (for ZS55; Heading - Ear half emerged).
+                // It is reasonable to fit a curve with cumulative probility before ZS40 and after ZS40 equal to 50%.
+                // Here we calculate the cumulative forst or heat degree hours of a day as it is assumed that the meiosis of floret will last for a day to finish.
+                DailyFlagLeafEmergedFreq = GammaDistributor(9.99994, 1.381259, phen.Zadok - 33);
+
                 // Probability of florets at the meiosis date on a spike
                 MeiosisFloretsOnSpikeFreq = NormalDistributor(FloretMeiosisDateMean, FloretMeiosisDateStddev, DaysAfterFlagLeafTip);
+
                 // Probability of florets at the meiotic phase among the population  
                 DailyMeiosisFloretFreq = DailyFlagLeafEmergedFreq * MeiosisFloretsOnSpikeFreq;
 
                 // Floret fertility in response to frost stress on the meiosis date
                 double DegreeHours = FrostDegreeHours(FrostCriticalTemp);
                 double Fertility = MeioticFloretFertility(DegreeHours, MeiosisHalfKillFrostDegreeHours, MeiosisFrostKillFactor);
+
                 // Floret fertility of the day in the population 
                 DailyMeiosisFloretFertilityFrost = DailyMeiosisFloretFreq * Fertility;
                 // CumMeiosisFloretFertilityFrost += DailyMeiosisFloretFertilityFrost;
@@ -445,14 +463,13 @@ namespace Models.Functions
                 // Floret fertility in response to heat stress on the meiosis date
                 DegreeHours = HeatDegreeHours(HeatCriticalTemp);
                 Fertility = MeioticFloretFertility(DegreeHours, MeiosisHalfKillHeatDegreeHours, MeiosisHeatKillFactor);
+
                 // Floret fertility of the day in the population 
                 DailyMeiosisFloretFertilityHeat = DailyMeiosisFloretFreq * Fertility;
                 // CumMeiosisFloretFertilityHeat += DailyMeiosisFloretFertilityHeat;
 
                 // Cumulative floret fertility of the population
                 CumMeiosisFloretFertility += DailyMeiosisFloretFertilityFrost * DailyMeiosisFloretFertilityHeat;
-
-                DaysAfterFlagLeafTip += 1;
             }
 
             // Calculating floret fertility in response to frost and heat event on flowering 
@@ -462,9 +479,16 @@ namespace Models.Functions
             // Step 4: Calculating the hourly frequency of florets flowered on the spike at the day in the population
             // Step 5: Calculating the hourly floret fertility in response to high and cold temperature
             // Step 6: Calculating the hourly floret fertility in repsonse to high and cold temperature at the day in the population
-            if (phen.Stage > 7 && phen.Stage <= 9)
+            if (phen.Zadok > 50 && phen.Zadok < 75)
             {
-                // Probability of spikes reaching heading at the day in a population 
+                // Probability of spikes reaching heading at the day in a population, 
+                // which is a right-skewed Gamma distribution of Zadok stage from 50 (first spikelet of spike just visible) to 75 (early grain filling),
+                // with the cumulative probability at ZS65 (50% of plants flowering) is 50%.
+                // In APSIM, ZS is respectively interpolated based on the growth phases. 
+                // For stages from ZS39 to ZS55, which are interpoloated from from GS6 (for ZS39) and GS7 (for ZS55; 50% of spike heading).
+                // For stages from ZS55 to ZS65, which are interpolated from GS7 (for ZS33) and GS8 (for ZS65).
+                // It is assumed that the flowering in in a population is initiated at ZS50 (first spikelet of spike just visible) and stopped at ZS75 (early grain filliing)
+                // Here we calculate the cumulative forst or heat degree hours of a day as it is assumed that the meiosis of floret will last for a day to finish.
                 DailyHeadingSpikeFreq = PoissionDistributor(LambdaSpikeHeading, DaysAfterHeadingInitiation);
                 // Probability of flowering florets on a spike
                 FloweringFloretsOnSpikeFreq = NormalDistributor(FloretFloweringDateMean, FloretFloweringDateStddev, DaysAfterHeadingInitiation);
@@ -520,7 +544,7 @@ namespace Models.Functions
                 DaysAfterHeadingInitiation += 1;
             }
 
-            if (phen.Stage >= 9)
+            if (phen.Zadok >= 9)
             {
                 // Floret fertility resulted from frost and heat damages on meiotic and flowering phases
                 CumFloretFertility = CumMeiosisFloretFertility * CumFloweringFloretFertility;
