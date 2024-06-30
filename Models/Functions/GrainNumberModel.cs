@@ -473,7 +473,7 @@ namespace Models.Functions
             }
 
             // Calculating floret fertility in response to frost and heat event on flowering 
-            // Step 1: Calculating the daily frequency of spikes headed on a day in a population
+            // Step 1: Calculating the daily frequency of spikes headed on a day in a population OR daily frequency of spikes flowered on a day in a population
             // Step 2: Calculating the frequency of florets flowered on a spike
             // Step 3: Calculating the hourly frequency of florets flowered on the spike at the day
             // Step 4: Calculating the hourly frequency of florets flowered on the spike at the day in the population
@@ -489,7 +489,8 @@ namespace Models.Functions
                 // For stages from ZS55 to ZS65, which are interpolated from GS7 (for ZS33) and GS8 (for ZS65).
                 // It is assumed that the flowering in in a population is initiated at ZS50 (first spikelet of spike just visible) and stopped at ZS75 (early grain filliing)
                 // Here we calculate the cumulative forst or heat degree hours of a day as it is assumed that the meiosis of floret will last for a day to finish.
-                DailyHeadingSpikeFreq = PoissionDistributor(LambdaSpikeHeading, DaysAfterHeadingInitiation);
+                DailyHeadingSpikeFreq = GammaDistributor(2.632749, 0.3842951, phen.Zadok - 49);
+                
                 // Probability of flowering florets on a spike
                 FloweringFloretsOnSpikeFreq = NormalDistributor(FloretFloweringDateMean, FloretFloweringDateStddev, DaysAfterHeadingInitiation);
                                 
