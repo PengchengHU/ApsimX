@@ -226,7 +226,8 @@ namespace Models.Functions
 
 
         /// <summary>The probability of heading dates of spikes</summary>
-        public double DailyHeadingSpikeFreq { get; set; }
+        //public double DailyHeadingSpikeFreq { get; set; }
+        public double DailyFloweringSpikeFreq { get; set; }
 
         /// <summary>The probability of flowering florets on a spike</summary>
         public double FloweringFloretsOnSpikeFreq { get; set; }
@@ -269,6 +270,14 @@ namespace Models.Functions
         private double GammaDistributor(double shape, double rate, double k)
         {
             var Distr = Gamma.WithShapeRate(shape, rate);
+            double DistrToday = Distr.Density(k);
+            return DistrToday;
+        }
+
+        /// <summary>Beta distribution</summary>
+        private double BetaDistributor(double shape, double rate, double k)
+        {
+            var Distr = new Beta(shape, rate);
             double DistrToday = Distr.Density(k);
             return DistrToday;
         }
@@ -447,7 +456,8 @@ namespace Models.Functions
                 DailyFlagLeafEmergedFreq = GammaDistributor(9.99994, 1.381259, phen.Zadok - 33);
 
                 // Probability of florets at the meiosis date on a spike
-                MeiosisFloretsOnSpikeFreq = NormalDistributor(FloretMeiosisDateMean, FloretMeiosisDateStddev, DaysAfterFlagLeafTip);
+                //MeiosisFloretsOnSpikeFreq = NormalDistributor(FloretMeiosisDateMean, FloretMeiosisDateStddev, DaysAfterFlagLeafTip);
+                MeiosisFloretsOnSpikeFreq = NormalDistributor(8.5, 2, phen.Zadok - 33); // mean +- 2sd ~ 95%
 
                 // Probability of florets at the meiotic phase among the population  
                 DailyMeiosisFloretFreq = DailyFlagLeafEmergedFreq * MeiosisFloretsOnSpikeFreq;
@@ -479,7 +489,7 @@ namespace Models.Functions
             // Step 4: Calculating the hourly frequency of florets flowered on the spike at the day in the population
             // Step 5: Calculating the hourly floret fertility in response to high and cold temperature
             // Step 6: Calculating the hourly floret fertility in repsonse to high and cold temperature at the day in the population
-            if (phen.Zadok > 50 && phen.Zadok < 75)
+            if (phen.Zadok > 50 && phen.Zadok < 70)
             {
                 // Probability of spikes reaching heading at the day in a population, 
                 // which is a right-skewed Gamma distribution of Zadok stage from 50 (first spikelet of spike just visible) to 75 (early grain filling),
@@ -489,11 +499,13 @@ namespace Models.Functions
                 // For stages from ZS55 to ZS65, which are interpolated from GS7 (for ZS33) and GS8 (for ZS65).
                 // It is assumed that the flowering in in a population is initiated at ZS50 (first spikelet of spike just visible) and stopped at ZS75 (early grain filliing)
                 // Here we calculate the cumulative forst or heat degree hours of a day as it is assumed that the meiosis of floret will last for a day to finish.
-                DailyHeadingSpikeFreq = GammaDistributor(2.632749, 0.3842951, phen.Zadok - 49);
-                
+                //DailyHeadingSpikeFreq = GammaDistributor(2.632749, 0.3842951, phen.Zadok - 49);
+                DailyFloweringSpikeFreq = BetaDistributor(3.172469, 1.645674, (phen.Stage - 50) / 22) / 22;
+
                 // Probability of flowering florets on a spike
-                FloweringFloretsOnSpikeFreq = NormalDistributor(FloretFloweringDateMean, FloretFloweringDateStddev, DaysAfterHeadingInitiation);
-                                
+                //FloweringFloretsOnSpikeFreq = NormalDistributor(FloretFloweringDateMean, FloretFloweringDateStddev, DaysAfterHeadingInitiation);
+                FloweringFloretsOnSpikeFreq = NormalDistributor(10.5, 4, phen.Stage - 50);
+
                 // Sunrise and sunset hour of the day
                 int SunriseHour = (int)Math.Floor(Weather.CalculateSunRise());
                 int SunsetHour = (int)Math.Ceiling(Weather.CalculateSunSet()); 
@@ -516,13 +528,16 @@ namespace Models.Functions
                 {
                     // Probability of florets that flower at the hour
                     HourlyFloweringFloretFreq = NormalDistributor(FloretFloweringTimeMean, FloretFloweringTimeStddev, Th);
+
                     // Probability of florets that flower at the hour of the day in the population
-                    DayHourFloweringFloretFreq[Th] = DailyHeadingSpikeFreq * FloweringFloretsOnSpikeFreq * HourlyFloweringFloretFreq;
+                    DayHourFloweringFloretFreq[Th] = DailyFloweringSpikeFreq * FloweringFloretsOnSpikeFreq * HourlyFloweringFloretFreq;
 
                     // Hourly floret fertility in reponse to high temperature
                     HourlyFloweringFloretsFertilityHeat = FloweringFloretFertility("Heat", HourlyTempList[Th], FloweringHalfKillHeatTemp, FloweringHeatKillFactor);
+                    
                     // Hourly fertility of flowering florets in repsonse to high temperature at the day in the population  
                     DayHourFloweringFloretFertilityHeat[Th] = DayHourFloweringFloretFreq[Th] * HourlyFloweringFloretsFertilityHeat;
+                    
                     // Cumulative floret fertility of the population at the day
                     DailyFloweringFloretFertilityHeat += DayHourFloweringFloretFertilityHeat[Th];
                 }
@@ -536,7 +551,7 @@ namespace Models.Functions
                     FrostFloweringFloretsFertilityHour = FloweringFloretFertility("Frost", HourlyTempList[NightHours[Th]], FloweringFrostHalfKillTemp, FloweringFrostKillFactor);
                     DailyFloweringFloretFertilityFrost *= FrostFloweringFloretsFertilityHour;
                 }
-                DailyFloweringFloretFertilityFrost = DailyHeadingSpikeFreq * FloweringFloretsOnSpikeFreq * DailyFloweringFloretFertilityFrost;
+                DailyFloweringFloretFertilityFrost = DailyFloweringSpikeFreq * FloweringFloretsOnSpikeFreq * DailyFloweringFloretFertilityFrost;
 
                 // Flowering floret fertility in the population in in response to frost and heat stress the day
                 DailyFloweringFloretFertility = DailyFloweringFloretFertilityHeat * DailyFloweringFloretFertilityFrost;
