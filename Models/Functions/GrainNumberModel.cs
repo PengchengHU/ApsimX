@@ -76,19 +76,19 @@ namespace Models.Functions
 
         /// <summary>Fertility of meiotic phase</summary>
         [Separator("Fertility of meiotic phase")]
-        // <summary>Lambda of poisson distribution of dates of flag leaf fully emerged of shoots</summary>
-        [Description("Lambda of Poission distribution of flag leaf fully emerged from shoots")]
-        public double LambdaFlagLeaf { get; set; }
+        //// <summary>Lambda of poisson distribution of dates of flag leaf fully emerged of shoots</summary>
+        //[Description("Lambda of Poission distribution of flag leaf fully emerged from shoots")]
+        //public double LambdaFlagLeaf { get; set; }
 
-        /// <summary>Mean (peak) date of normal distribution of florets during the meiotic phase</summary>
-        [Description("Mean date of normal distribution of meiosis dates of florets")]
-        public double FloretMeiosisDateMean { get; set; }
+        ///// <summary>Mean (peak) date of normal distribution of florets during the meiotic phase</summary>
+        //[Description("Mean date of normal distribution of meiosis dates of florets")]
+        //public double FloretMeiosisDateMean { get; set; }
 
-        /// <summary>Standard deviation in date of normal distribution of florets during the meiotic phase</summary>
-        [Description("Standard deviation of normal distribution of meiosis dates of florets")]
-        public double FloretMeiosisDateStddev { get; set; }
+        ///// <summary>Standard deviation in date of normal distribution of florets during the meiotic phase</summary>
+        //[Description("Standard deviation of normal distribution of meiosis dates of florets")]
+        //public double FloretMeiosisDateStddev { get; set; }
 
-        /// <summary>Threshold temperature of heat stress</summary>
+        // <summary>Threshold temperature of heat stress</summary>
         [Description("Threshold temperature of heat stress")]
         public double HeatCriticalTemp { get; set; }
 
@@ -112,19 +112,19 @@ namespace Models.Functions
         [Description("Factor controlling shape of logistic curve of frost damage on meiotic florets")]
         public double MeiosisFrostKillFactor { get; set; }
 
-        /// <summary>Fertility of anthesis</summary>
-        [Separator("Fertility of anthesis")]
+        ///// <summary>Fertility of anthesis</summary>
+        //[Separator("Fertility of anthesis")]
         // <summary>Lambda of poisson distribution of heading dates of spikes</summary>
-        [Description("Lambda of Poission distribution of heading dates of spikes")]
-        public double LambdaSpikeHeading { get; set; }
+        //[Description("Lambda of Poission distribution of heading dates of spikes")]
+        //public double LambdaSpikeHeading { get; set; }
 
-        /// <summary>Mean (peak) date of normal distribution of flowering florets on spike</summary>
-        [Description("Mean date of normal distribution of flowering florets on a spike")]
-        public double FloretFloweringDateMean { get; set; }
+        ///// <summary>Mean (peak) date of normal distribution of flowering florets on spike</summary>
+        //[Description("Mean date of normal distribution of flowering florets on a spike")]
+        //public double FloretFloweringDateMean { get; set; }
 
-        /// <summary>Standard deviation of normal distribution of flowering florets on a spike</summary>
-        [Description("Standard deviation of normal distribution of flowering spikelets on a spike")]
-        public double FloretFloweringDateStddev { get; set; }
+        ///// <summary>Standard deviation of normal distribution of flowering florets on a spike</summary>
+        //[Description("Standard deviation of normal distribution of flowering spikelets on a spike")]
+        //public double FloretFloweringDateStddev { get; set; }
 
         /// <summary>Mean (peak) date of normal distribution of florets flowering at a time of a day</summary>
         [Description("Mean date of normal distribution of florets flowering at a time of a day")]
@@ -161,21 +161,18 @@ namespace Models.Functions
         /// <summary>Crop type</summary>
         string CropType;
 
-        /// <summary>The start stage name in numeric values</summary>
-        [Description("Numeric Stage to start accumulation")]
-        Double StartStageName;
+        ///// <summary>The start stage name in numeric values for spikelet primordia initiation</summary>
+        //double StartStageName;
 
-        /// <summary>The end stage name</summary>
-        [Description("Numeric Stage to stop accumulation")]
-        double EndStageName;
+        ///// <summary>The end stage name in numeric values for spikelet primordia initiation</summary>
+        //double EndStageName;
 
-        /// <summary>Days after stage >= 6</summary>
-        [Description("Days after numeric Stage >= 6")]
-        int DaysAfterFlagLeafTip;
+        ///// <summary>Days after stage >= 6</summary>
+        //int DaysAfterFlagLeafTip;
 
-        /// <summary>Days after heading initiation >= 6</summary>
-        [Description("Days after heading initiation")]
-        int DaysAfterHeadingInitiation;
+        ///// <summary>Days after heading initiation >= 6</summary>
+        //[Description("Days after heading initiation")]
+        //int DaysAfterHeadingInitiation;
 
 
         // Output variables
@@ -363,9 +360,9 @@ namespace Models.Functions
             // initialize
             //CropType = Plant.PlantType;
             CropType = "Wheat";
-            StartStageName = 4; // VernalSaturation or floral initiation stage
-            EndStageName = 5; // terminal spikelet stage
-            DaysAfterFlagLeafTip = 0;
+            //StartStageName = 4; // VernalSaturation or floral initiation stage
+            //EndStageName = 5; // terminal spikelet stage
+            //DaysAfterFlagLeafTip = 0;
 
             TTFITS = 0;
             SpikeletPrimordiaPerSpike = 0;
@@ -411,7 +408,7 @@ namespace Models.Functions
             // Cumulative thermal time from floral initiation (vernalSaturation in APSIM) to terminal spikelet stage
             if (CropType == "Wheat" | CropType == "wheat")
             {
-                if (phen.Stage >= StartStageName && phen.Stage <= EndStageName) 
+                if (phen.Stage >= 4 && phen.Stage <= 5) 
                 { 
                     TTFITS += phen.thermalTime.Value(); 
                 }
@@ -421,8 +418,8 @@ namespace Models.Functions
                 throw new Exception("Crop type not supported!");
             }
 
-            // Calculating spikelet primordia, floret primordia, fertile florets, and grains per spike from terminal spikelet
-            if (phen.Stage >= EndStageName && phen.Stage < 8.1) 
+            // Calculating spikelet primordia, floret primordia, fertile florets, and grains per spike from terminal spikelet stage
+            if (phen.Stage >= 5 && phen.Stage < 8.1) 
             {
                 // Spikelet primordia per spike
                 SpikeletPrimordiaPerSpike = TTFITS / SpikeletPrimordiaPlastochron;
