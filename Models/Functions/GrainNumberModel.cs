@@ -544,11 +544,11 @@ namespace Models.Functions
 
                 // Flowering floret fertility in the population in response to frost stress on an hour of a day
                 // Sequence of night hours
-                int[] NightHours = Enumerable.Range(0, SunriseHour - 1).Concat(Enumerable.Range(SunsetHour + 1, 23)).ToArray();
-                for (int Th = 0; Th <= (NightHours.Length - 1); Th++)
+                //int[] NightHours = Enumerable.Range(0, SunriseHour - 1).Concat(Enumerable.Range(SunsetHour + 1, 23)).ToArray();
+                for (int Th = 0; Th <= 23; Th++)
                 {
                     // Hourly floret fertility in reponse to cold temperature
-                    FrostFloweringFloretsFertilityHour = FloweringFloretFertility("Frost", HourlyTempList[NightHours[Th]], FloweringFrostHalfKillTemp, FloweringFrostKillFactor);
+                    FrostFloweringFloretsFertilityHour = FloweringFloretFertility("Frost", HourlyTempList[Th], FloweringFrostHalfKillTemp, FloweringFrostKillFactor);
                     DailyFloweringFloretFertilityFrost *= FrostFloweringFloretsFertilityHour;
                 }
                 DailyFloweringFloretFertilityFrost = DailyFloweringSpikeFreq * FloweringFloretsOnSpikeFreq * DailyFloweringFloretFertilityFrost;
@@ -557,13 +557,14 @@ namespace Models.Functions
                 DailyFloweringFloretFertility = DailyFloweringFloretFertilityHeat * DailyFloweringFloretFertilityFrost;
 
                 CumFloweringFloretFertility += DailyFloweringFloretFertility;
-                DaysAfterHeadingInitiation += 1;
+                //DaysAfterHeadingInitiation += 1;
             }
 
             if (phen.Zadok >= 9)
             {
                 // Floret fertility resulted from frost and heat damages on meiotic and flowering phases
                 CumFloretFertility = CumMeiosisFloretFertility * CumFloweringFloretFertility;
+
                 // Apply the fertility on potential grain number to get the actual one
                 ActualGrainNumberPerArea = PotentialGrainNumberPerArea * CumFloretFertility;
             }
