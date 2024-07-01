@@ -15,6 +15,9 @@ using DocumentFormat.OpenXml.ExtendedProperties;
 using Models.PostSimulationTools;
 using static ICSharpCode.SharpZipLib.Zip.ExtendedUnixData;
 using MathNet.Numerics;
+using DocumentFormat.OpenXml.Spreadsheet;
+using Models.Interfaces;
+using DocumentFormat.OpenXml.Wordprocessing;
 
 namespace Models.Functions
 {
@@ -112,8 +115,8 @@ namespace Models.Functions
         [Description("Factor controlling shape of logistic curve of frost damage on meiotic florets")]
         public double MeiosisFrostKillFactor { get; set; }
 
-        ///// <summary>Fertility of anthesis</summary>
-        //[Separator("Fertility of anthesis")]
+        /// <summary>Fertility of anthesis</summary>
+        [Separator("Fertility of flowering phase")]
         // <summary>Lambda of poisson distribution of heading dates of spikes</summary>
         //[Description("Lambda of Poission distribution of heading dates of spikes")]
         //public double LambdaSpikeHeading { get; set; }
@@ -126,7 +129,7 @@ namespace Models.Functions
         //[Description("Standard deviation of normal distribution of flowering spikelets on a spike")]
         //public double FloretFloweringDateStddev { get; set; }
 
-        /// <summary>Mean (peak) date of normal distribution of florets flowering at a time of a day</summary>
+        // <summary>Mean (peak) date of normal distribution of florets flowering at a time of a day</summary>
         [Description("Mean date of normal distribution of florets flowering at a time of a day")]
         public double FloretFloweringTimeMean { get; set; }
 
@@ -295,11 +298,65 @@ namespace Models.Functions
             return RateToday;
         }
 
-        /// <summary>Calculate heat degree hours</summary>
-        private double HeatDegreeHours(double HeatCriticalTemp)
+        /// <summary>Creates a list of temperature range factors used to estimate daily temperature from Min and Max temp</summary>
+        /// <returns></returns>
+        public List<double> HourlyTemperature(double DayLength, double MinT, double MaxT, double YesterdayMaxT, double TomorrowMinT, double SunRise, double SunSet)
         {
-            var HourlyTemp = new HourlySinPpAdjusted();
-            List<double> HourlyTempList = HourlyTemp.SubDailyValues();
+            double P = 1.5;
+            double TC = 4.0;            
+            double Tsset;
+
+            List<double> sdts = new List<double>();
+
+            for (int Th = 0; Th <= 23; Th++)
+            {
+                double Ta = 1.0;
+                if (Th < SunRise)
+                {
+                    //  Hour between midnight and sunrise
+                    //  PERIOD A MaxTB is max. temperature, before day considered
+
+                    //this is the sunset temperature of based on the previous day
+                    double n = 24 - DayLength;
+                    Tsset = MinT + (YesterdayMaxT - MinT) *
+                                    Math.Sin(Math.PI * (DayLength / (DayLength + 2 * P)));
+
+                    Ta = (MinT - Tsset * Math.Exp(-n / TC) +
+                            (Tsset - MinT) * Math.Exp(-(Th + 24 - SunSet) / TC)) /
+                            (1 - Math.Exp(-n / TC));
+                }
+                else if (Th >= SunRise & Th < 12 + P)
+                {
+                    // PERIOD B Hour between sunrise and normal time of MaxT
+                    Ta = MinT + (MaxT - MinT) *
+                            Math.Sin(Math.PI * (Th - SunRise) / (DayLength + 2 * P));
+                }
+                else if (Th >= 12 + P & Th < SunSet)
+                {
+                    // PERIOD C Hour between normal time of MaxT and sunset
+                    //  MinTA is min. temperature, after day considered
+
+                    Ta = TomorrowMinT + (MaxT - TomorrowMinT) *
+                        Math.Sin(Math.PI * (Th - SunRise) / (DayLength + 2 * P));
+                }
+                else
+                {
+                    // PERIOD D Hour between sunset and midnight
+                    Tsset = TomorrowMinT + (MaxT - TomorrowMinT) * Math.Sin(Math.PI * (DayLength / (DayLength + 2 * P)));
+                    double n = 24 - DayLength;
+                    Ta = (TomorrowMinT - Tsset * Math.Exp(-n / TC) +
+                            (Tsset - TomorrowMinT) * Math.Exp(-(Th - SunSet) / TC)) /
+                            (1 - Math.Exp(-n / TC));
+                }
+                sdts.Add(Ta);
+            }
+            return sdts;
+        }
+
+
+        /// <summary>Calculate heat degree hours</summary>
+        private double HeatDegreeHours(double HeatCriticalTemp, List<double> HourlyTempList)
+        {
             double HeatDegree = 0;
             for (int Th = 0; Th <= 23; Th++)
             {
@@ -312,10 +369,8 @@ namespace Models.Functions
         }
 
         /// <summary>Calculate heat degree hours</summary>
-        private double FrostDegreeHours(double FrostCriticalTemp)
+        private double FrostDegreeHours(double FrostCriticalTemp, List<double> HourlyTempList)
         {
-            var HourlyTemp = new HourlySinPpAdjusted();
-            List<double> HourlyTempList = HourlyTemp.SubDailyValues();
             double FrostDegree = 0;
             for (int Th = 0; Th <= 23; Th++)
             {
@@ -441,6 +496,19 @@ namespace Models.Functions
             // Step 3: Calculating the frequency of florets reached the meiotic phase in the population
             // Step 4: Calculating the probability of florets to be fertile in response to heat and cold degree hour
             // Step 5: Calculating the floret fertility in the population 
+
+            // Met data and hourly temperature
+            double DayLength = Weather.CalculateDayLength(-6);
+            double MinT = Weather.MinT;
+            double MaxT = Weather.MaxT;
+            double YesterdayMaxT = (Weather.YesterdaysMetData == null) ? MaxT : Weather.YesterdaysMetData.MaxT;
+            double TomorrowMinT = (Weather.YesterdaysMetData == null) ? MinT : Weather.YesterdaysMetData.MinT;
+            double SunRise = Weather.CalculateSunRise();
+            double SunSet = Weather.CalculateSunSet();
+            List<double> HourlyTempList = HourlyTemperature(DayLength, MinT, MaxT, YesterdayMaxT, TomorrowMinT, SunRise, SunSet);
+            int SunriseHour = (int)Math.Floor(SunRise);
+            int SunsetHour = (int)Math.Ceiling(SunSet);
+
             if (phen.Zadok >= 33 && phen.Zadok <= 50)
             {
                 // Probability of flag leaf fully emerged (liguale appears) of shoots/ spikes at the day in a population,
@@ -460,7 +528,7 @@ namespace Models.Functions
                 DailyMeiosisFloretFreq = DailyFlagLeafEmergedFreq * MeiosisFloretsOnSpikeFreq;
 
                 // Floret fertility in response to frost stress on the meiosis date
-                double DegreeHours = FrostDegreeHours(FrostCriticalTemp);
+                double DegreeHours = FrostDegreeHours(FrostCriticalTemp, HourlyTempList);
                 double Fertility = MeioticFloretFertility(DegreeHours, MeiosisHalfKillFrostDegreeHours, MeiosisFrostKillFactor);
 
                 // Floret fertility of the day in the population 
@@ -468,7 +536,7 @@ namespace Models.Functions
                 // CumMeiosisFloretFertilityFrost += DailyMeiosisFloretFertilityFrost;
 
                 // Floret fertility in response to heat stress on the meiosis date
-                DegreeHours = HeatDegreeHours(HeatCriticalTemp);
+                DegreeHours = HeatDegreeHours(HeatCriticalTemp, HourlyTempList);
                 Fertility = MeioticFloretFertility(DegreeHours, MeiosisHalfKillHeatDegreeHours, MeiosisHeatKillFactor);
 
                 // Floret fertility of the day in the population 
@@ -502,14 +570,6 @@ namespace Models.Functions
                 // Probability of flowering florets on a spike
                 //FloweringFloretsOnSpikeFreq = NormalDistributor(FloretFloweringDateMean, FloretFloweringDateStddev, DaysAfterHeadingInitiation);
                 FloweringFloretsOnSpikeFreq = NormalDistributor(10.5, 4, phen.Stage - 50);
-
-                // Sunrise and sunset hour of the day
-                int SunriseHour = (int)Math.Floor(Weather.CalculateSunRise());
-                int SunsetHour = (int)Math.Ceiling(Weather.CalculateSunSet()); 
-                
-                // Hourly temperature
-                var HourlyTemp = new HourlySinPpAdjusted();
-                List<double> HourlyTempList = HourlyTemp.SubDailyValues();
 
                 DayHourFloweringFloretFreq = new double[24];
                 DayHourFloweringFloretFertilityHeat = new double[24];
