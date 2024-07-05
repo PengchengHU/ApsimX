@@ -1,4 +1,6 @@
 ﻿using System;
+using System.Data;
+using APSIM.Shared.Utilities;
 using Models.Core;
 using Models.PMF;
 using Models.PMF.Phen;
@@ -18,7 +20,11 @@ using MathNet.Numerics;
 using DocumentFormat.OpenXml.Spreadsheet;
 using Models.Interfaces;
 using DocumentFormat.OpenXml.Wordprocessing;
-using System.Drawing;
+using static Models.Core.ScriptCompiler;
+using ExcelDataReader;
+using System.IO;
+using System.Collections;
+using DocumentFormat.OpenXml.Drawing.Charts;
 
 namespace Models.Functions
 {
@@ -210,6 +216,107 @@ namespace Models.Functions
             return (Fertility);
         }
 
+        static Dictionary<string, List<double>> ReadPoissonParameter(string filePath)
+        {
+            // Create a dictionary to hold the column data as lists of doubles
+            var columnData = new Dictionary<string, List<double>>();
+
+            // Register the ExcelDataReader (required to use the library)
+            System.Text.Encoding.RegisterProvider(System.Text.CodePagesEncodingProvider.Instance);
+
+            // Open the Excel file
+            using (var stream = File.Open(filePath, FileMode.Open, FileAccess.Read))
+            {
+                using (var reader = ExcelReaderFactory.CreateReader(stream))
+                {
+                    // Convert the data to a DataSet
+                    var result = reader.AsDataSet();
+
+                    // Assuming the first worksheet
+                    var dataTable = result.Tables[0];
+
+                    // Get the number of columns in the worksheet
+                    int columnCount = dataTable.Columns.Count;
+
+                    // Iterate over each column
+                    for (int col = 0; col < columnCount; col++)
+                    {
+                        // Get the column header
+                        string columnName = dataTable.Rows[0][col].ToString();
+
+                        // Create a list to hold the column values
+                        var columnList = new List<double>();
+
+                        // Iterate over each row in the column, starting from the second row
+                        for (int row = 1; row < dataTable.Rows.Count; row++)
+                        {
+                            if (double.TryParse(dataTable.Rows[row][col].ToString(), out double cellValue))
+                            {
+                                columnList.Add(cellValue);
+                            }
+                            else
+                            {
+                                Console.WriteLine($"Warning: Unable to convert cell value '{dataTable.Rows[row][col]}' in column '{columnName}' to double.");
+                            }
+                        }
+
+                        // Add the list to the dictionary
+                        columnData[columnName] = columnList;
+                    }
+                }
+            }
+            return columnData;
+        }
+
+        Dictionary<string, List<double>> DetermineLambda(Dictionary<string, List<double>> PoissonParameter, int RangeMid, int RangeEnd) 
+        {
+
+            List<double> MidValue = PoissonParameter["mid"];
+            List<double> EndValue = PoissonParameter["end"];
+            //List<double> LambdaValue = PoissonParameter["lambda"];
+
+            List<double> Dist = new();
+            int ParameterIndex;
+            for (int i = 0; i < MidValue.Count; i++)
+            {
+                Dist.Add(Math.Sqrt(MidValue[i] - RangeMid) + Math.Sqrt(EndValue[i] - RangeEnd));
+            }
+
+            // Find the minimum value
+            double DistMin = Dist.Min();
+
+            // Find all indices of the minimum value
+            List<int> MinIndices = Dist
+                .Select((value, index) => new { value, index })
+                .Where(x => x.value == DistMin)
+                .Select(x => x.index)
+                .ToList();
+
+            List<double> Diff = new();
+            if (MinIndices.Count > 1)
+            {
+                for (int j = 0; j < MinIndices.Count - 1; j++)
+                {
+                    Diff.Add(MidValue[MinIndices[j]] - RangeMid);
+                }
+                // Find the index of the minimum value
+                int MinDiffIndex = Diff.IndexOf(Diff.Min());
+                ParameterIndex = MinIndices[MinDiffIndex];
+            }
+            else
+            {
+                ParameterIndex = MinIndices[0];
+            }
+
+            // Get a slice of the dictionary
+            var res = PoissonParameter
+                .Skip(ParameterIndex - 1)  // Skip items before the start index
+                .Take(1)  // Take items from the start index to the end index (inclusive)
+                .ToDictionary(pair => pair.Key, pair => pair.Value);  // Convert back to a dictionary
+
+            return res;
+        }
+
         #endregion
 
         #region Define parameters
@@ -384,7 +491,7 @@ namespace Models.Functions
         public double DailyMeioisFloretFertility { get; set; }
 
         /// <summary>Cumulative floret fertilities in the population during meiotic phase</summary>
-        public double CumMeiosisFertileFloretPerc { get; set; }
+        public double FinalMeiosisFertileFloretPerc { get; set; }
 
 
         /// <summary>The probability of heading dates of spikes</summary>
@@ -422,10 +529,10 @@ namespace Models.Functions
         public List<double> DailyFloweringFertileFloretPerc { get; set; }
 
         /// <summary>Cumulative floret fertility during flowering</summary>
-        public double CumFloweringFloretFertility { get; set; }
+        public double FinalFloweringFloretFertility { get; set; }
 
         /// <summary>Cumulative floret fertility during and meiotic and flowering phase</summary>
-        public double CumFloweringFertileFloretPerc { get; set; }
+        public double FinalFloweringFertileFloretPerc { get; set; }
 
         /// <summary> Final percentage of fertile floret </summary>
         public double FinalFertileFloretPerc { get; set; }
@@ -438,6 +545,8 @@ namespace Models.Functions
 
         /// <summary>Crop type</summary>
         string CropType;
+
+        //DataTable PoissonParameters { get; set; }
 
         /// <summary>The shape parameter for gamma distribution of flag leaf</summary>
         const double MeiosisShape = 9.99994;
@@ -452,7 +561,7 @@ namespace Models.Functions
         const double MeiosisStddev = 1;
 
         /// <summary>The lambda parameter for poisson distribution of flag leaf emerged</summary>
-        const double MeiosisLambda = 8.655686;
+        double MeiosisLambda = 8.655686;
 
         /// <summary>Days after ZS33</summary>
         public int DaysAfterZS33 { get; set; }
@@ -475,7 +584,7 @@ namespace Models.Functions
         /// <summary>Days after ZS33 for the stage of start of grian filling</summary>
         public int DaysAtStartGrainFill { get; set; }
 
-        const double FloweringLambda = 6;
+        double FloweringLambda = 6;
         const double FloretFloweringDateMean = 2.5;
         const double FloretFloweringDateStddev = 1;        
 
@@ -488,6 +597,8 @@ namespace Models.Functions
         List<double> DayLength = new List<double>();
         List<int> SunriseHour = new List<int>();
         List<int> SunsetHour = new List<int>();
+
+        Dictionary<string, List<double>> PoissonParameter;
 
         #endregion
 
@@ -514,7 +625,7 @@ namespace Models.Functions
             DailyMeiosisFloretFertilityFrost = new List<double>();
             DailyMeiosisFloretFertilityHeat = new List<double>();
             DailyMeioisFloretFertility = 0;
-            CumMeiosisFertileFloretPerc = 0;
+            FinalMeiosisFertileFloretPerc = 0;
 
             DailyFloweringSpikePerc = new List<double>();
             DailyFloweringFloretsOnSpikePerc = new List<double>();
@@ -525,10 +636,14 @@ namespace Models.Functions
             DailyFloweringFloretFertilityFrost = new List<double>();
             DailyFloweringFertileFloretPerc = new List<double>();
             DailyFloweringFloretFertility = new List<double>();
-            CumFloweringFloretFertility = 0;
-            CumFloweringFertileFloretPerc = 0;
+            FinalFloweringFloretFertility = 0;
+            FinalFloweringFertileFloretPerc = 0;
 
             FinalFertileFloretPerc = 0;
+
+            PoissonParameter = ReadPoissonParameter("./PoissonParameters.xlsx");
+            if (PoissonParameter == null)
+                throw new Exception("Data for Poisson parameter does not appear to be any data.");
         }
                
 
@@ -609,6 +724,11 @@ namespace Models.Functions
             if (phen.Zadok > 50 && ReachedZS50 == false)
             {
                 ReachedZS50 = true;
+
+                // Determin parameter value
+                Dictionary<string, List<double>> PoissonPara = DetermineLambda(PoissonParameter, DaysAtFlagLeaf, DaysAtZS50);
+                MeiosisLambda = PoissonPara["lambda"][0];
+
                 for (int i = 0; i < DaysAtZS50 - 1; i++)
                 {
                     // Probability of flag leaf fully emerged (liguale appears) of shoots/ spikes at the day in a population,
@@ -646,7 +766,7 @@ namespace Models.Functions
                     DailyMeioisFloretFertility = FrostFertilityToday * HeatFertilityToday;
 
                     // Cumulative floret fertility of the population
-                    CumMeiosisFertileFloretPerc += MeiosisFloretPercToday * DailyMeioisFloretFertility;
+                    FinalMeiosisFertileFloretPerc += MeiosisFloretPercToday * DailyMeioisFloretFertility;
                 }
             }
             #endregion
@@ -675,6 +795,9 @@ namespace Models.Functions
 
             if (phen.CurrentStageName == "StartGrainFill")
             {
+                Dictionary<string, List<double>> PoissonPara = DetermineLambda(PoissonParameter, DaysAtFlowering, DaysAtStartGrainFill);
+                FloweringLambda = PoissonPara["lambda"][0];
+
                 for (int i = 0; i < DaysAtStartGrainFill - 1; i++)
                 {
                     // Probability of spikes reaching heading at the day in a population, 
@@ -747,8 +870,8 @@ namespace Models.Functions
                     DailyFloweringFloretFertility.Add(FloweringFloretFertilityToday);
 
 
-                    CumFloweringFertileFloretPerc += FloweringFloretPercToday * FloweringFloretFertilityToday;
-                    CumFloweringFloretFertility += FloweringFloretFertilityToday;
+                    FinalFloweringFertileFloretPerc += FloweringFloretPercToday * FloweringFloretFertilityToday;
+                    FinalFloweringFloretFertility += FloweringFloretFertilityToday;
                 }
             }
             #endregion
@@ -756,7 +879,7 @@ namespace Models.Functions
             if (phen.Stage >= 9)
             {
                 // Floret fertility resulted from frost and heat damages on meiotic and flowering phases
-                FinalFertileFloretPerc = CumMeiosisFertileFloretPerc * CumFloweringFertileFloretPerc;
+                FinalFertileFloretPerc = FinalMeiosisFertileFloretPerc * FinalFloweringFertileFloretPerc;
 
                 // Apply the fertility on potential grain number to get the actual one
                 ActualGrainNumberPerArea = PotentialGrainNumberPerArea * FinalFertileFloretPerc;
