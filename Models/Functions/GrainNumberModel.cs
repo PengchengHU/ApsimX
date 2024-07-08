@@ -268,18 +268,18 @@ namespace Models.Functions
             return columnData;
         }
 
-        Dictionary<string, List<double>> DetermineLambda(Dictionary<string, List<double>> PoissonParameter, int RangeMid, int RangeEnd) 
+        static Dictionary<string, double> DetermineLambda(Dictionary<string, List<double>> PoissonParameter, int RangeMid, int RangeEnd) 
         {
 
             List<double> MidValue = PoissonParameter["mid"];
             List<double> EndValue = PoissonParameter["end"];
-            //List<double> LambdaValue = PoissonParameter["lambda"];
+            List<double> LambdaValue = PoissonParameter["lambda"];
 
-            List<double> Dist = new();
+            List<double> Dist = new List<double>();
             int ParameterIndex;
-            for (int i = 0; i < MidValue.Count; i++)
+            for (int i = 0; i < MidValue.Count - 1; i++)
             {
-                Dist.Add(Math.Sqrt(MidValue[i] - RangeMid) + Math.Sqrt(EndValue[i] - RangeEnd));
+                Dist.Add(Math.Pow(MidValue[i] - RangeMid, 2) + Math.Pow(EndValue[i] - RangeEnd, 2));
             }
 
             // Find the minimum value
@@ -308,11 +308,13 @@ namespace Models.Functions
                 ParameterIndex = MinIndices[0];
             }
 
-            // Get a slice of the dictionary
-            var res = PoissonParameter
-                .Skip(ParameterIndex - 1)  // Skip items before the start index
-                .Take(1)  // Take items from the start index to the end index (inclusive)
-                .ToDictionary(pair => pair.Key, pair => pair.Value);  // Convert back to a dictionary
+            // Create a dictionary
+            var res = new Dictionary<string, double>
+            {
+                { "mid", MidValue[ParameterIndex] },
+                { "end", EndValue[ParameterIndex] },
+                { "lambda", LambdaValue[ParameterIndex] }
+            };
 
             return res;
         }
@@ -575,6 +577,9 @@ namespace Models.Functions
         /// <summary>Bool for reaching ZS50</summary>
         bool ReachedZS50;
 
+        /// <summary>Bool for reaching start of grain filling</summary>
+        bool ReachedStartGrainFill;
+
         /// <summary>Days after ZS33</summary>
         public int DaysAfterZS50 { get; set; }
 
@@ -627,6 +632,7 @@ namespace Models.Functions
             DailyMeioisFloretFertility = 0;
             FinalMeiosisFertileFloretPerc = 0;
 
+            ReachedStartGrainFill = false;
             DailyFloweringSpikePerc = new List<double>();
             DailyFloweringFloretsOnSpikePerc = new List<double>();
             DailyFloweringFloretPerc = new List<double>();
@@ -726,8 +732,8 @@ namespace Models.Functions
                 ReachedZS50 = true;
 
                 // Determin parameter value
-                Dictionary<string, List<double>> PoissonPara = DetermineLambda(PoissonParameter, DaysAtFlagLeaf, DaysAtZS50);
-                MeiosisLambda = PoissonPara["lambda"][0];
+                Dictionary<string, double> PoissonPara = DetermineLambda(PoissonParameter, DaysAtFlagLeaf, DaysAtZS50);
+                MeiosisLambda = PoissonPara["lambda"];
 
                 for (int i = 0; i < DaysAtZS50 - 1; i++)
                 {
@@ -779,14 +785,19 @@ namespace Models.Functions
             // Step 5: Calculating the hourly floret fertility in response to high and cold temperature
             // Step 6: Calculating the hourly floret fertility in repsonse to high and cold temperature at the day in the population
 
-            if (phen.Zadok > 50 && phen.Zadok < 70)
+            if (phen.Zadok > 50 && ReachedStartGrainFill == false)
             {
                 DaysAfterZS50 = DaysAfterZS50 + 1;
                 if (phen.CurrentStageName == "Flowering")
                 {
                     DaysAtFlowering = DaysAfterZS50;
                 }
-                DaysAtStartGrainFill = DaysAfterZS50;
+
+                if (phen.CurrentStageName == "StartGrainFill")
+                {
+                    ReachedStartGrainFill = true;
+                    DaysAtStartGrainFill = DaysAfterZS50;
+                }
 
                 SunriseHour.Add((int)Math.Floor(Weather.CalculateSunRise()));
                 SunsetHour.Add((int)Math.Floor(Weather.CalculateSunSet()));
@@ -795,8 +806,8 @@ namespace Models.Functions
 
             if (phen.CurrentStageName == "StartGrainFill")
             {
-                Dictionary<string, List<double>> PoissonPara = DetermineLambda(PoissonParameter, DaysAtFlowering, DaysAtStartGrainFill);
-                FloweringLambda = PoissonPara["lambda"][0];
+                Dictionary<string, double> PoissonPara = DetermineLambda(PoissonParameter, DaysAtFlowering, DaysAtStartGrainFill);
+                FloweringLambda = PoissonPara["lambda"];
 
                 for (int i = 0; i < DaysAtStartGrainFill - 1; i++)
                 {
