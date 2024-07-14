@@ -6,6 +6,7 @@ using Models.PMF.Organs;
 using Models.Climate;
 using System.Reflection;
 using System.Collections.Generic;
+using static Models.Functions.FrostHeatDamageFunctions;
 
 namespace Models.Functions
 {
@@ -56,9 +57,15 @@ namespace Models.Functions
         /// <summary>Define the enum for crop types</summary>
         public enum CropTypes
         {
+            /// <summary>Please select crop type.</summary>
+            [Description("Please select the crop type")]
+            PleaseSelect,
+
             /// <summary>Wheat crop type.</summary>
+            [Description("Wheat")]
             Wheat,
             /// <summary>Canola crop type.</summary>
+            [Description("Canola")]
             Canola
         }
 
@@ -76,7 +83,7 @@ namespace Models.Functions
                 SetDefaultValues();
             }
         }
-        private CropTypes cropType;
+        private CropTypes cropType = CropTypes.PleaseSelect;
 
 
         /// <summary>Frost damage</summary>
@@ -204,6 +211,12 @@ namespace Models.Functions
         private readonly Dictionary<CropTypes, Dictionary<string, double>> cropDefaults = new Dictionary<CropTypes, Dictionary<string, double>>()
         {
             {
+                CropTypes.PleaseSelect, new Dictionary<string, double>()
+                {
+                    // No default values for PleaseSelect
+                }
+            },
+            {
                 CropTypes.Wheat, new Dictionary<string, double>()
                 {
                     { nameof(FrostLowTT), -4.0 },
@@ -247,10 +260,16 @@ namespace Models.Functions
             }
         };
 
+
         // Function to set default values using reflection
         private void SetDefaultValues()
         {
-            if (cropDefaults.TryGetValue(CropType, out var defaults))
+            if (cropType == CropTypes.PleaseSelect)
+            {
+                // Clear all values if crop type is "PleaseSelect"
+                ClearValues();
+            }
+            else if (cropDefaults.TryGetValue(CropType, out var defaults))
             {
                 Type thisType = this.GetType();
                 foreach (var kvp in defaults)
@@ -262,9 +281,24 @@ namespace Models.Functions
                     }
                 }
             }
-            else
+            //else
+            //{
+            //    throw new ArgumentException($"Unknown crop type: {CropType}");
+            //    // Clear all values if crop type is "PleaseSelect"
+            //    //ClearValues();
+            //}
+        }
+
+        // Function to clear all values
+        private void ClearValues()
+        {
+            var props = GetType().GetProperties(BindingFlags.Public | BindingFlags.Instance);
+            foreach (var prop in props)
             {
-                throw new ArgumentException($"Unknown crop type: {CropType}");
+                if (prop.CanWrite && prop.PropertyType == typeof(double))
+                {
+                    prop.SetValue(this, 0.0);
+                }
             }
         }
 
