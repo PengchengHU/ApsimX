@@ -227,22 +227,22 @@ namespace Models.Functions
             {
                 CropTypes.Canola, new Dictionary<string, double>()
                 {
-                    { nameof(FrostLowTT), -4.108862 },
-                    { nameof(FrostMaxReductionRatio), 0.3050003 },
-                    { nameof(FrostUpTT), -0.7549879 },
+                    { nameof(FrostLowTT), -4.76508 },
+                    { nameof(FrostMaxReductionRatio), 0.1332648 },
+                    { nameof(FrostUpTT), 1.002032 },
                     { nameof(FrostMinReductionRatio), 0 },
-                    { nameof(FrostStartSensitiveGS), 7.222864 },
-                    { nameof(FrostStartMostSensitiveGS), 7.329504 },
-                    { nameof(FrostEndMostSensitiveGS), 8.063452 },
-                    { nameof(FrostEndSensitiveGS), 8.181088 },
-                    { nameof(HeatLowTT), 27.45271 },
+                    { nameof(FrostStartSensitiveGS), 5.750795 },
+                    { nameof(FrostStartMostSensitiveGS), 8.874668 },
+                    { nameof(FrostEndMostSensitiveGS), 9.018017 },
+                    { nameof(FrostEndSensitiveGS), 9.13313 },
+                    { nameof(HeatLowTT), 30.59847 },
                     { nameof(HeatMinReductionRatio), 0 },
-                    { nameof(HeatUpTT), 38.8354 },
-                    { nameof(HeatMaxReductionRatio), 0.5810167 },
-                    { nameof(HeatStartSensitiveGS), 5.578273 },
-                    { nameof(HeatStartMostSensitiveGS), 6.260291 },
-                    { nameof(HeatEndMostSensitiveGS), 9.200536 },
-                    { nameof(HeatEndSensitiveGS), 9.428058 }
+                    { nameof(HeatUpTT), 35.50227 },
+                    { nameof(HeatMaxReductionRatio), 0.5810438 },
+                    { nameof(HeatStartSensitiveGS), 6.036363 },
+                    { nameof(HeatStartMostSensitiveGS), 7.160984 },
+                    { nameof(HeatEndMostSensitiveGS), 8.614249 },
+                    { nameof(HeatEndSensitiveGS), 10.0 }
                 }
             }
         };
@@ -414,7 +414,7 @@ namespace Models.Functions
 
             double GrowthStageToday = phen.Stage; ;
             //GrowthStageToday = phen.Zadok;
-            
+
             // Daily potential yield reduction ratio by a frost event
             FrostPotentialReductionRatio = FrostPotentialReductionRatioFun(Weather.MinT);
 
