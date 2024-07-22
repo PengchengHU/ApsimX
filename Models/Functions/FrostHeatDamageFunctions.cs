@@ -64,6 +64,7 @@ namespace Models.Functions
             /// <summary>Wheat crop type.</summary>
             [Description("Wheat")]
             Wheat,
+
             /// <summary>Canola crop type.</summary>
             [Description("Canola")]
             Canola
@@ -79,11 +80,20 @@ namespace Models.Functions
             get => cropType;
             set
             {
+                //cropType = value;
+                //SetDefaultValues();
                 cropType = value;
-                SetDefaultValues();
+                if (value != CropTypes.PleaseSelect)
+                {
+                    SetDefaultValues(value);
+                }
+                else
+                {
+                    ClearValues();
+                }
             }
         }
-        private CropTypes cropType = CropTypes.PleaseSelect;
+        private CropTypes cropType;
 
 
         /// <summary>Frost damage</summary>
@@ -211,12 +221,6 @@ namespace Models.Functions
         private readonly Dictionary<CropTypes, Dictionary<string, double>> cropDefaults = new Dictionary<CropTypes, Dictionary<string, double>>()
         {
             {
-                CropTypes.PleaseSelect, new Dictionary<string, double>()
-                {
-                    // No default values for PleaseSelect
-                }
-            },
-            {
                 CropTypes.Wheat, new Dictionary<string, double>()
                 {
                     { nameof(FrostLowTT), -4.0 },
@@ -262,7 +266,7 @@ namespace Models.Functions
 
 
         // Function to set default values using reflection
-        private void SetDefaultValues()
+        private void SetDefaultValues(CropTypes cropType)
         {
             if (cropType == CropTypes.PleaseSelect)
             {
@@ -281,12 +285,10 @@ namespace Models.Functions
                     }
                 }
             }
-            //else
-            //{
-            //    throw new ArgumentException($"Unknown crop type: {CropType}");
-            //    // Clear all values if crop type is "PleaseSelect"
-            //    //ClearValues();
-            //}
+            else
+            {
+                throw new ArgumentException($"Unknown crop type: {CropType}");
+            }
         }
 
         // Function to clear all values
