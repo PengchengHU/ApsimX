@@ -6,7 +6,6 @@ using Models.PMF.Organs;
 using Models.Climate;
 using System.Reflection;
 using System.Collections.Generic;
-using static Models.Functions.FrostHeatDamageFunctions;
 
 namespace Models.Functions
 {
@@ -57,14 +56,9 @@ namespace Models.Functions
         /// <summary>Define the enum for crop types</summary>
         public enum CropTypes
         {
-            /// <summary>Please select crop type.</summary>
-            [Description("Please select the crop type")]
-            PleaseSelect,
-
             /// <summary>Wheat crop type.</summary>
             [Description("Wheat")]
             Wheat,
-
             /// <summary>Canola crop type.</summary>
             [Description("Canola")]
             Canola
@@ -80,17 +74,8 @@ namespace Models.Functions
             get => cropType;
             set
             {
-                //cropType = value;
-                //SetDefaultValues();
                 cropType = value;
-                if (value != CropTypes.PleaseSelect)
-                {
-                    SetDefaultValues(value);
-                }
-                else
-                {
-                    ClearValues();
-                }
+                SetDefaultValues();
             }
         }
         private CropTypes cropType;
@@ -244,36 +229,30 @@ namespace Models.Functions
             {
                 CropTypes.Canola, new Dictionary<string, double>()
                 {
-                    { nameof(FrostLowTT), -4.76508 },
-                    { nameof(FrostMaxReductionRatio), 0.1332648 },
-                    { nameof(FrostUpTT), 1.002032 },
+                    { nameof(FrostLowTT), -4.108862 },
+                    { nameof(FrostMaxReductionRatio), 0.3050003 },
+                    { nameof(FrostUpTT), -0.7549879 },
                     { nameof(FrostMinReductionRatio), 0 },
-                    { nameof(FrostStartSensitiveGS), 5.750795 },
-                    { nameof(FrostStartMostSensitiveGS), 8.874668 },
-                    { nameof(FrostEndMostSensitiveGS), 9.018017 },
-                    { nameof(FrostEndSensitiveGS), 9.13313 },
-                    { nameof(HeatLowTT), 30.59847 },
+                    { nameof(FrostStartSensitiveGS), 7.222864 },
+                    { nameof(FrostStartMostSensitiveGS), 7.329504 },
+                    { nameof(FrostEndMostSensitiveGS), 8.063452 },
+                    { nameof(FrostEndSensitiveGS), 8.181088 },
+                    { nameof(HeatLowTT), 27.45271 },
                     { nameof(HeatMinReductionRatio), 0 },
-                    { nameof(HeatUpTT), 35.50227 },
-                    { nameof(HeatMaxReductionRatio), 0.5810438 },
-                    { nameof(HeatStartSensitiveGS), 6.036363 },
-                    { nameof(HeatStartMostSensitiveGS), 7.160984 },
-                    { nameof(HeatEndMostSensitiveGS), 8.614249 },
-                    { nameof(HeatEndSensitiveGS), 10.0 }
+                    { nameof(HeatUpTT), 38.8354 },
+                    { nameof(HeatMaxReductionRatio), 0.5810167 },
+                    { nameof(HeatStartSensitiveGS), 5.578273 },
+                    { nameof(HeatStartMostSensitiveGS), 6.260291 },
+                    { nameof(HeatEndMostSensitiveGS), 9.200536 },
+                    { nameof(HeatEndSensitiveGS), 9.428058 }
                 }
             }
         };
 
-
         // Function to set default values using reflection
-        private void SetDefaultValues(CropTypes cropType)
+        private void SetDefaultValues()
         {
-            if (cropType == CropTypes.PleaseSelect)
-            {
-                // Clear all values if crop type is "PleaseSelect"
-                ClearValues();
-            }
-            else if (cropDefaults.TryGetValue(CropType, out var defaults))
+            if (cropDefaults.TryGetValue(CropType, out var defaults))
             {
                 Type thisType = this.GetType();
                 foreach (var kvp in defaults)
@@ -288,19 +267,6 @@ namespace Models.Functions
             else
             {
                 throw new ArgumentException($"Unknown crop type: {CropType}");
-            }
-        }
-
-        // Function to clear all values
-        private void ClearValues()
-        {
-            var props = GetType().GetProperties(BindingFlags.Public | BindingFlags.Instance);
-            foreach (var prop in props)
-            {
-                if (prop.CanWrite && prop.PropertyType == typeof(double))
-                {
-                    prop.SetValue(this, 0.0);
-                }
             }
         }
 
@@ -448,7 +414,7 @@ namespace Models.Functions
             Phenology phen = (Phenology)zone.Get("[" + CropType + "].Phenology");
             ReproductiveOrgan organs = (ReproductiveOrgan)zone.Get("[" + CropType + "].Grain");
 
-            double GrowthStageToday = phen.Stage; ;
+            double GrowthStageToday = phen.Stage;
             //GrowthStageToday = phen.Zadok;
 
             // Daily potential yield reduction ratio by a frost event
