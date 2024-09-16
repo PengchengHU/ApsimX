@@ -30,7 +30,7 @@ namespace Models.Functions
 {
     /// <summary> Damage functions of frost and heat stress. </summary>
     [Serializable]
-    [Description("New grian number model considering reproductive biology and the effects of frost and heat stresses on grain number.")]
+    [Description("New grian number model considering reproductive and stress biology.")]
     [ViewName("UserInterface.Views.PropertyView")]
     [PresenterName("UserInterface.Presenters.PropertyPresenter")]
     [ValidParent(ParentType = typeof(Plant))]
@@ -696,7 +696,7 @@ namespace Models.Functions
             }
 
             // Calculating potential grain number per unit of area
-            PotentialGrainNumberPerArea = GrainsPerSpike * Plant.Population * (1 + stru.BranchNumber); // main shoot and tillers
+            PotentialGrainNumberPerArea = GrainsPerSpike * Plant.Population * (1 + stru.BranchNumber); // main shoot and tillers, may need to consider the difference between main stem and tillers
             #endregion
 
             #region Calculating floret fertility in response to frost and heat event on meiotic phase 
@@ -735,11 +735,11 @@ namespace Models.Functions
                 Dictionary<string, double> PoissonPara = DetermineLambda(PoissonParameter, DaysAtFlagLeaf, DaysAtZS50);
                 MeiosisLambda = PoissonPara["lambda"];
 
-                for (int i = 0; i < DaysAtZS50 - 1; i++)
+                for (int i = 0; i <= DaysAtZS50 - 1; i++)
                 {
                     // Probability of flag leaf fully emerged (liguale appears) of shoots/ spikes at the day in a population,
                     // which is a right-skewed Gamma distribution of Zadok stage from 33 (3rd node detectable) to 50 (first spikelet of spike just visible),
-                    // with the cumulative probability at ZS39 or ZS40 (50% of plants with fully emerged flag leaf) is 50%.
+                    // with the cumulative probability at ZS39 or ZS40 (50% of plants with fully emerged flag leaf) is 50%, i.e., cumulative probability reaches peak at ZS39.
                     // In APSIM, ZS is respectively interpolated based on the growth phases. For stages from ZS33 to ZS39, which are interpolated from GS5.9 (for ZS33) and GS6 (for ZS39).
                     // For stages from ZS39 to ZS55, which are interpoloated from from GS6 (for ZS39) and GS7 (for ZS55; Heading - Ear half emerged).
                     // It is reasonable to fit a curve with cumulative probility before ZS40 and after ZS40 equal to 50%.
@@ -809,7 +809,7 @@ namespace Models.Functions
                 Dictionary<string, double> PoissonPara = DetermineLambda(PoissonParameter, DaysAtFlowering, DaysAtStartGrainFill);
                 FloweringLambda = PoissonPara["lambda"];
 
-                for (int i = 0; i < DaysAtStartGrainFill - 1; i++)
+                for (int i = 0; i <= DaysAtStartGrainFill - 1; i++)
                 {
                     // Probability of spikes reaching heading at the day in a population, 
                     // which is a right-skewed Gamma distribution of Zadok stage from 50 (first spikelet of spike just visible) to 75 (early grain filling),
@@ -875,14 +875,14 @@ namespace Models.Functions
                     //double FloretFertilityFrostToday = FloweringFloretPercToday * DailyFertilityFrost;
                     DailyFloweringFloretFertilityFrost.Add(FloweringFloretFertilityFrostToday);
 
-                    // Flowering floret fertility in the population in in response to frost and heat stress the day
+                    // Flowering floret fertility in the population in response to frost and heat stress the day
                     double FloweringFloretFertilityToday = FloweringFloretFertilityHeatToday * FloweringFloretFertilityFrostToday;
                     DailyFloweringFertileFloretPerc.Add(FloweringFloretPercToday * FloweringFloretFertilityToday);
                     DailyFloweringFloretFertility.Add(FloweringFloretFertilityToday);
 
 
                     FinalFloweringFertileFloretPerc += FloweringFloretPercToday * FloweringFloretFertilityToday;
-                    FinalFloweringFloretFertility += FloweringFloretFertilityToday;
+                    FinalFloweringFloretFertility *= FloweringFloretFertilityToday;
                 }
             }
             #endregion
