@@ -620,10 +620,13 @@ namespace Models.Functions
             FertileFloretsPerSpike = 0;
             GrainsPerSpike = 0;
             PotentialGrainNumberPerArea = 0;
+            ActualGrainNumberPerArea = 0;
 
             HourlyTemp = new List<double>();
             
             ReachedZS50 = false;
+            DaysAfterZS33 = 0;
+            DaysAtZS50 = 0;
             DailyEmergedFlagLeafPerc = new List<double>();
             DailyMeiosisFloretsOnSpikePerc = new List<double>();
             DailyMeiosisFloretPerc = new List<double>();
@@ -633,6 +636,9 @@ namespace Models.Functions
             FinalMeiosisFertileFloretPerc = 0;
 
             ReachedStartGrainFill = false;
+            DaysAfterZS50 = 0;
+            DaysAtFlowering = 0;
+            DaysAtStartGrainFill = 0;
             DailyFloweringSpikePerc = new List<double>();
             DailyFloweringFloretsOnSpikePerc = new List<double>();
             DailyFloweringFloretPerc = new List<double>();
@@ -875,7 +881,7 @@ namespace Models.Functions
                     //double FloretFertilityFrostToday = FloweringFloretPercToday * DailyFertilityFrost;
                     DailyFloweringFloretFertilityFrost.Add(FloweringFloretFertilityFrostToday);
 
-                    // Flowering floret fertility in the population in response to frost and heat stress the day
+                    // Flowering floret fertility in the population in response to frost and heat stress of the day
                     double FloweringFloretFertilityToday = FloweringFloretFertilityHeatToday * FloweringFloretFertilityFrostToday;
                     DailyFloweringFertileFloretPerc.Add(FloweringFloretPercToday * FloweringFloretFertilityToday);
                     DailyFloweringFloretFertility.Add(FloweringFloretFertilityToday);
