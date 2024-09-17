@@ -25,6 +25,7 @@ using ExcelDataReader;
 using System.IO;
 using System.Collections;
 using DocumentFormat.OpenXml.Drawing.Charts;
+using Models.CLEM;
 
 namespace Models.Functions
 {
@@ -567,7 +568,7 @@ namespace Models.Functions
         const double MeiosisStddev = 1;
 
         /// <summary>The lambda parameter for poisson distribution of flag leaf emerged</summary>
-        double MeiosisLambda = 8.655686;
+        public double MeiosisLambda { get; set; }
 
         /// <summary>Days after ZS33</summary>
         public int DaysAfterZS33 { get; set; }
@@ -593,7 +594,8 @@ namespace Models.Functions
         /// <summary>Days after ZS33 for the stage of start of grian filling</summary>
         public int DaysAtStartGrainFill { get; set; }
 
-        double FloweringLambda = 6;
+        /// <summary>The lambda parameter for poisson distribution of flowering date</summary>
+        public double FloweringLambda { get; set; }
         const double FloretFloweringDateMean = 2.5;
         const double FloretFloweringDateStddev = 1;        
 
@@ -610,6 +612,15 @@ namespace Models.Functions
         Dictionary<string, List<double>> PoissonParameter;
 
         #endregion
+
+        [EventSubscribe("StartOfSimulation")]
+        private void OnStartOfSimulation(object sender, EventArgs e)
+        {
+            PoissonParameter = ReadPoissonParameter("./PoissonParameters.csv");
+            if (PoissonParameter == null)
+                throw new Exception("Data for Poisson parameter does not appear to be any data.");
+        }
+
 
         [EventSubscribe("Sowing")]
         private void OnDoSowing(object sender, EventArgs e)
@@ -656,10 +667,6 @@ namespace Models.Functions
             FinalFloweringFertileFloretPerc = 0;
 
             FinalFertileFloretPerc = 0;
-
-            PoissonParameter = ReadPoissonParameter("./PoissonParameters.csv");
-            if (PoissonParameter == null)
-                throw new Exception("Data for Poisson parameter does not appear to be any data.");
         }
                
 
