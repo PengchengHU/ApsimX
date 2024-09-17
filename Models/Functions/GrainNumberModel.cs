@@ -216,55 +216,59 @@ namespace Models.Functions
             return (Fertility);
         }
 
+        
         static Dictionary<string, List<double>> ReadPoissonParameter(string filePath)
         {
             // Create a dictionary to hold the column data as lists of doubles
             var columnData = new Dictionary<string, List<double>>();
 
-            // Register the ExcelDataReader (required to use the library)
-            System.Text.Encoding.RegisterProvider(System.Text.CodePagesEncodingProvider.Instance);
-
-            // Open the Excel file
-            using (var stream = File.Open(filePath, FileMode.Open, FileAccess.Read))
+            try
             {
-                using (var reader = ExcelReaderFactory.CreateReader(stream))
+                // Read all lines from the CSV file
+                string[] lines = File.ReadAllLines(filePath);
+
+                if (lines.Length > 0)
                 {
-                    // Convert the data to a DataSet
-                    var result = reader.AsDataSet();
+                    // Get the headers from the first line
+                    string[] headers = lines[0].Split(',');
 
-                    // Assuming the first worksheet
-                    var dataTable = result.Tables[0];
-
-                    // Get the number of columns in the worksheet
-                    int columnCount = dataTable.Columns.Count;
-
-                    // Iterate over each column
-                    for (int col = 0; col < columnCount; col++)
+                    // Initialize the dictionary with empty lists for each column
+                    foreach (string header in headers)
                     {
-                        // Get the column header
-                        string columnName = dataTable.Rows[0][col].ToString();
+                        columnData[header] = new List<double>();
+                    }
 
-                        // Create a list to hold the column values
-                        var columnList = new List<double>();
+                    // Process each row of data
+                    for (int row = 1; row < lines.Length; row++)
+                    {
+                        string[] values = lines[row].Split(',');
 
-                        // Iterate over each row in the column, starting from the second row
-                        for (int row = 1; row < dataTable.Rows.Count; row++)
+                        if (values.Length == headers.Length)
                         {
-                            if (double.TryParse(dataTable.Rows[row][col].ToString(), out double cellValue))
+                            for (int col = 0; col < headers.Length; col++)
                             {
-                                columnList.Add(cellValue);
-                            }
-                            else
-                            {
-                                Console.WriteLine($"Warning: Unable to convert cell value '{dataTable.Rows[row][col]}' in column '{columnName}' to double.");
+                                if (double.TryParse(values[col], out double cellValue))
+                                {
+                                    columnData[headers[col]].Add(cellValue);
+                                }
+                                else
+                                {
+                                    Console.WriteLine($"Warning: Unable to convert cell value '{values[col]}' in column '{headers[col]}' to double. Row: {row + 1}");
+                                }
                             }
                         }
-
-                        // Add the list to the dictionary
-                        columnData[columnName] = columnList;
+                        else
+                        {
+                            Console.WriteLine($"Warning: Skipping row {row + 1} due to incorrect number of values.");
+                        }
                     }
                 }
             }
+            catch (Exception ex)
+            {
+                Console.WriteLine($"An error occurred while reading the CSV file: {ex.Message}");
+            }
+
             return columnData;
         }
 
@@ -653,7 +657,7 @@ namespace Models.Functions
 
             FinalFertileFloretPerc = 0;
 
-            PoissonParameter = ReadPoissonParameter("./PoissonParameters.xlsx");
+            PoissonParameter = ReadPoissonParameter("./PoissonParameters.csv");
             if (PoissonParameter == null)
                 throw new Exception("Data for Poisson parameter does not appear to be any data.");
         }
