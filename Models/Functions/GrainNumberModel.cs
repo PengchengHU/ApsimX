@@ -425,7 +425,7 @@ namespace Models.Functions
         /// <summary>High temperature inducing 50% of flowering florets sterility in logistic function</summary>
         [Description("High temperature inducing 50% of flowering florets sterility in logistic function")]
         // Normally > 30 oC
-        public double FloweringHalfKillHeatTemp { get; set; }
+        public double FloweringHeatHalfKillTemp { get; set; }
 
         /// <summary>Kill factor to control shape of logistic curve of heat damage </summary>
         [Description("Factor controlling shape of logistic curve of heat damage on flowering florets")]
@@ -484,18 +484,12 @@ namespace Models.Functions
         //public double DailyMeiosisFloretFertilityFrost { get; set; }
         public List<double> DailyMeiosisFloretFertilityFrost { get; set; }
 
-        /// <summary>Caumulative floret fertilities in the population as affected by frost stress at meiosis</summary>
-        public double CumMeiosisFloretFertilityFrost { get; set; }
-
         /// <summary>Daily floret fertilities in the population as affected by heat stress at meiosis</summary>
         //public double DailyMeiosisFloretFertilityHeat { get; set; }
         public List<double> DailyMeiosisFloretFertilityHeat { get; set; }
 
-        /// <summary>Cumulative floret fertilities in the population as affected by heat stress at meiosis</summary>
-        public double CumMeiosisFloretFertilityHeat { get; set; }
-
         /// <summary>Daily floret fertility induced by frost and heat at meiosis</summary>
-        public double DailyMeioisFloretFertility { get; set; }
+        public List<double> DailyMeiosisFloretFertility { get; set; }
 
         /// <summary>Cumulative floret fertilities in the population during meiotic phase</summary>
         public double FinalMeiosisFertileFloretPerc { get; set; }
@@ -609,6 +603,9 @@ namespace Models.Functions
         List<int> SunriseHour = new List<int>();
         List<int> SunsetHour = new List<int>();
 
+        List<double> DailyFrostDegreeHours = new List<double>();
+        List<double> DailyHeatDegreeHours = new List<double>();
+
         Dictionary<string, List<double>> PoissonParameter;
 
         #endregion
@@ -647,7 +644,7 @@ namespace Models.Functions
             DailyMeiosisFloretPerc = new List<double>();
             DailyMeiosisFloretFertilityFrost = new List<double>();
             DailyMeiosisFloretFertilityHeat = new List<double>();
-            DailyMeioisFloretFertility = 0;
+            DailyMeiosisFloretFertility = new List<double>();
             FinalMeiosisFertileFloretPerc = 0;
 
             ReachedStartGrainFill = false;
@@ -762,34 +759,35 @@ namespace Models.Functions
                     // It is reasonable to fit a curve with cumulative probility before ZS40 and after ZS40 equal to 50%.
                     // Here we calculate the cumulative forst or heat degree hours of a day as it is assumed that the meiosis of floret will last for a day to finish.
 
-                    //DailyEmergedFlagLeafPerc = GammaDistributor(MeiosisShape, MeiosisRate, phen.Zadok - 33);
-                    DailyEmergedFlagLeafPerc.Add(PoissionDistributor(MeiosisLambda, i + 1));
+                    double EmergedFlagLeafPercToday = PoissionDistributor(MeiosisLambda, i + 1);
+                    DailyEmergedFlagLeafPerc.Add(EmergedFlagLeafPercToday);
 
                     // Probability of florets at the meiosis date on a spike
-                    //DailyMeiosisFloretsOnSpikePerc = NormalDistributor(FloretMeiosisDateMean, FloretMeiosisDateStddev, DaysAfterFlagLeafTip);
-                    DailyMeiosisFloretsOnSpikePerc.Add(NormalDistributor(MeiosisMean, MeiosisStddev, i + 1)); // mean +- 2sd ~ 95%
+                    double MeiosisFloretsOnSpikePercToday = NormalDistributor(MeiosisMean, MeiosisStddev, i + 1); // mean +- 2sd ~ 95%
+                    DailyMeiosisFloretsOnSpikePerc.Add(MeiosisFloretsOnSpikePercToday); 
 
                     // Probability of florets at the meiotic phase among the population  
-                    //DailyMeiosisFloretPerc = DailyEmergedFlagLeafPerc * DailyMeiosisFloretsOnSpikePerc;
                     double MeiosisFloretPercToday = IntegrateProduct(i + 1, MeiosisLambda, MeiosisMean, MeiosisStddev);
                     DailyMeiosisFloretPerc.Add(MeiosisFloretPercToday);
 
-
                     // Floret fertility in response to frost stress on the meiosis date
                     HourlyTemp = HourlyTemperature(DayLength[i], MinT[i], MaxT[i], YesterdayMaxT[i], TomorrowMinT[i], Sunrise[i], Sunset[i]);
-                    double DegreeHours = FrostDegreeHours(FrostCriticalTemp, HourlyTemp);
-                    double FrostFertilityToday = MeioticFloretFertility(DegreeHours, MeiosisHalfKillFrostDegreeHours, MeiosisFrostKillFactor);
+                    double FrostDegreeHoursToday = FrostDegreeHours(FrostCriticalTemp, HourlyTemp);
+                    DailyFrostDegreeHours.Add(FrostDegreeHoursToday);
+                    double FrostFertilityToday = MeioticFloretFertility(FrostDegreeHoursToday, MeiosisHalfKillFrostDegreeHours, MeiosisFrostKillFactor);
                     DailyMeiosisFloretFertilityFrost.Add(FrostFertilityToday);
                     
                     // Floret fertility in response to heat stress on the meiosis date
-                    DegreeHours = HeatDegreeHours(HeatCriticalTemp, HourlyTemp);
-                    double HeatFertilityToday = MeioticFloretFertility(DegreeHours, MeiosisHalfKillHeatDegreeHours, MeiosisHeatKillFactor);
+                    double HeatDegreeHoursToday = HeatDegreeHours(HeatCriticalTemp, HourlyTemp);
+                    DailyHeatDegreeHours.Add(HeatDegreeHoursToday);
+                    double HeatFertilityToday = MeioticFloretFertility(HeatDegreeHoursToday, MeiosisHalfKillHeatDegreeHours, MeiosisHeatKillFactor);
                     DailyMeiosisFloretFertilityHeat.Add(HeatFertilityToday);
 
-                    DailyMeioisFloretFertility = FrostFertilityToday * HeatFertilityToday;
+                    double MeioisFloretFertilityToday = FrostFertilityToday * HeatFertilityToday;
+                    DailyMeiosisFloretFertility.Add(MeioisFloretFertilityToday); 
 
                     // Cumulative floret fertility of the population
-                    FinalMeiosisFertileFloretPerc += MeiosisFloretPercToday * DailyMeioisFloretFertility;
+                    FinalMeiosisFertileFloretPerc += MeiosisFloretPercToday * MeioisFloretFertilityToday;
                 }
             }
             #endregion
@@ -837,23 +835,23 @@ namespace Models.Functions
                     // It is assumed that the flowering in in a population is initiated at ZS50 (first spikelet of spike just visible) and stopped at ZS75 (early grain filliing)
                     // Here we calculate the cumulative forst or heat degree hours of a day as it is assumed that the meiosis of floret will last for a day to finish.
 
-                    //DailyHeadingSpikeFreq = GammaDistributor(2.632749, 0.3842951, phen.Zadok - 49);
-                    // DailyFloweringSpikePerc.Add(BetaDistributor(3.172469, 1.645674, i + 1));
-                    DailyFloweringSpikePerc.Add(PoissionDistributor(FloweringLambda, i + 1));
+                    double FloweringSpikePercToday = PoissionDistributor(FloweringLambda, i + 1);
+                    DailyFloweringSpikePerc.Add(FloweringSpikePercToday);
 
                     // Probability of flowering florets on a spike
-                    DailyFloweringFloretsOnSpikePerc.Add(NormalDistributor(FloretFloweringDateMean, FloretFloweringDateStddev, i + 1));
+                    double FloweringFloretsOnSpikePercToday = NormalDistributor(FloretFloweringDateMean, FloretFloweringDateStddev, i + 1);
+                    DailyFloweringFloretsOnSpikePerc.Add(FloweringFloretsOnSpikePercToday);
 
-                    // Probability of florets flowering among the population  
+                    // Probability of florets flowering in the population  
                     double FloweringFloretPercToday = IntegrateProduct(i + 1, FloweringLambda, FloretFloweringDateMean, FloretFloweringDateStddev);
                     DailyFloweringFloretPerc.Add(FloweringFloretPercToday);
 
+                    // Flowering floret fertility in the population in response to heat stress on an hour of a day
                     DayHourFloweringFloretFreq = new List<double>();
                     DayHourFloweringFertileFloretPercHeat = new List<double>();
                     double HourlyFloweringFloretPerc;
                     double HourlyFloweringFloretsFertilityHeat;             
-
-                    // Flowering floret fertility in the population in response to heat stress on an hour of a day
+                    
                     for (int Th = SunriseHour[i]; Th <= SunsetHour[i]; Th++)
                     {
                         // Probability of florets that flower at the hour
@@ -864,10 +862,11 @@ namespace Models.Functions
                         DayHourFloweringFloretFreq.Add(FloweringFloretPercTodayHour);
 
                         // Hourly floret fertility in reponse to high temperature
-                        HourlyFloweringFloretsFertilityHeat = FloweringFloretFertility("Heat", HourlyTemp[Th], FloweringHalfKillHeatTemp, FloweringHeatKillFactor);
+                        HourlyFloweringFloretsFertilityHeat = FloweringFloretFertility("Heat", HourlyTemp[Th], FloweringHeatHalfKillTemp, FloweringHeatKillFactor);
 
                         // Hourly fertility of flowering florets in repsonse to high temperature at the day in the population  
-                        DayHourFloweringFertileFloretPercHeat.Add(FloweringFloretPercTodayHour * HourlyFloweringFloretsFertilityHeat);
+                        double FloweringFertileFloretPercHeatTodayHour = FloweringFloretPercTodayHour * HourlyFloweringFloretsFertilityHeat;
+                        DayHourFloweringFertileFloretPercHeat.Add(FloweringFertileFloretPercHeatTodayHour);
                     }
 
                     // Cumulative floret fertility of the population at the day
@@ -877,9 +876,7 @@ namespace Models.Functions
                     DailyFloweringFloretFertilityHeat.Add(FloweringFloretFertilityHeatToday);
 
                     // Flowering floret fertility in the population in response to frost stress on an hour of a day
-                    // Sequence of night hours
-                    //int[] NightHours = Enumerable.Range(0, SunriseHour - 1).Concat(Enumerable.Range(SunsetHour + 1, 23)).ToArray();
-                    double FrostFloweringFloretsFertilityHour;
+                    double FrostFloweringFloretsFertilityHour = 1;
                     double FloweringFloretFertilityFrostToday = 1;
                     for (int Th = 0; Th <= 23; Th++)
                     {
@@ -889,16 +886,16 @@ namespace Models.Functions
                     }
 
                     // Cumulative floret fertility of the population at the day
-                    //double FloretFertilityFrostToday = FloweringFloretPercToday * DailyFertilityFrost;
                     DailyFloweringFloretFertilityFrost.Add(FloweringFloretFertilityFrostToday);
 
                     // Flowering floret fertility in the population in response to frost and heat stress of the day
                     double FloweringFloretFertilityToday = FloweringFloretFertilityHeatToday * FloweringFloretFertilityFrostToday;
-                    DailyFloweringFertileFloretPerc.Add(FloweringFloretPercToday * FloweringFloretFertilityToday);
                     DailyFloweringFloretFertility.Add(FloweringFloretFertilityToday);
+                    double FloweringFertileFloretPercToday = FloweringFloretPercToday * FloweringFloretFertilityToday;
+                    DailyFloweringFertileFloretPerc.Add(FloweringFertileFloretPercToday);                    
 
 
-                    FinalFloweringFertileFloretPerc += FloweringFloretPercToday * FloweringFloretFertilityToday;
+                    FinalFloweringFertileFloretPerc += FloweringFertileFloretPercToday;
                     FinalFloweringFloretFertility *= FloweringFloretFertilityToday;
                 }
             }
