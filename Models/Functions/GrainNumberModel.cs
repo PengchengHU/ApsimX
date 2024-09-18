@@ -443,9 +443,6 @@ namespace Models.Functions
         #endregion
 
         #region Output variables
-        /// <summary>Hourly temperature</summary>
-        public List<double> HourlyTemp { get; set; }
-
         /// <summary>Number of spikelet primordia per spike</summary>
         public double SpikeletPrimordiaPerSpike { get; set; }
 
@@ -593,15 +590,26 @@ namespace Models.Functions
         const double FloretFloweringDateMean = 2.5;
         const double FloretFloweringDateStddev = 1;        
 
-        List<double> MinT = new List<double>();
-        List<double> MaxT = new List<double>();
-        List<double> YesterdayMaxT = new List<double>();
-        List<double> TomorrowMinT = new List<double>();
-        List<double> Sunrise = new List<double>();
-        List<double> Sunset = new List<double>();
-        List<double> DayLength = new List<double>();
+        List<double> MinTFL = new List<double>();
+        List<double> MaxTFL = new List<double>();
+        List<double> YesterdayMaxTFL = new List<double>();
+        List<double> TomorrowMinTFL = new List<double>();
+        List<double> SunriseFL = new List<double>();
+        List<double> SunsetFL = new List<double>();
+        List<double> DayLengthFL = new List<double>();
+        List<double> HourlyTempFL = new List<double>();
+
+        List<double> MinTAN = new List<double>();
+        List<double> MaxTAN = new List<double>();
+        List<double> YesterdayMaxTAN = new List<double>();
+        List<double> TomorrowMinTAN = new List<double>();
+        List<double> SunriseAN = new List<double>();
+        List<double> SunsetAN = new List<double>();
+        List<double> DayLengthAN = new List<double>();
         List<int> SunriseHour = new List<int>();
         List<int> SunsetHour = new List<int>();
+        List<double> HourlyTempAN = new List<double>();
+
 
         List<double> DailyFrostDegreeHours = new List<double>();
         List<double> DailyHeatDegreeHours = new List<double>();
@@ -633,8 +641,6 @@ namespace Models.Functions
             GrainsPerSpike = 0;
             PotentialGrainNumberPerArea = 0;
             ActualGrainNumberPerArea = 0;
-
-            HourlyTemp = new List<double>();
             
             ReachedZS50 = false;
             DaysAfterZS33 = 0;
@@ -729,15 +735,15 @@ namespace Models.Functions
                 }
                 DaysAtZS50 = DaysAfterZS33;
 
-                DayLength.Add(Weather.CalculateDayLength(-6));
-                MinT.Add(Weather.MinT);
-                MaxT.Add(Weather.MaxT);
+                DayLengthFL.Add(Weather.CalculateDayLength(-6));
+                MinTFL.Add(Weather.MinT);
+                MaxTFL.Add(Weather.MaxT);
                 double tmp = (Weather.YesterdaysMetData == null) ? Weather.MaxT : Weather.YesterdaysMetData.MaxT;
-                YesterdayMaxT.Add(tmp);
+                YesterdayMaxTFL.Add(tmp);
                 tmp = (Weather.TomorrowsMetData == null) ? Weather.MinT : Weather.TomorrowsMetData.MinT;
-                TomorrowMinT.Add(tmp);
-                Sunrise.Add(Weather.CalculateSunRise());
-                Sunset.Add(Weather.CalculateSunSet());
+                TomorrowMinTFL.Add(tmp);
+                SunriseFL.Add(Weather.CalculateSunRise());
+                SunsetFL.Add(Weather.CalculateSunSet());
             }
             
 
@@ -771,14 +777,14 @@ namespace Models.Functions
                     DailyMeiosisFloretPerc.Add(MeiosisFloretPercToday);
 
                     // Floret fertility in response to frost stress on the meiosis date
-                    HourlyTemp = HourlyTemperature(DayLength[i], MinT[i], MaxT[i], YesterdayMaxT[i], TomorrowMinT[i], Sunrise[i], Sunset[i]);
-                    double FrostDegreeHoursToday = FrostDegreeHours(FrostCriticalTemp, HourlyTemp);
+                    HourlyTempFL = HourlyTemperature(DayLengthFL[i], MinTFL[i], MaxTFL[i], YesterdayMaxTFL[i], TomorrowMinTFL[i], SunriseFL[i], SunsetFL[i]);
+                    double FrostDegreeHoursToday = FrostDegreeHours(FrostCriticalTemp, HourlyTempFL);
                     DailyFrostDegreeHours.Add(FrostDegreeHoursToday);
                     double FrostFertilityToday = MeioticFloretFertility(FrostDegreeHoursToday, MeiosisHalfKillFrostDegreeHours, MeiosisFrostKillFactor);
                     DailyMeiosisFloretFertilityFrost.Add(FrostFertilityToday);
                     
                     // Floret fertility in response to heat stress on the meiosis date
-                    double HeatDegreeHoursToday = HeatDegreeHours(HeatCriticalTemp, HourlyTemp);
+                    double HeatDegreeHoursToday = HeatDegreeHours(HeatCriticalTemp, HourlyTempFL);
                     DailyHeatDegreeHours.Add(HeatDegreeHoursToday);
                     double HeatFertilityToday = MeioticFloretFertility(HeatDegreeHoursToday, MeiosisHalfKillHeatDegreeHours, MeiosisHeatKillFactor);
                     DailyMeiosisFloretFertilityHeat.Add(HeatFertilityToday);
@@ -802,6 +808,19 @@ namespace Models.Functions
 
             if (phen.Zadok > 50 && ReachedStartGrainFill == false)
             {
+                DayLengthAN.Add(Weather.CalculateDayLength(-6));
+                MinTAN.Add(Weather.MinT);
+                MaxTAN.Add(Weather.MaxT);
+                double tmp = (Weather.YesterdaysMetData == null) ? Weather.MaxT : Weather.YesterdaysMetData.MaxT;
+                YesterdayMaxTAN.Add(tmp);
+                tmp = (Weather.TomorrowsMetData == null) ? Weather.MinT : Weather.TomorrowsMetData.MinT;
+                TomorrowMinTAN.Add(tmp);
+                SunriseAN.Add(Weather.CalculateSunRise());
+                SunsetAN.Add(Weather.CalculateSunSet());
+                
+                SunriseHour.Add((int)Math.Floor(Weather.CalculateSunRise()));
+                SunsetHour.Add((int)Math.Floor(Weather.CalculateSunSet()));
+
                 DaysAfterZS50 = DaysAfterZS50 + 1;
                 if (phen.CurrentStageName == "Flowering")
                 {
@@ -813,9 +832,6 @@ namespace Models.Functions
                     ReachedStartGrainFill = true;
                     DaysAtStartGrainFill = DaysAfterZS50;
                 }
-
-                SunriseHour.Add((int)Math.Floor(Weather.CalculateSunRise()));
-                SunsetHour.Add((int)Math.Floor(Weather.CalculateSunSet()));
             }
 
 
@@ -850,8 +866,9 @@ namespace Models.Functions
                     DayHourFloweringFloretFreq = new List<double>();
                     DayHourFloweringFertileFloretPercHeat = new List<double>();
                     double HourlyFloweringFloretPerc;
-                    double HourlyFloweringFloretsFertilityHeat;             
-                    
+                    double HourlyFloweringFloretsFertilityHeat;
+
+                    HourlyTempAN = HourlyTemperature(DayLengthAN[i], MinTAN[i], MaxTAN[i], YesterdayMaxTAN[i], TomorrowMinTAN[i], SunriseAN[i], SunsetAN[i]);
                     for (int Th = SunriseHour[i]; Th <= SunsetHour[i]; Th++)
                     {
                         // Probability of florets that flower at the hour
@@ -862,7 +879,7 @@ namespace Models.Functions
                         DayHourFloweringFloretFreq.Add(FloweringFloretPercTodayHour);
 
                         // Hourly floret fertility in reponse to high temperature
-                        HourlyFloweringFloretsFertilityHeat = FloweringFloretFertility("Heat", HourlyTemp[Th], FloweringHeatHalfKillTemp, FloweringHeatKillFactor);
+                        HourlyFloweringFloretsFertilityHeat = FloweringFloretFertility("Heat", HourlyTempAN[Th], FloweringHeatHalfKillTemp, FloweringHeatKillFactor);
 
                         // Hourly fertility of flowering florets in repsonse to high temperature at the day in the population  
                         double FloweringFertileFloretPercHeatTodayHour = FloweringFloretPercTodayHour * HourlyFloweringFloretsFertilityHeat;
@@ -881,7 +898,7 @@ namespace Models.Functions
                     for (int Th = 0; Th <= 23; Th++)
                     {
                         // Hourly floret fertility in reponse to cold temperature
-                        FrostFloweringFloretsFertilityHour = FloweringFloretFertility("Frost", HourlyTemp[Th], FloweringFrostHalfKillTemp, FloweringFrostKillFactor);
+                        FrostFloweringFloretsFertilityHour = FloweringFloretFertility("Frost", HourlyTempAN[Th], FloweringFrostHalfKillTemp, FloweringFrostKillFactor);
                         FloweringFloretFertilityFrostToday *= FrostFloweringFloretsFertilityHour;
                     }
 
