@@ -336,7 +336,7 @@ namespace Models.Functions
         public double SpikeletPrimordiaPlastochron { get; set; }
 
         /// <summary>The number of floret primordia on proximal spikelets (third-fifth spikelet from the basal) </summary>
-        [Description("The number of floret primordia on proximal spikelet")]
+        [Description("The number of floret primordia on proximal spikelets")]
         // Normally 6-8
         public int FloretPrimordiaNoProximal { get; set; }
 
@@ -346,7 +346,7 @@ namespace Models.Functions
         public int FloretPrimordiaNoCentral { get; set; }
 
         /// <summary>The number of floret primordia on distal spikelets (third-fifth spikelet from the apical)</summary>
-        [Description("The number of floret primordia on apical spikelet")]
+        [Description("The number of floret primordia on apical spikelets")]
         // Normally 6-8
         public int FloretPrimordiaNoApical { get; set; }
 
