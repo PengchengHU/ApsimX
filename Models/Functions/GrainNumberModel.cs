@@ -534,7 +534,6 @@ namespace Models.Functions
         /// <summary>Bool for reaching terminal spikelet stage</summary>
         bool ReachedTerminalSpikeletStage;
 
-
         /// <summary>The shape parameter for gamma distribution of flag leaf</summary>
         const double MeiosisShape = 9.99994;
 
