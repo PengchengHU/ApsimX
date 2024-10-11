@@ -26,6 +26,8 @@ using System.IO;
 using System.Collections;
 using DocumentFormat.OpenXml.Drawing.Charts;
 using Models.CLEM;
+using DocumentFormat.OpenXml.Office2016.Drawing.ChartDrawing;
+using SixLabors.ImageSharp;
 
 namespace Models.Functions
 {
@@ -335,25 +337,25 @@ namespace Models.Functions
         // [Units("oCd/spikelet")]
         public double SpikeletPrimordiaPlastochron { get; set; }
 
-        /// <summary>The number of floret primordia on proximal spikelets (third-fifth spikelet from the basal) </summary>
-        [Description("The number of floret primordia on proximal spikelets")]
+        ///// <summary>The number of floret primordia on proximal spikelets (third-fifth spikelet from the basal) </summary>
+        //[Description("The number of floret primordia on proximal spikelets")]
         // Normally 6-8
-        public int FloretPrimordiaNoProximal { get; set; }
+        //public int FloretPrimordiaNoProximal { get; set; }
 
-        /// <summary>The number of floret primordia on central spikelets (middle spikelets)</summary>
-        [Description("The number of floret primordia on central spikelets")]
+        ///// <summary>The number of floret primordia on central spikelets (middle spikelets)</summary>
+        //[Description("The number of floret primordia on central spikelets")]
         // Normally 8-12
-        public int FloretPrimordiaNoCentral { get; set; }
+        //public int FloretPrimordiaNoCentral { get; set; }
 
-        /// <summary>The number of floret primordia on distal spikelets (third-fifth spikelet from the apical)</summary>
-        [Description("The number of floret primordia on apical spikelets")]
+        ///// <summary>The number of floret primordia on distal spikelets (third-fifth spikelet from the apical)</summary>
+        //[Description("The number of floret primordia on apical spikelets")]
         // Normally 6-8
-        public int FloretPrimordiaNoApical { get; set; }
+        //public int FloretPrimordiaNoApical { get; set; }
 
-        /// <summary>Floret fertility accounting for floret survival to reach fertile floret stage</summary>
-        [Description("Floret fertility rate")]
+        ///// <summary>Floret fertility accounting for floret survival to reach fertile floret stage</summary>
+        //[Description("Floret fertility rate")]
         // Normally < 0.5
-        public double FloretFertilityRate { get; set; } // may need to consider the resource availibility, e.g., fruiting efficiency 
+        //public double FloretFertilityRate { get; set; } // may need to consider the resource availibility, e.g., fruiting efficiency 
 
         /// <summary>Grain abortion accounting for fertilized florets obort</summary>
         [Description("Grain abortion rate")]
@@ -446,11 +448,14 @@ namespace Models.Functions
         /// <summary>Number of spikelet primordia per spike</summary>
         public double SpikeletPrimordiaPerSpike { get; set; }
 
-        /// <summary>Number of floret primordia per spike</summary>
-        public double FloretPrimordiaPerSpike { get; set; }
+        ///// <summary>Number of floret primordia per spike</summary>
+        //public double FloretPrimordiaPerSpike { get; set; }
 
         /// <summary>Number of fertile florets per spike</summary>
         public double FertileFloretsPerSpike { get; set; }
+
+        /// <summary>Number of fertile florets per spikelet</summary>
+        public double FertileFloretsPerSpikelet { get; set; }
 
         /// <summary>Grain number per spike</summary>
         public double GrainsPerSpike { get; set; }
@@ -527,6 +532,9 @@ namespace Models.Functions
         #region Internal variables
         /// <summary>Cumulative thermal time from floral iniation stage to termimal spikelet stage</summary>
         public double TTFITS { get; set; }
+
+        /// <summary>Cumulative thermal time from termimal spikelet to anthesis stage</summary>
+        public double TTTSAN { get; set; }
 
         /// <summary>Crop type</summary>
         string CropType;
@@ -624,7 +632,8 @@ namespace Models.Functions
             TTFITS = 0;
             ReachedTerminalSpikeletStage = false;
             SpikeletPrimordiaPerSpike = 0;
-            FloretPrimordiaPerSpike = 0;
+            //FloretPrimordiaPerSpike = 0;
+            FertileFloretsPerSpikelet = 0;
             FertileFloretsPerSpike = 0;
             GrainsPerSpike = 0;
             PotentialGrainNumberPerArea = 0;
@@ -676,12 +685,18 @@ namespace Models.Functions
             ReproductiveOrgan organs = (ReproductiveOrgan)zone.Get("[" + CropType + "].Grain");
 
             #region Modelling potential grain number
-            // Cumulative thermal time from floral initiation (vernalSaturation in APSIM) to terminal spikelet stage
             if (CropType == "Wheat" | CropType == "wheat")
             {
+                // Cumulative thermal time from floral initiation (vernalSaturation in APSIM) to terminal spikelet stage
                 if (phen.Stage >= 4 && phen.Stage <= 5) 
                 { 
                     TTFITS += phen.thermalTime.Value(); 
+                }
+
+                // Cumulative thermal time from terminal spikelet to anthesis stage
+                if (phen.Stage >= 5 && phen.Stage <= 8)
+                {
+                    TTTSAN += phen.thermalTime.Value();
                 }
             }
             else
@@ -690,22 +705,41 @@ namespace Models.Functions
             }
 
             // Calculating spikelet primordia, floret primordia, fertile florets, and grains per spike from terminal spikelet stage
-            if (phen.Stage > 5 && ReachedTerminalSpikeletStage == false) 
+            if (phen.CurrentStageName == "Flowering")
             {
-                ReachedTerminalSpikeletStage = true;
-
-                // Spikelet primordia per spike
+                // Number of spikelet primordia per spike
                 SpikeletPrimordiaPerSpike = TTFITS / SpikeletPrimordiaPlastochron;
-                // Floret primordia per spike
-                FloretPrimordiaPerSpike = SpikeletPrimordiaPerSpike * (FloretPrimordiaNoApical + FloretPrimordiaNoCentral + FloretPrimordiaNoProximal) / 3;
-                // Fertile florets per spike with fruiting efficiency applied
-                FertileFloretsPerSpike = FloretPrimordiaPerSpike * FloretFertilityRate;
+
+                // Calculate fertile florets per spikelete (https://doi.org/10.1093/jxb/err182)
+                // Relation between the beginning of spike growth at the maximum rate (in oC) and duration of the floret primordia phase (terminal spikele to anthesis; FPP)
+                double OnsetOfSpikeGrowthAtMaxRateFromTS =  -170 + 0.95 * TTTSAN;
+
+                // Onset of floret death versus beginning of spike growth at maximum rate (time as percentage duration of the floret primordia phase)
+                double OnsetOfSpikeGrowthAtMaxRatePercFPP = OnsetOfSpikeGrowthAtMaxRateFromTS / TTTSAN;
+                double OnsetOfFloretDeathPercFPP = OnsetOfSpikeGrowthAtMaxRatePercFPP;
+
+                // Relationship between rate of floret death and duration of the pre-anthesis period of floret death
+                // duration of the pre-anthesis period of floret death (oC)
+                double PreanthesisDurationOfFloretDeath = (1 - OnsetOfFloretDeathPercFPP) * TTTSAN;
+                // Rate of floret death: expressed as the relative number of floret primordia (RNFP) per  unit of thermal time (/[°Cd], Tb = 0 °C).
+                double FloretDeathRate = -8.8e-4 + 1.37 / PreanthesisDurationOfFloretDeath;
+
+                // Relationship between floret primordia survival (%) and rate of floret death
+                double FloretPrimordiaSurvivalPerc = -8.57 + 1.15 * Math.Pow(Math.Log(FloretDeathRate), 2);
+
+                // Relationship between the number of fertile florets per spikelet at anthesis and the floret primordia survival
+                FertileFloretsPerSpikelet = -0.034 + 0.071 * FloretPrimordiaSurvivalPerc;
+
+                // Fertile florets per spike
+                FertileFloretsPerSpike = SpikeletPrimordiaPerSpike * FertileFloretsPerSpikelet;
                 // Grains per spike
                 GrainsPerSpike = FertileFloretsPerSpike * (1 - GrainAbortionRate); // may need to consider the effects of frost and heat stress on fertiled ovary abortion
 
                 // Calculating potential grain number per unit of area
                 PotentialGrainNumberPerArea = GrainsPerSpike * Plant.Population * (1 + stru.BranchNumber); // main shoot and tillers, may need to consider the difference between main stem and tillers
             }
+
+
             #endregion
 
             #region Calculating floret fertility in response to frost and heat event on meiotic phase 
