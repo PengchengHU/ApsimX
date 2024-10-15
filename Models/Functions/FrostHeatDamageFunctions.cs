@@ -70,7 +70,7 @@ namespace Models.Functions
         }
 
         /// <summary>Crop to be simulated</summary>
-        [Separator("Crop to be simulated, wheat or canola?")]
+        [Separator("Crop to be simulated, wheat, canola, or barley?")]
         // <summary>Crop to be simulated</summary>
         [Description("Crop to be simulated")]
         //public string CropType { get; set; }
@@ -101,7 +101,7 @@ namespace Models.Functions
         public double FrostUpTT { get; set; }
 
         /// <summary>Yield reduction at upper threshold</summary>
-        [Description("Yield reduction ratio frost damage induced by upper threshold")]
+        [Description("Yield reduction ratio of frost damage induced by upper threshold")]
         public double FrostMinReductionRatio { get; set; }
 
 
@@ -275,8 +275,8 @@ namespace Models.Functions
                     { nameof(HeatMaxReductionRatio), 0.1641404 },
                     { nameof(HeatStartSensitiveGS), 6.2831749 },
                     { nameof(HeatStartMostSensitiveGS), 6.7676495 },
-                    { nameof(HeatEndMostSensitiveGS), 8.4913296 },
-                    { nameof(HeatEndSensitiveGS), 8.4989954 }
+                    { nameof(HeatEndMostSensitiveGS), 9.4913296 },
+                    { nameof(HeatEndSensitiveGS), 9.4989954 }
                 }
             }
         };
