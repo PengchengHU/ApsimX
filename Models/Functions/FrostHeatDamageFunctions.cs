@@ -63,7 +63,10 @@ namespace Models.Functions
             Wheat,
             /// <summary>Canola crop type.</summary>
             [Description("Canola")]
-            Canola
+            Canola,
+            /// <summary>Barley crop type.</summary>
+            [Description("Barley")]
+            Barley
         }
 
         /// <summary>Crop to be simulated</summary>
@@ -253,6 +256,27 @@ namespace Models.Functions
                     { nameof(HeatStartMostSensitiveGS), 6.260291 },
                     { nameof(HeatEndMostSensitiveGS), 9.200536 },
                     { nameof(HeatEndSensitiveGS), 9.428058 }
+                }
+            },
+            {
+                CropTypes.Barley, new Dictionary<string, double>()
+                {
+                    { nameof(FrostLowTT), -7.6832749 },
+                    { nameof(FrostMaxReductionRatio), 0.303395 },
+                    { nameof(FrostUpTT), 0.9924306 },
+                    { nameof(FrostMinReductionRatio), 0 },
+                    { nameof(FrostStartSensitiveGS), 6.6949957 },
+                    { nameof(FrostStartMostSensitiveGS), 6.9916243 },
+                    { nameof(FrostEndMostSensitiveGS), 9.0302490 },
+                    { nameof(FrostEndSensitiveGS), 9.0306239 },
+                    { nameof(HeatLowTT), 31.2000155 },
+                    { nameof(HeatMinReductionRatio), 0 },
+                    { nameof(HeatUpTT), 34.0000003 },
+                    { nameof(HeatMaxReductionRatio), 0.1641404 },
+                    { nameof(HeatStartSensitiveGS), 6.2831749 },
+                    { nameof(HeatStartMostSensitiveGS), 6.7676495 },
+                    { nameof(HeatEndMostSensitiveGS), 8.4913296 },
+                    { nameof(HeatEndSensitiveGS), 8.4989954 }
                 }
             }
         };
