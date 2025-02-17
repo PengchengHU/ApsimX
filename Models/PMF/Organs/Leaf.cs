@@ -1,7 +1,6 @@
 using System;
 using System.Collections.Generic;
 using System.Linq;
-using APSIM.Shared.Documentation;
 using APSIM.Shared.Utilities;
 using Models.Core;
 using Models.Functions;
@@ -1891,6 +1890,16 @@ namespace Models.PMF.Organs
             CohortsAtInitialisation = 0;
         }
 
+        /// <summary>Called when crop is harvested</summary>
+        /// <param name="sender">The sender.</param>
+        /// <param name="e">The <see cref="EventArgs"/> instance containing the event data.</param>
+        [EventSubscribe("PostHarvesting")]
+        protected void OnPostHarvesting(object sender, HarvestingParameters e)
+        {
+            if (e.RemoveBiomass)
+                Harvest();
+        }
+
         /// <summary>Called when [do daily initialisation].</summary>
         /// <param name="sender">The sender.</param>
         /// <param name="e">The <see cref="EventArgs"/> instance containing the event data.</param>
@@ -1925,31 +1934,5 @@ namespace Models.PMF.Organs
         }
         #endregion
 
-
-        /// <summary>Document this model.</summary>
-        public override IEnumerable<ITag> Document()
-        {
-            foreach (var tag in GetModelDescription())
-                yield return tag;
-
-            var tags = new List<ITag>();
-            tags.Add(new Paragraph("The most important DM supply from leaf is the photosynthetic fixation supply.  Radiation interception is calculated from LAI using an extinction coefficient of:"));
-            tags.AddRange(ExtinctionCoeff.Document());
-            tags.AddRange(Photosynthesis.Document());
-            yield return new Section("Dry Matter Fixation", tags);
-
-            // Document Constants
-            var constantTags = new List<ITag>();
-            foreach (var constant in FindAllChildren<Constant>())
-                foreach (var tag in constant.Document())
-                    constantTags.Add(tag);
-            yield return new Section("Constants", constantTags);
-
-            // Document everything else.
-            foreach (var child in Children.Where(child => !(child is Constant) &&
-                                                          child != ExtinctionCoeff &&
-                                                          child != Photosynthesis))
-                yield return new Section(child.Name, child.Document());
-        }
     }
 }

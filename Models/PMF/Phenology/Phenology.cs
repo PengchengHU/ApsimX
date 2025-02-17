@@ -3,11 +3,9 @@ using System.Collections.Generic;
 using System.Data;
 using System.Globalization;
 using System.Linq;
-using APSIM.Shared.Documentation;
 using Models.Core;
 using Models.Functions;
 using Models.PMF.Interfaces;
-using Models.PMF.Struct;
 using Newtonsoft.Json;
 
 namespace Models.PMF.Phen
@@ -40,7 +38,8 @@ namespace Models.PMF.Phen
         /// -------------------------------------------------------------------------------------------------
 
         /// <summary>The phases</summary>
-        private List<IPhase> phases = new List<IPhase>();
+        [JsonIgnore]
+        public List<IPhase> phases = new List<IPhase>();
 
         /// <summary>The current phase index</summary>
         private int currentPhaseIndex;
@@ -99,6 +98,17 @@ namespace Models.PMF.Phen
                     stages.Add(current);
                 }
                 return stages;
+            }
+        }
+
+        private Dictionary<string, int> stageDict
+        {
+            get
+            {
+                Dictionary<string,int> dict = new Dictionary<string, int>();
+                dict = StageNames.Zip(StageCodes, (k, v) => new { Key = k, Value = v })
+                     .ToDictionary(x => x.Key, x => x.Value);
+                return dict;
             }
         }
 
@@ -359,7 +369,7 @@ namespace Models.PMF.Phen
             return currentPhaseIndex >= startPhaseIndex && currentPhaseIndex <= endPhaseIndex;
         }
 
-        /// <summary> A utility function to return true if the simulation is currently betweenthe specified start and end stages. </summary>
+        /// <summary> A utility function to return true if the simulation is currently between the specified start and end stages. </summary>
         public bool Between(String start, String end)
         {
             if (phases == null)
@@ -410,6 +420,22 @@ namespace Models.PMF.Phen
             throw new Exception("Unable to find phase starting with " + start);
         }
 
+        /// <summary>
+        /// Helper function to check if a particular phase is present between specifice start and end stages.
+        /// </summary>
+        /// <param name="startStage"></param>
+        /// <param name="endStage"></param>
+        /// <param name="checkPhase"></param>
+        /// <returns></returns>
+        public bool PhaseBetweenStages(string startStage, string endStage, IPhase checkPhase)
+        {
+            if ((stageDict[checkPhase.Start] >= stageDict[startStage]) && (stageDict[checkPhase.End] <= stageDict[endStage]))
+            {
+                return true;
+
+            }
+            return false;
+        }
 
         /// <summary>
         /// Resets the Vrn expression parameters for the CAMP model
@@ -434,10 +460,10 @@ namespace Models.PMF.Phen
                 phases = new List<IPhase>();
             else
                 phases.Clear();
-
             foreach (IPhase phase in this.FindAllChildren<IPhase>())
                 phases.Add(phase);
         }
+
         /// <summary>Called when model has been created.</summary>
         public override void OnCreated()
         {
@@ -601,43 +627,6 @@ namespace Models.PMF.Phen
             currentPhaseIndex = 0;
             foreach (IPhase phase in phases)
                 phase.ResetPhase();
-        }
-
-        /// <summary>Writes documentation for this function by adding to the list of documentation tags.</summary>
-        public override IEnumerable<ITag> Document()
-        {
-            // Write description of this class from summary and remarks XML documentation.
-            foreach (var tag in GetModelDescription())
-                yield return tag;
-
-            // Write memos.
-            foreach (var tag in DocumentChildren<Memo>())
-                yield return tag;
-
-            // Document thermal time function.
-            yield return new Section("ThermalTime", thermalTime.Document());
-
-            // Write a table containing phase numers and start/end stages.
-            yield return new Paragraph("**List of stages and phases used in the simulation of crop phenological development**");
-            yield return new Table(GetPhaseTable());
-
-            // Document Phases
-            foreach (var phase in FindAllChildren<IPhase>())
-                yield return new Section(phase.Name, phase.Document());
-
-            // Document Constants
-            var constantTags = new List<ITag>();
-            foreach (var constant in FindAllChildren<Constant>())
-                foreach (var tag in constant.Document())
-                    constantTags.Add(tag);
-            yield return new Section("Constants", constantTags);
-
-            // Document everything else.
-            foreach (var phase in Children.Where(child => !(child is IPhase) &&
-                                                          !(child is Memo) &&
-                                                          !(child is Constant) &&
-                                                          child != thermalTime))
-                yield return new Section(phase.Name, phase.Document());
         }
     }
 }
