@@ -28,6 +28,7 @@ using DocumentFormat.OpenXml.Drawing.Charts;
 using Models.CLEM;
 using DocumentFormat.OpenXml.Office2016.Drawing.ChartDrawing;
 using SixLabors.ImageSharp;
+using DocumentFormat.OpenXml.Drawing;
 
 namespace Models.Functions
 {
@@ -711,23 +712,16 @@ namespace Models.Functions
                 SpikeletPrimordiaPerSpike = TTFITS / SpikeletPrimordiaPlastochron;
 
                 // Calculate fertile florets per spikelete (https://doi.org/10.1093/jxb/err182)
-                // Relation between the beginning of spike growth at the maximum rate (in oC) and duration of the floret primordia phase (terminal spikele to anthesis; FPP)
-                double OnsetOfSpikeGrowthAtMaxRateFromTS =  -170 + 0.95 * TTTSAN;
+                // DFD is the thermal time (°Cd) during which floret death occurs, affecting survival.
+                double DurationFloretDeath = 813.1 - 161140000 / Math.Pow(TTTSAN, 2);
 
-                // Onset of floret death versus beginning of spike growth at maximum rate (time as percentage duration of the floret primordia phase)
-                double OnsetOfSpikeGrowthAtMaxRatePercFPP = OnsetOfSpikeGrowthAtMaxRateFromTS / TTTSAN;
-                double OnsetOfFloretDeathPercFPP = OnsetOfSpikeGrowthAtMaxRatePercFPP;
+                // RFD (florets °Cd⁻¹) measures how quickly florets die; a longer DFD reduces RFD, increasing survival.
+                double RateOfFloretDeath = -8.85e-4 + 1.37 / DurationFloretDeath;
 
-                // Relationship between rate of floret death and duration of the pre-anthesis period of floret death
-                // duration of the pre-anthesis period of floret death (oC)
-                double PreanthesisDurationOfFloretDeath = (1 - OnsetOfFloretDeathPercFPP) * TTTSAN;
-                // Rate of floret death: expressed as the relative number of floret primordia (RNFP) per  unit of thermal time (/[°Cd], Tb = 0 °C).
-                double FloretDeathRate = -8.8e-4 + 1.37 / PreanthesisDurationOfFloretDeath;
-
-                // Relationship between floret primordia survival (%) and rate of floret death
-                double FloretPrimordiaSurvivalPerc = -8.57 + 1.15 * Math.Pow(Math.Log(FloretDeathRate), 2);
-
-                // Relationship between the number of fertile florets per spikelet at anthesis and the floret primordia survival
+                // FS (%) is the percentage of floret primordia surviving to anthesis; lower RFD increases FS.
+                double FloretPrimordiaSurvivalPerc = -8.57 + 1.15 *  Math.Pow(Math.Log(RateOfFloretDeath), 2);
+              
+                // FF (florets spikelet⁻¹) is the final output, directly proportional to survival.
                 FertileFloretsPerSpikelet = -0.034 + 0.071 * FloretPrimordiaSurvivalPerc;
 
                 // Fertile florets per spike
