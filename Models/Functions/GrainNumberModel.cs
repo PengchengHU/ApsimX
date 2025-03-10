@@ -727,12 +727,13 @@ namespace Models.Functions
                 // Fertile florets per spike
                 FertileFloretsPerSpike = SpikeletPrimordiaPerSpike * FertileFloretsPerSpikelet;
                 // Grains per spike
-                GrainsPerSpike = FertileFloretsPerSpike * (1 - GrainAbortionRate); // may need to consider the effects of frost and heat stress on fertiled ovary abortion
+                // NOTE: may need to consider the effects of frost and heat stress on fertiled ovary abortion
+                GrainsPerSpike = FertileFloretsPerSpike * (1 - GrainAbortionRate);
 
                 // Calculating potential grain number per unit of area
-                PotentialGrainNumberPerArea = GrainsPerSpike * Plant.Population * (1 + stru.BranchNumber); // main shoot and tillers, may need to consider the difference between main stem and tillers
+                // NOTE: may need to consider the difference between main stem and tillers
+                PotentialGrainNumberPerArea = GrainsPerSpike * Plant.Population * (1 + stru.BranchNumber); // main shoot and tillers
             }
-
 
             #endregion
 
