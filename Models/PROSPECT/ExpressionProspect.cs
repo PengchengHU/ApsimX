@@ -79,20 +79,20 @@ namespace Models.Prospect
         /// Supports variables: [Leaf.Thickness], [Leaf.SLA]
         /// Example: "1.2 + 0.3 * [Leaf.Thickness]"
         /// </remarks>
-        [Category("5. 干物质计算")]
-        [Description("叶片质量计算公式(g/cm²)")]
+        [Category("5. 比叶重计算")]
+        [Description("比叶重计算公式(g/cm²)")]
         [Display(Order = 50)]
         public string LMAExpression { get; set; } = "0.008 * (1 + 0.1 * [Leaf.Age])";
 
         /// <summary>
-        /// Mathematical expression for ncidence angle in degrees calculation
+        /// Mathematical expression for incidence angle in degrees calculation
         /// </summary>
         /// <remarks>
         /// Supports variables: [Leaf.Thickness], [Leaf.SLA]
         /// Example: "1.2 + 0.3 * [Leaf.Thickness]"
         /// </remarks>
-        [Category("5. 干物质计算")]
-        [Description("叶片质量计算公式(g/cm²)")]
+        [Category("5. 入射角度计算")]
+        [Description("入射角度计算公式(g/cm²)")]
         [Display(Order = 60)]
         public string AlphaExpression { get; set; } = "0.008 * (1 + 0.1 * [Leaf.Age])";
 
