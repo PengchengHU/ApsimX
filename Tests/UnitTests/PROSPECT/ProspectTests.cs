@@ -54,9 +54,6 @@ namespace UnitTests
 
         private (Vector<double> Reflectance, Vector<double> Transmittance) RunCSharpImplementation(ProspectTestCase testCase)
         {
-            //var spec = ProspectCore.LoadDefaultSpectra();
-            //return ProspectCore.Run(N: testCase.N, CHL: testCase.CHL, CAR: testCase.CAR, EWT: testCase.EWT, LMA: testCase.LMA, alpha: testCase.Alpha);
-
             try
             {
                 return ProspectCore.Run(N: testCase.N, CHL: testCase.CHL, CAR: testCase.CAR, EWT: testCase.EWT, LMA: testCase.LMA, alpha: testCase.Alpha);
