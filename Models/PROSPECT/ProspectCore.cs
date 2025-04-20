@@ -17,36 +17,35 @@ namespace Models.Prospect
     /// </remarks>
     public static class ProspectCore
     {
-        // 光谱常数结构体
         /// <summary>
         /// Contains spectral constants required for PROSPECT calculations
         /// </summary>
         public struct SpectralConstants
         {
             /// <summary>Wavelength array in nanometers</summary>
-            public Vector<double> Wavelengths;      // 波长(nm)
+            public Vector<double> Wavelengths;      
             /// <summary>Refractive index spectrum</summary>
-            public Vector<double> RefractiveIndex;   // 折射率
+            public Vector<double> RefractiveIndex;   
             /// <summary>Specific absorption coefficient for chlorophyll</summary>
-            public Vector<double> SAC_CHL;          // 叶绿素比吸收系数
+            public Vector<double> SAC_CHL;          
             /// <summary>Specific absorption coefficient for carotenoids</summary>
-            public Vector<double> SAC_CAR;          // 类胡萝卜素比吸收系数
+            public Vector<double> SAC_CAR;          
             /// <summary>Specific absorption coefficient for water</summary>
-            public Vector<double> SAC_EWT;          // 水分比吸收系数
+            public Vector<double> SAC_EWT;          
             /// <summary>Specific absorption coefficient for dry matter</summary>
-            public Vector<double> SAC_LMA;          // 干物质比吸收系数
+            public Vector<double> SAC_LMA;         
             /// <summary>Transmissivity at 40° incidence angle</summary>
-            public Vector<double> Tav40;            // 40度入射角透射率
+            public Vector<double> Tav40;            
             /// <summary>Transmissivity at 90° incidence angle</summary>
-            public Vector<double> Tav90;            // 90度入射角透射率
+            public Vector<double> Tav90;            
             /// <summary>Specific absorption coefficient for anthocyanin</summary>
-            public Vector<double> SAC_ANT;    // Added
+            public Vector<double> SAC_ANT;    
             /// <summary>Specific absorption coefficient for brown pigmentn</summary>
-            public Vector<double> SAC_BROWN;  // Added
+            public Vector<double> SAC_BROWN;  
             /// <summary>Specific absorption coefficient for protein</summary>
-            public Vector<double> SAC_PROT;   // Added
+            public Vector<double> SAC_PROT;   
             /// <summary>Specific absorption coefficient for non-protein carbon-based constituent</summary>
-            public Vector<double> SAC_CBC;    // Added
+            public Vector<double> SAC_CBC;    
         }
 
         /// <summary>
@@ -60,7 +59,6 @@ namespace Models.Prospect
         private static readonly string RelativeSpectralDataPath = "..\\..\\..\\Models\\PROSPECT\\SpecPROSPECT_FullRange.json";
         private static string DefaultSpectralDataPath => PathUtilities.GetAbsolutePath(RelativeSpectralDataPath, AppDomain.CurrentDomain.BaseDirectory);
 
-        // 运行PROSPECT模型
         /// <summary>
         /// Runs the PROSPECT model to calculate leaf reflectance and transmittance
         /// </summary>
@@ -99,7 +97,7 @@ namespace Models.Prospect
             if (alpha < 0 || alpha > 90)
                 throw new ArgumentException("Incidence angle must be between 0 and 90 degrees");
 
-            // 计算总吸收系数
+            // compute total absorption corresponding to each homogeneous layer
             Vector<double> Kall = (CHL * spectralData.SAC_CHL +
                                  CAR * spectralData.SAC_CAR +
                                  EWT * spectralData.SAC_EWT +
@@ -109,10 +107,10 @@ namespace Models.Prospect
                                  PROT * spectralData.SAC_PROT +
                                  CBC * spectralData.SAC_CBC) / N;
 
-            // 计算单层透射率tau
+            // reflectance and transmittance of one layer (tau)
             Vector<double> tau = ComputeTau(Kall);
 
-            // 计算界面透反射
+            // reflectivity and transmissivity at the interface
             Vector<double> talf = alpha == 40 ? spectralData.Tav40 : ComputeTav(alpha, spectralData.RefractiveIndex);
             Vector<double> ralf = 1.0 - talf;
             Vector<double> t12 = spectralData.Tav90;
@@ -120,16 +118,16 @@ namespace Models.Prospect
             Vector<double> t21 = t12.PointwiseDivide(spectralData.RefractiveIndex.PointwisePower(2));
             Vector<double> r21 = 1.0 - t21;
 
-            // 顶层反射透射
+            // top surface side
             Vector<double> denom = 1.0 - r21.PointwiseMultiply(r21).PointwiseMultiply(tau.PointwisePower(2));
             Vector<double> Ta = talf.PointwiseMultiply(tau).PointwiseMultiply(t21).PointwiseDivide(denom);
             Vector<double> Ra = ralf + r21.PointwiseMultiply(tau).PointwiseMultiply(Ta);
 
-            // 底层反射透射
+            // bottom surface side
             Vector<double> T = t12.PointwiseMultiply(tau).PointwiseMultiply(t21).PointwiseDivide(denom);
             Vector<double> R = r12 + r21.PointwiseMultiply(tau).PointwiseMultiply(T);
 
-            // N层叠加计算
+            // reflectance and transmittance of N layers
             Vector<double> D = (1 + R + T).PointwiseMultiply(1 + R - T)
                               .PointwiseMultiply(1 - R + T).PointwiseMultiply(1 - R - T).PointwiseSqrt();
             Vector<double> Rq = R.PointwisePower(2);
@@ -145,7 +143,7 @@ namespace Models.Prospect
             Vector<double> Rsub = a.PointwiseMultiply(bN2 - 1).PointwiseDivide(denom);
             Vector<double> Tsub = bNm1.PointwiseMultiply(a2 - 1).PointwiseDivide(denom);
 
-            // 处理零吸收情况
+            // Case of zero absorption
             for (int i = 0; i < R.Count; i++)
             {
                 if (R[i] + T[i] >= 1.0 - 1e-10)
@@ -155,7 +153,7 @@ namespace Models.Prospect
                 }
             }
 
-            // 最终结果
+            // leaf reflectance and transmittance : combine top layer with next N-1 layers
             denom = 1 - Rsub.PointwiseMultiply(R) + 1e-10;
             Vector<double> transmittance = Ta.PointwiseMultiply(Tsub).PointwiseDivide(denom);
             Vector<double> reflectance = Ra + Ta.PointwiseMultiply(Rsub).PointwiseMultiply(T).PointwiseDivide(denom);
@@ -167,7 +165,7 @@ namespace Models.Prospect
             return (reflectance, transmittance);
         }
 
-        // 计算单层透射率tau
+        // reflectance and transmittance of one layer (tau)
         private static Vector<double> ComputeTau(Vector<double> k)
         {
             return k.Map(k_i =>
@@ -180,7 +178,7 @@ namespace Models.Prospect
             });
         }
 
-        // 计算平均透射率
+        // computation of transmissivity of a dielectric plane surface, averaged over all directions of incidence and over all polarizations.
         private static Vector<double> ComputeTav(double alpha, Vector<double> nr)
         {
             double rd = Math.PI / 180.0;
