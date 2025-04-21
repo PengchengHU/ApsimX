@@ -210,11 +210,15 @@ namespace Models.Prospect
         /// <summary>Called when [do daily calculations].</summary>
         /// <param name="sender">The sender.</param>
         /// <param name="e">The <see cref="EventArgs"/> instance containing the event data.</param>
-        [EventSubscribe("DoDaily")]
-        private void OnDoDaily(object sender, EventArgs e)
+        //[EventSubscribe("DoManagementCalculations")]
+        [EventSubscribe("DoManagementCalculations")]
+        private void OnDoManagementCalculations(object sender, EventArgs e)
         {
             // Calculate PROSPECT outputs
             var results = CalculateProspect();
+
+            // Diagnostic: Log that the method is called
+            Summary.WriteMessage(this, "ProspectModel.OnDoDaily called.", MessageType.Information);
 
             // Get wavelength range
             if (ParseWavelengthRange(out double startWavelength, out double endWavelength))
@@ -437,12 +441,16 @@ namespace Models.Prospect
         /// </summary>
         private void EnsureSpectralConstantsLoaded()
         {
-            if (cachedSpectralConstants == null)
+            Summary.WriteMessage(this, "ProspectModel: Loading spectral constants.", MessageType.Information);
+            try
             {
-                // The null value will trigger ProspectCore to load the constants from the default file
-                var results = ProspectCore.Run();
-                // Store the loaded spectral constants for future use
-                cachedSpectralConstants = new ProspectCore.SpectralConstants();
+                cachedSpectralConstants = ProspectCore.LoadLocalSpectralData();
+                Summary.WriteMessage(this, $"ProspectModel: Spectral constants loaded, Wavelengths count: {cachedSpectralConstants.Value.Wavelengths.Count}.", MessageType.Information);
+            }
+            catch (Exception ex)
+            {
+                Summary.WriteMessage(this, $"ProspectModel: Failed to load spectral constants: {ex.Message}", MessageType.Error);
+                throw; // Rethrow to halt simulation if data is missing
             }
         }
 
