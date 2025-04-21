@@ -210,8 +210,10 @@ namespace Models.Prospect
             });
         }
 
-        // Load spectral data from a local JSON file
-        private static SpectralConstants LoadLocalSpectralData()
+        /// <summary>
+        /// Load spectral data from a local JSON file
+        /// </summary>
+        public static SpectralConstants LoadLocalSpectralData()
         {
             string path = DefaultSpectralDataPath;
             if (!File.Exists(path))
