@@ -9,6 +9,7 @@ using Models.Core;
 using Models.Functions;
 using APSIM.Shared.Utilities;
 using Models.PMF;
+using System.Threading;
 
 namespace Models.Prospect
 {
@@ -623,29 +624,77 @@ namespace Models.Prospect
                 Summary.WriteMessage(this, $"ProspectModel: CalculateProspect called without spectral constants on {Clock?.Today:yyyy-MM-dd}.", MessageType.Error);
                 throw new InvalidOperationException("Spectral constants not loaded.");
             }
-
             Summary.WriteMessage(this, $"ProspectModel: CalculateProspect called on {Clock?.Today:yyyy-MM-dd}.", MessageType.Information);
 
-            // Evaluate expressions and store current parameter values
+            // Evaluate expressions and validate parameter values
             double nValue = EvaluateExpression(N);
+            if (double.IsNaN(nValue) || nValue <= 0)
+            {
+                throw new InvalidOperationException($"Invalid N value ({nValue}) from expression '{N}' on {Clock?.Today:yyyy-MM-dd}. Must be positive and not NaN.");
+            }
             CurrentParameterValues["N"] = nValue;
+
             double chlValue = EvaluateExpression(CHL);
+            if (double.IsNaN(chlValue) || chlValue < 0)
+            {
+                throw new InvalidOperationException($"Invalid CHL value ({chlValue}) from expression '{CHL}' on {Clock?.Today:yyyy-MM-dd}. Must be non-negative and not NaN.");
+            }
             CurrentParameterValues["CHL"] = chlValue;
+
             double carValue = EvaluateExpression(CAR);
+            if (double.IsNaN(carValue) || carValue < 0)
+            {
+                throw new InvalidOperationException($"Invalid CAR value ({carValue}) from expression '{CAR}' on {Clock?.Today:yyyy-MM-dd}. Must be non-negative and not NaN.");
+            }
             CurrentParameterValues["CAR"] = carValue;
+
             double ewtValue = EvaluateExpression(EWT);
+            if (double.IsNaN(ewtValue) || ewtValue < 0)
+            {
+                throw new InvalidOperationException($"Invalid EWT value ({ewtValue}) from expression '{EWT}' on {Clock?.Today:yyyy-MM-dd}. Must be non-negative and not NaN.");
+            }
             CurrentParameterValues["EWT"] = ewtValue;
+
             double lmaValue = EvaluateExpression(LMA);
+            if (double.IsNaN(lmaValue) || lmaValue < 0)
+            {
+                throw new InvalidOperationException($"Invalid LMA value ({lmaValue}) from expression '{LMA}' on {Clock?.Today:yyyy-MM-dd}. Must be non-negative and not NaN.");
+            }
             CurrentParameterValues["LMA"] = lmaValue;
+
             double antValue = EvaluateExpression(ANT);
+            if (double.IsNaN(antValue) || antValue < 0)
+            {
+                throw new InvalidOperationException($"Invalid ANT value ({antValue}) from expression '{ANT}' on {Clock?.Today:yyyy-MM-dd}. Must be non-negative and not NaN.");
+            }
             CurrentParameterValues["ANT"] = antValue;
+
             double brownValue = EvaluateExpression(BROWN);
+            if (double.IsNaN(brownValue) || brownValue < 0)
+            {
+                throw new InvalidOperationException($"Invalid BROWN value ({brownValue}) from expression '{BROWN}' on {Clock?.Today:yyyy-MM-dd}. Must be non-negative and not NaN.");
+            }
             CurrentParameterValues["BROWN"] = brownValue;
+
             double protValue = EvaluateExpression(PROT);
+            if (double.IsNaN(protValue) || protValue < 0)
+            {
+                throw new InvalidOperationException($"Invalid PROT value ({protValue}) from expression '{PROT}' on {Clock?.Today:yyyy-MM-dd}. Must be non-negative and not NaN.");
+            }
             CurrentParameterValues["PROT"] = protValue;
+
             double cbcValue = EvaluateExpression(CBC);
+            if (double.IsNaN(cbcValue) || cbcValue < 0)
+            {
+                throw new InvalidOperationException($"Invalid CBC value ({cbcValue}) from expression '{CBC}' on {Clock?.Today:yyyy-MM-dd}. Must be non-negative and not NaN.");
+            }
             CurrentParameterValues["CBC"] = cbcValue;
+
             double alphaValue = EvaluateExpression(Alpha);
+            if (double.IsNaN(alphaValue))
+            {
+                throw new InvalidOperationException($"Invalid Alpha value ({alphaValue}) from expression '{Alpha}' on {Clock?.Today:yyyy-MM-dd}. Must not be NaN.");
+            }
             CurrentParameterValues["Alpha"] = alphaValue;
 
             // Run the PROSPECT model with current parameters
@@ -653,9 +702,7 @@ namespace Models.Prospect
                 cachedSpectralConstants,
                 nValue, chlValue, carValue, ewtValue, lmaValue,
                 antValue, brownValue, protValue, cbcValue, alphaValue);
-
             Summary.WriteMessage(this, $"ProspectModel: CalculateProspect completed, Reflectance[{results.Reflectance.Count}], Transmittance[{results.Transmittance.Count}]", MessageType.Information);
-
             return results;
         }
 
