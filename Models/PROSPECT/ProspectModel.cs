@@ -18,9 +18,6 @@ namespace Models.Prospect
     [Serializable]
     [ViewName("UserInterface.Views.PropertyView")]
     [PresenterName("UserInterface.Presenters.PropertyPresenter")]
-    //[ValidParent(ParentType = typeof(Simulation))]
-    //[ValidParent(ParentType = typeof(Zone))]
-    //[ValidParent(ParentType = typeof(Model))]
     [ValidParent(ParentType = typeof(Plant))]
     public class ProspectModel : Model
     {
@@ -86,7 +83,7 @@ namespace Models.Prospect
         /// Flag to enable daily SQLite database output
         /// </summary>
         [Description("Enable daily output to SQLite database")]
-        public bool EnableSQLiteOutput { get; set; } = false;
+        public bool EnableSQLiteOutput { get; set; } = true;
 
         /// <summary>
         /// Path to the SQLite database file (relative to simulation directory)
@@ -101,9 +98,19 @@ namespace Models.Prospect
         public string OutputWavelengthRange { get; set; } = "400-2500";
 
         /// <summary>
-        /// The optional cached spectral constants to avoid reloading for each calculation
+        /// The cached spectral constants loaded at simulation start
         /// </summary>
         private ProspectCore.SpectralConstants? cachedSpectralConstants = null;
+
+        /// <summary>
+        /// Cached PROSPECT results for the current day
+        /// </summary>
+        private (Vector<double> Reflectance, Vector<double> Transmittance)? cachedResults = null;
+
+        /// <summary>
+        /// The date of the last cached results
+        /// </summary>
+        private DateTime? lastCalculationDate = null;
 
         /// <summary>
         /// Database connection
@@ -123,8 +130,12 @@ namespace Models.Prospect
         {
             get
             {
-                EnsureSpectralConstantsLoaded();
-                return cachedSpectralConstants?.Wavelengths.ToArray();
+                if (cachedSpectralConstants == null)
+                {
+                    Summary.WriteMessage(this, "ProspectModel: Wavelengths accessed before spectral constants loaded.", MessageType.Warning);
+                    return Array.Empty<double>();
+                }
+                return cachedSpectralConstants.Value.Wavelengths.ToArray();
             }
         }
 
@@ -142,8 +153,13 @@ namespace Models.Prospect
         {
             get
             {
-                var results = CalculateProspect();
-                return results.Reflectance.ToArray();
+                if (Clock == null || cachedResults == null || lastCalculationDate != Clock.Today)
+                {
+                    Summary.WriteMessage(this, $"ProspectModel: LeafReflectance accessed without valid cached results on {Clock?.Today:yyyy-MM-dd}. Recalculating.", MessageType.Warning);
+                    var results = CalculateProspect();
+                    return results.Reflectance.ToArray();
+                }
+                return cachedResults.Value.Reflectance.ToArray();
             }
         }
 
@@ -156,8 +172,13 @@ namespace Models.Prospect
         {
             get
             {
-                var results = CalculateProspect();
-                return results.Transmittance.ToArray();
+                if (Clock == null || cachedResults == null || lastCalculationDate != Clock.Today)
+                {
+                    Summary.WriteMessage(this, $"ProspectModel: LeafTransmittance accessed without valid cached results on {Clock?.Today:yyyy-MM-dd}. Recalculating.", MessageType.Warning);
+                    var results = CalculateProspect();
+                    return results.Transmittance.ToArray();
+                }
+                return cachedResults.Value.Transmittance.ToArray();
             }
         }
 
@@ -170,18 +191,19 @@ namespace Models.Prospect
         {
             get
             {
-                var results = CalculateProspect();
-                Vector<double> reflectance = results.Reflectance;
-                Vector<double> transmittance = results.Transmittance;
-
-                // Calculate absorptance as 1 - reflectance - transmittance
-                Vector<double> absorptance = Vector<double>.Build.Dense(reflectance.Count);
-                for (int i = 0; i < reflectance.Count; i++)
+                if (Clock == null || cachedResults == null || lastCalculationDate != Clock.Today)
                 {
-                    absorptance[i] = Math.Round(1.0 - reflectance[i] - transmittance[i], 4);
+                    Summary.WriteMessage(this, $"ProspectModel: LeafAbsorptance accessed without valid cached results on {Clock?.Today:yyyy-MM-dd}. Recalculating.", MessageType.Warning);
+                    var results = CalculateProspect();
+                    Vector<double> reflectance = results.Reflectance;
+                    Vector<double> transmittance = results.Transmittance;
+                    Vector<double> absorptance = Vector<double>.Build.Dense(reflectance.Count, i => Math.Round(1.0 - reflectance[i] - transmittance[i], 4));
+                    return absorptance.ToArray();
                 }
-
-                return absorptance.ToArray();
+                Vector<double> cachedReflectance = cachedResults.Value.Reflectance;
+                Vector<double> cachedTransmittance = cachedResults.Value.Transmittance;
+                Vector<double> cachedAbsorptance = Vector<double>.Build.Dense(cachedReflectance.Count, i => Math.Round(1.0 - cachedReflectance[i] - cachedTransmittance[i], 4));
+                return cachedAbsorptance.ToArray();
             }
         }
 
@@ -189,8 +211,27 @@ namespace Models.Prospect
         /// <param name="sender">The sender.</param>
         /// <param name="e">The <see cref="EventArgs"/> instance containing the event data.</param>
         [EventSubscribe("Commencing")]
-        private void OnSimulationCommencing(object sender, EventArgs e)
+        private void OnCommencing(object sender, EventArgs e)
         {
+            Summary.WriteMessage(this, $"ProspectModel: Subscribed to events - Commencing, DoDailyInitialisation, DoDaily, Completed.", MessageType.Information);
+            Summary.WriteMessage(this, $"ProspectModel: Clock is {(Clock == null ? "null" : "not null")}.", MessageType.Information);
+            Summary.WriteMessage(this, $"ProspectModel: Simulation is {(Simulation == null ? "null" : "not null")}.", MessageType.Information);
+            var parent = Parent as IModel;
+            Summary.WriteMessage(this, $"ProspectModel: Parent model is {(parent == null ? "null" : parent.GetType().Name)}.", MessageType.Information);
+
+            // Load spectral constants at simulation start
+            Summary.WriteMessage(this, "ProspectModel: Loading spectral constants.", MessageType.Information);
+            try
+            {
+                cachedSpectralConstants = ProspectCore.LoadLocalSpectralData();
+                Summary.WriteMessage(this, $"ProspectModel: Spectral constants loaded, Wavelengths count: {cachedSpectralConstants.Value.Wavelengths.Count}.", MessageType.Information);
+            }
+            catch (Exception ex)
+            {
+                Summary.WriteMessage(this, $"ProspectModel: Failed to load spectral constants: {ex.Message}", MessageType.Error);
+                throw; // Halt simulation if data is missing
+            }
+
             if (EnableSQLiteOutput)
             {
                 InitializeDatabase();
@@ -203,44 +244,86 @@ namespace Models.Prospect
         [EventSubscribe("DoDailyInitialisation")]
         private void OnDoDailyInitialisation(object sender, EventArgs e)
         {
-            // Clear previous parameter values
+            Summary.WriteMessage(this, $"ProspectModel.OnDoDailyInitialisation called on {Clock?.Today:yyyy-MM-dd}.", MessageType.Information);
             CurrentParameterValues.Clear();
+            // Clear cached results to force recalculation
+            cachedResults = null;
+            lastCalculationDate = null;
         }
 
         /// <summary>Called when [do daily calculations].</summary>
         /// <param name="sender">The sender.</param>
         /// <param name="e">The <see cref="EventArgs"/> instance containing the event data.</param>
-        //[EventSubscribe("DoManagementCalculations")]
+        //[EventSubscribe("DoDaily")]
         [EventSubscribe("DoManagementCalculations")]
         private void OnDoManagementCalculations(object sender, EventArgs e)
+        //private void OnDoDaily(object sender, EventArgs e)
         {
-            // Calculate PROSPECT outputs
-            var results = CalculateProspect();
+            Summary.WriteMessage(this, $"ProspectModel.OnDoDaily called on {Clock.Today:yyyy-MM-dd}.", MessageType.Information);
 
-            // Diagnostic: Log that the method is called
-            Summary.WriteMessage(this, "ProspectModel.OnDoDaily called.", MessageType.Information);
-
-            // Get wavelength range
-            if (ParseWavelengthRange(out double startWavelength, out double endWavelength))
+            if (!EnableSQLiteOutput)
             {
-                // Save results to database
-                if (EnableSQLiteOutput)
-                {
-                    SaveResultsToDatabase(results.Reflectance.ToArray(), results.Transmittance.ToArray(), startWavelength, endWavelength);
-                }                   
-                // Report to summary
-                Summary.WriteMessage(this, $"PROSPECT results for {Clock.Today:yyyy-MM-dd} saved to database.", MessageType.Information);
-                Summary.WriteMessage(this, $"  Wavelength range: {startWavelength}-{endWavelength} nm", MessageType.Information);
-                Summary.WriteMessage(this, $"  Parameters: N={CurrentParameterValues["N"]:F2}, CHL={CurrentParameterValues["CHL"]:F1}, CAR={CurrentParameterValues["CAR"]:F1}, EWT={CurrentParameterValues["EWT"]:F4}, LMA={CurrentParameterValues["LMA"]:F4}", MessageType.Information);
+                Summary.WriteMessage(this, "ProspectModel: SQLite output is disabled (EnableSQLiteOutput is false).", MessageType.Warning);
+                return;
             }
-            else
+
+            if (Clock == null)
             {
-                Summary.WriteMessage(this, $"Invalid wavelength range specified: {OutputWavelengthRange}. Using full spectrum.", MessageType.Warning);
-                // Save results to database
-                if (EnableSQLiteOutput)
+                Summary.WriteMessage(this, "ProspectModel: Clock is null, cannot proceed with daily calculations.", MessageType.Error);
+                return;
+            }
+
+            try
+            {
+                // Calculate PROSPECT outputs
+                Summary.WriteMessage(this, $"ProspectModel: Starting PROSPECT calculation with parameters: N={N}, CHL={CHL}, CAR={CAR}, EWT={EWT}, LMA={LMA}", MessageType.Information);
+                var results = CalculateProspect();
+                cachedResults = results; // Cache results
+                lastCalculationDate = Clock.Today;
+
+                Summary.WriteMessage(this, $"ProspectModel: PROSPECT calculation completed, Reflectance[{results.Reflectance.Count}], Transmittance[{results.Transmittance.Count}]", MessageType.Information);
+
+                // Get wavelength range
+                if (ParseWavelengthRange(out double startWavelength, out double endWavelength))
                 {
-                    SaveResultsToDatabase(results.Reflectance.ToArray(), results.Transmittance.ToArray(), 0, 10000); // Full range
+                    // Save results to database
+                    dbConnection?.ExecuteNonQuery("BEGIN TRANSACTION;");
+                    try
+                    {
+                        SaveResultsToDatabase(results.Reflectance.ToArray(), results.Transmittance.ToArray(), startWavelength, endWavelength);
+                        dbConnection?.ExecuteNonQuery("COMMIT;");
+                        Summary.WriteMessage(this, $"PROSPECT results for {Clock.Today:yyyy-MM-dd} saved to database.", MessageType.Information);
+                        Summary.WriteMessage(this, $"  Wavelength range: {startWavelength}-{endWavelength} nm", MessageType.Information);
+                        Summary.WriteMessage(this, $"  Parameters: N={CurrentParameterValues["N"]:F2}, CHL={CurrentParameterValues["CHL"]:F1}, CAR={CurrentParameterValues["CAR"]:F1}, EWT={CurrentParameterValues["EWT"]:F4}, LMA={CurrentParameterValues["LMA"]:F4}", MessageType.Information);
+                    }
+                    catch (Exception ex)
+                    {
+                        dbConnection?.ExecuteNonQuery("ROLLBACK;");
+                        Summary.WriteMessage(this, $"ProspectModel: Failed to save results: {ex.Message}", MessageType.Error);
+                        throw; // Rethrow to halt simulation
+                    }
                 }
+                else
+                {
+                    Summary.WriteMessage(this, $"Invalid wavelength range specified: {OutputWavelengthRange}. Using full spectrum.", MessageType.Warning);
+                    dbConnection?.ExecuteNonQuery("BEGIN TRANSACTION;");
+                    try
+                    {
+                        SaveResultsToDatabase(results.Reflectance.ToArray(), results.Transmittance.ToArray(), 0, 10000);
+                        dbConnection?.ExecuteNonQuery("COMMIT;");
+                        Summary.WriteMessage(this, $"PROSPECT results for {Clock.Today:yyyy-MM-dd} saved to database (full spectrum).", MessageType.Information);
+                    }
+                    catch (Exception ex)
+                    {
+                        dbConnection?.ExecuteNonQuery("ROLLBACK;");
+                        Summary.WriteMessage(this, $"ProspectModel: Failed to save results: {ex.Message}", MessageType.Error);
+                        throw; // Rethrow to halt simulation
+                    }
+                }
+            }
+            catch (Exception ex)
+            {
+                Summary.WriteMessage(this, $"ProspectModel: Error in OnDoDaily: {ex.Message}", MessageType.Error);
             }
         }
 
@@ -248,14 +331,12 @@ namespace Models.Prospect
         /// <param name="sender">The sender.</param>
         /// <param name="e">The <see cref="EventArgs"/> instance containing the event data.</param>
         [EventSubscribe("Completed")]
-        private void OnSimulationCompleted(object sender, EventArgs e)
+        private void OnCompleted(object sender, EventArgs e)
         {
-            // Close database connection if open
             if (dbConnection != null)
             {
                 dbConnection.CloseDatabase();
                 dbConnection = null;
-
                 string dbPath = GetFullDatabasePath();
                 Summary.WriteMessage(this, $"PROSPECT results database saved to: {dbPath}", MessageType.Information);
             }
@@ -269,65 +350,59 @@ namespace Models.Prospect
             try
             {
                 string dbPath = GetFullDatabasePath();
-
-                // Create directory if it doesn't exist
                 string dbDir = Path.GetDirectoryName(dbPath);
                 if (!string.IsNullOrEmpty(dbDir) && !Directory.Exists(dbDir))
                 {
                     Directory.CreateDirectory(dbDir);
                 }
 
-                // Create or open database
                 dbConnection = new SQLite();
-                dbConnection.OpenDatabase(dbPath, false); // false for read/write mode
+                dbConnection.OpenDatabase(dbPath, false);
 
-                // Generate a unique simulation ID
                 simulationID = Guid.NewGuid().ToString();
 
-                // Create tables if they don't exist
                 dbConnection.ExecuteNonQuery(@"
-            CREATE TABLE IF NOT EXISTS Simulations (
-                SimulationID TEXT PRIMARY KEY,
-                SimulationName TEXT,
-                StartDate TEXT,
-                EndDate TEXT,
-                CreatedAt TEXT
-            )");
+                    CREATE TABLE IF NOT EXISTS Simulations (
+                        SimulationID TEXT PRIMARY KEY,
+                        SimulationName TEXT,
+                        StartDate TEXT,
+                        EndDate TEXT,
+                        CreatedAt TEXT
+                    )");
 
                 dbConnection.ExecuteNonQuery(@"
-            CREATE TABLE IF NOT EXISTS Parameters (
-                Date TEXT,
-                SimulationID TEXT,
-                N REAL,
-                CHL REAL,
-                CAR REAL,
-                EWT REAL,
-                LMA REAL,
-                ANT REAL,
-                BROWN REAL,
-                PROT REAL,
-                CBC REAL,
-                Alpha REAL,
-                PRIMARY KEY (Date, SimulationID),
-                FOREIGN KEY (SimulationID) REFERENCES Simulations(SimulationID)
-            )");
+                    CREATE TABLE IF NOT EXISTS Parameters (
+                        Date TEXT,
+                        SimulationID TEXT,
+                        N REAL,
+                        CHL REAL,
+                        CAR REAL,
+                        EWT REAL,
+                        LMA REAL,
+                        ANT REAL,
+                        BROWN REAL,
+                        PROT REAL,
+                        CBC REAL,
+                        Alpha REAL,
+                        PRIMARY KEY (Date, SimulationID),
+                        FOREIGN KEY (SimulationID) REFERENCES Simulations(SimulationID)
+                    )");
 
                 dbConnection.ExecuteNonQuery(@"
-            CREATE TABLE IF NOT EXISTS Spectra (
-                WavelengthNM REAL,
-                Date TEXT,
-                SimulationID TEXT,
-                Reflectance REAL,
-                Transmittance REAL,
-                Absorptance REAL,
-                PRIMARY KEY (WavelengthNM, Date, SimulationID),
-                FOREIGN KEY (Date, SimulationID) REFERENCES Parameters(Date, SimulationID)
-            )");
+                    CREATE TABLE IF NOT EXISTS Spectra (
+                        WavelengthNM REAL,
+                        Date TEXT,
+                        SimulationID TEXT,
+                        Reflectance REAL,
+                        Transmittance REAL,
+                        Absorptance REAL,
+                        PRIMARY KEY (WavelengthNM, Date, SimulationID),
+                        FOREIGN KEY (Date, SimulationID) REFERENCES Parameters(Date, SimulationID)
+                    )");
 
-                // Insert simulation record
                 string sql = $@"
-            INSERT INTO Simulations (SimulationID, SimulationName, StartDate, EndDate, CreatedAt)
-            VALUES ('{simulationID}', '{Simulation.Name.Replace("'", "''")}', '{Clock.StartDate:yyyy-MM-dd}', '{Clock.EndDate:yyyy-MM-dd}', '{DateTime.Now:yyyy-MM-dd HH:mm:ss}')";
+                    INSERT INTO Simulations (SimulationID, SimulationName, StartDate, EndDate, CreatedAt)
+                    VALUES ('{simulationID}', '{Simulation.Name.Replace("'", "''")}', '{Clock.StartDate:yyyy-MM-dd}', '{Clock.EndDate:yyyy-MM-dd}', '{DateTime.Now:yyyy-MM-dd HH:mm:ss}')";
                 dbConnection.ExecuteNonQuery(sql);
 
                 Summary.WriteMessage(this, $"PROSPECT database initialized: {dbPath}", MessageType.Information);
@@ -349,9 +424,7 @@ namespace Models.Prospect
         /// </summary>
         private string GetFullDatabasePath()
         {
-            // Get the simulation directory
             string simDir = Path.GetDirectoryName(Simulation.FileName);
-            // If path is absolute, use it directly, otherwise combine with simulation directory
             if (Path.IsPathRooted(SQLiteDatabasePath))
                 return SQLiteDatabasePath;
             else
@@ -370,18 +443,31 @@ namespace Models.Prospect
             endWavelength = 2500;
 
             if (string.IsNullOrWhiteSpace(OutputWavelengthRange))
-                return true; // Use defaults
+            {
+                Summary.WriteMessage(this, "ProspectModel: OutputWavelengthRange is empty, using default range 400-2500 nm.", MessageType.Information);
+                return true;
+            }
 
             string[] parts = OutputWavelengthRange.Split('-');
             if (parts.Length != 2)
+            {
+                Summary.WriteMessage(this, $"ProspectModel: Invalid wavelength range format: {OutputWavelengthRange}.", MessageType.Warning);
                 return false;
+            }
 
             if (!double.TryParse(parts[0], out startWavelength) || !double.TryParse(parts[1], out endWavelength))
+            {
+                Summary.WriteMessage(this, $"ProspectModel: Failed to parse wavelength range values: {OutputWavelengthRange}.", MessageType.Warning);
                 return false;
+            }
 
             if (startWavelength < 0 || endWavelength < startWavelength)
+            {
+                Summary.WriteMessage(this, $"ProspectModel: Invalid wavelength range values (start < 0 or end < start): {OutputWavelengthRange}.", MessageType.Warning);
                 return false;
+            }
 
+            Summary.WriteMessage(this, $"ProspectModel: Parsed wavelength range: {startWavelength}-{endWavelength} nm.", MessageType.Information);
             return true;
         }
 
@@ -395,22 +481,23 @@ namespace Models.Prospect
         private void SaveResultsToDatabase(double[] reflectance, double[] transmittance, double startWavelength, double endWavelength)
         {
             if (dbConnection == null || reflectance == null || transmittance == null || Wavelengths == null)
+            {
+                Summary.WriteMessage(this, "ProspectModel: SaveResultsToDatabase skipped due to null dbConnection, reflectance, transmittance, or Wavelengths.", MessageType.Warning);
                 return;
+            }
 
             try
             {
                 string date = Clock.Today.ToString("yyyy-MM-dd");
 
-                dbConnection.BeginTransaction();
-
                 // Save parameter values
                 string paramSql = $@"
-            INSERT OR REPLACE INTO Parameters 
-            (Date, SimulationID, N, CHL, CAR, EWT, LMA, ANT, BROWN, PROT, CBC, Alpha)
-            VALUES ('{date}', '{simulationID}', {CurrentParameterValues["N"]}, {CurrentParameterValues["CHL"]}, 
-                    {CurrentParameterValues["CAR"]}, {CurrentParameterValues["EWT"]}, {CurrentParameterValues["LMA"]}, 
-                    {CurrentParameterValues["ANT"]}, {CurrentParameterValues["BROWN"]}, {CurrentParameterValues["PROT"]}, 
-                    {CurrentParameterValues["CBC"]}, {CurrentParameterValues["Alpha"]})";
+                    INSERT OR REPLACE INTO Parameters 
+                    (Date, SimulationID, N, CHL, CAR, EWT, LMA, ANT, BROWN, PROT, CBC, Alpha)
+                    VALUES ('{date}', '{simulationID}', {CurrentParameterValues["N"]}, {CurrentParameterValues["CHL"]}, 
+                            {CurrentParameterValues["CAR"]}, {CurrentParameterValues["EWT"]}, {CurrentParameterValues["LMA"]}, 
+                            {CurrentParameterValues["ANT"]}, {CurrentParameterValues["BROWN"]}, {CurrentParameterValues["PROT"]}, 
+                            {CurrentParameterValues["CBC"]}, {CurrentParameterValues["Alpha"]})";
                 dbConnection.ExecuteNonQuery(paramSql);
 
                 // Save spectral data
@@ -420,37 +507,18 @@ namespace Models.Prospect
                     if (wavelength >= startWavelength && wavelength <= endWavelength)
                     {
                         string spectraSql = $@"
-                    INSERT OR REPLACE INTO Spectra
-                    (WavelengthNM, Date, SimulationID, Reflectance, Transmittance, Absorptance)
-                    VALUES ({wavelength}, '{date}', '{simulationID}', {reflectance[i]}, {transmittance[i]}, 
-                            {1.0 - reflectance[i] - transmittance[i]})";
+                            INSERT OR REPLACE INTO Spectra
+                            (WavelengthNM, Date, SimulationID, Reflectance, Transmittance, Absorptance)
+                            VALUES ({wavelength}, '{date}', '{simulationID}', {reflectance[i]}, {transmittance[i]}, 
+                                    {1.0 - reflectance[i] - transmittance[i]})";
                         dbConnection.ExecuteNonQuery(spectraSql);
                     }
                 }
-
-                // Transaction is committed when connection is closed
             }
             catch (Exception ex)
             {
-                Summary.WriteMessage(this, $"Failed to save PROSPECT results to database: {ex.Message}", MessageType.Error);
-            }
-        }
-
-        /// <summary>
-        /// Ensure the spectral constants are loaded
-        /// </summary>
-        private void EnsureSpectralConstantsLoaded()
-        {
-            Summary.WriteMessage(this, "ProspectModel: Loading spectral constants.", MessageType.Information);
-            try
-            {
-                cachedSpectralConstants = ProspectCore.LoadLocalSpectralData();
-                Summary.WriteMessage(this, $"ProspectModel: Spectral constants loaded, Wavelengths count: {cachedSpectralConstants.Value.Wavelengths.Count}.", MessageType.Information);
-            }
-            catch (Exception ex)
-            {
-                Summary.WriteMessage(this, $"ProspectModel: Failed to load spectral constants: {ex.Message}", MessageType.Error);
-                throw; // Rethrow to halt simulation if data is missing
+                Summary.WriteMessage(this, $"ProspectModel: Failed to save PROSPECT results to database: {ex.Message}", MessageType.Error);
+                throw;
             }
         }
 
@@ -461,17 +529,14 @@ namespace Models.Prospect
         /// <returns>The evaluated expression value</returns>
         private double EvaluateExpression(string expression)
         {
-            // First check if expression is a simple number
             if (double.TryParse(expression, out double result))
                 return result;
 
-            // Otherwise, evaluate the expression using the ExpressionFunction mechanism
             object value = ExpressionFunction.Evaluate(expression, this);
-
             if (value is double)
                 return (double)value;
             else if (value is double[] && ((double[])value).Length > 0)
-                return ((double[])value)[0]; // Take first element if it's an array
+                return ((double[])value)[0];
             else
                 return Convert.ToDouble(value);
         }
@@ -482,44 +547,45 @@ namespace Models.Prospect
         /// <returns>A tuple containing reflectance and transmittance vectors</returns>
         public (Vector<double> Reflectance, Vector<double> Transmittance) CalculateProspect()
         {
-            EnsureSpectralConstantsLoaded();
+            if (cachedSpectralConstants == null)
+            {
+                Summary.WriteMessage(this, $"ProspectModel: CalculateProspect called without spectral constants on {Clock?.Today:yyyy-MM-dd}.", MessageType.Error);
+                throw new InvalidOperationException("Spectral constants not loaded.");
+            }
+
+            Summary.WriteMessage(this, $"ProspectModel: CalculateProspect called on {Clock?.Today:yyyy-MM-dd}.", MessageType.Information);
 
             // Evaluate expressions and store current parameter values
             double nValue = EvaluateExpression(N);
             CurrentParameterValues["N"] = nValue;
-
             double chlValue = EvaluateExpression(CHL);
             CurrentParameterValues["CHL"] = chlValue;
-
             double carValue = EvaluateExpression(CAR);
             CurrentParameterValues["CAR"] = carValue;
-
             double ewtValue = EvaluateExpression(EWT);
             CurrentParameterValues["EWT"] = ewtValue;
-
             double lmaValue = EvaluateExpression(LMA);
             CurrentParameterValues["LMA"] = lmaValue;
-
             double antValue = EvaluateExpression(ANT);
             CurrentParameterValues["ANT"] = antValue;
-
             double brownValue = EvaluateExpression(BROWN);
             CurrentParameterValues["BROWN"] = brownValue;
-
             double protValue = EvaluateExpression(PROT);
             CurrentParameterValues["PROT"] = protValue;
-
             double cbcValue = EvaluateExpression(CBC);
             CurrentParameterValues["CBC"] = cbcValue;
-
             double alphaValue = EvaluateExpression(Alpha);
             CurrentParameterValues["Alpha"] = alphaValue;
 
             // Run the PROSPECT model with current parameters
-            return ProspectCore.Run(
+            var results = ProspectCore.Run(
                 cachedSpectralConstants,
                 nValue, chlValue, carValue, ewtValue, lmaValue,
                 antValue, brownValue, protValue, cbcValue, alphaValue);
+
+            Summary.WriteMessage(this, $"ProspectModel: CalculateProspect completed, Reflectance[{results.Reflectance.Count}], Transmittance[{results.Transmittance.Count}]", MessageType.Information);
+
+            return results;
         }
 
         /// <summary>
@@ -530,22 +596,17 @@ namespace Models.Prospect
         /// <param name="indent">The indentation level</param>
         public void Document(List<AutoDocumentation.ITag> tags, int headingLevel, int indent)
         {
-            // Model description
             tags.Add(new AutoDocumentation.Heading(Name, headingLevel));
             tags.Add(new AutoDocumentation.Paragraph("The PROSPECT model simulates leaf optical properties (reflectance, transmittance, and absorptance) " +
                                                       "based on leaf biochemical and structural properties.", indent));
 
-            // Parameters section
             tags.Add(new AutoDocumentation.Heading("Input Parameters", headingLevel + 1));
             tags.Add(new AutoDocumentation.Paragraph("The following parameters control the leaf optical properties:", indent));
-
-            // List parameters and their expressions
             tags.Add(new AutoDocumentation.Paragraph($"N (Leaf structure parameter): {N}", indent));
             tags.Add(new AutoDocumentation.Paragraph($"CHL (Chlorophyll content, μg/cm²): {CHL}", indent));
             tags.Add(new AutoDocumentation.Paragraph($"CAR (Carotenoid content, μg/cm²): {CAR}", indent));
             tags.Add(new AutoDocumentation.Paragraph($"EWT (Equivalent Water Thickness, g/cm²): {EWT}", indent));
             tags.Add(new AutoDocumentation.Paragraph($"LMA (Leaf Mass per Area, g/cm²): {LMA}", indent));
-
             if (!string.IsNullOrEmpty(ANT) && ANT != "0.0")
                 tags.Add(new AutoDocumentation.Paragraph($"ANT (Anthocyanin content, μg/cm²): {ANT}", indent));
             if (!string.IsNullOrEmpty(BROWN) && BROWN != "0.0")
@@ -554,10 +615,8 @@ namespace Models.Prospect
                 tags.Add(new AutoDocumentation.Paragraph($"PROT (Protein content, g/cm²): {PROT}", indent));
             if (!string.IsNullOrEmpty(CBC) && CBC != "0.0")
                 tags.Add(new AutoDocumentation.Paragraph($"CBC (Carbon-based constituent content, g/cm²): {CBC}", indent));
-
             tags.Add(new AutoDocumentation.Paragraph($"Alpha (Incidence angle, degrees): {Alpha}", indent));
 
-            // Outputs section
             tags.Add(new AutoDocumentation.Heading("Outputs", headingLevel + 1));
             tags.Add(new AutoDocumentation.Paragraph("The model provides the following outputs:", indent));
             tags.Add(new AutoDocumentation.Paragraph("- Full spectrum leaf reflectance, transmittance, and absorptance", indent));
