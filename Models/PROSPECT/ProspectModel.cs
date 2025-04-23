@@ -218,15 +218,6 @@ namespace Models.Prospect
         [EventSubscribe("Commencing")]
         private void OnCommencing(object sender, EventArgs e)
         {
-            /*Summary.WriteMessage(this, $"ProspectModel: Subscribed to events - Commencing, DoDailyInitialisation, DoManagementCalculations, Completed.", MessageType.Information);
-            Summary.WriteMessage(this, $"ProspectModel: Clock is {(Clock == null ? "null" : "not null")}.", MessageType.Information);
-            Summary.WriteMessage(this, $"ProspectModel: Simulation is {(Simulation == null ? "null" : "not null")}.", MessageType.Information);
-            Summary.WriteMessage(this, $"ProspectModel: ParentPlant is {(ParentPlant == null ? "null" : "not null")}.", MessageType.Information);
-            var parent = Parent as IModel;
-            Summary.WriteMessage(this, $"ProspectModel: Parent model is {(parent == null ? "null" : parent.GetType().Name)}.", MessageType.Information);
-
-            // Load spectral constants at simulation start
-            Summary.WriteMessage(this, "ProspectModel: Loading spectral constants.", MessageType.Information);*/
             try
             {
                 cachedSpectralConstants = ProspectCore.LoadLocalSpectralData();
@@ -642,7 +633,7 @@ namespace Models.Prospect
             }
             CurrentParameterValues["N"] = nValue;
 
-            // Check the realistic range of N (1.0-2.6 μg/cm²)
+            // Check the range of N (1.0-2.6 μg/cm²)
             if (nValue < 1 || nValue > 2.6)
             {
                 Summary.WriteMessage(this, $"ProspectModel: N value ({nValue}) out of range [1.0, 2.6] on {Clock?.Today:yyyy-MM-dd}.", MessageType.Warning);
@@ -654,7 +645,7 @@ namespace Models.Prospect
                 throw new InvalidOperationException($"Invalid CAB value ({cabValue}) from expression '{CAB}' on {Clock?.Today:yyyy-MM-dd}. Must be non-negative and not NaN.");
             }
             CurrentParameterValues["CAB"] = cabValue;
-            // Check CAB realistic range (10-80 μg/cm²)
+            // Check CAB range (10-80 μg/cm²)
             if (cabValue < 10 || cabValue > 80)
             {
                 Summary.WriteMessage(this, $"ProspectModel: CAB value ({cabValue}) out of range [10, 80] on {Clock?.Today:yyyy-MM-dd}.", MessageType.Warning);
@@ -666,6 +657,11 @@ namespace Models.Prospect
                 throw new InvalidOperationException($"Invalid CAR value ({carValue}) from expression '{CAR}' on {Clock?.Today:yyyy-MM-dd}. Must be non-negative and not NaN.");
             }
             CurrentParameterValues["CAR"] = carValue;
+            // Check CAR range (1-24 μg/cm²)
+            if (carValue < 1 || carValue > 24)
+            {
+                Summary.WriteMessage(this, $"ProspectModel: CAB value ({carValue}) out of range [1, 24] on {Clock?.Today:yyyy-MM-dd}.", MessageType.Warning);
+            }
 
             double ewtValue = EvaluateExpression(EWT);
             if (double.IsNaN(ewtValue) || ewtValue < 0)
@@ -674,12 +670,24 @@ namespace Models.Prospect
             }
             CurrentParameterValues["EWT"] = ewtValue;
 
+            // Check EWT range (0.001-0.08cm)
+            if (ewtValue < 0.001 || ewtValue > 0.08)
+            {
+                Summary.WriteMessage(this, $"ProspectModel: EWT value ({ewtValue}) out of range [0.001, 0.08] on {Clock?.Today:yyyy-MM-dd}.", MessageType.Warning);
+            }
+
             double lmaValue = EvaluateExpression(LMA);
             if (double.IsNaN(lmaValue) || lmaValue < 0)
             {
                 throw new InvalidOperationException($"Invalid LMA value ({lmaValue}) from expression '{LMA}' on {Clock?.Today:yyyy-MM-dd}. Must be non-negative and not NaN.");
             }
             CurrentParameterValues["LMA"] = lmaValue;
+
+            // Check LMA range (0.001-0.02 g/m²)
+            if (lmaValue < 0.001 || lmaValue > 0.02)
+            {
+                Summary.WriteMessage(this, $"ProspectModel: LMA value ({lmaValue}) out of range [0.001, 0.02] on {Clock?.Today:yyyy-MM-dd}.", MessageType.Warning);
+            }
 
             double antValue = EvaluateExpression(ANT);
             if (double.IsNaN(antValue) || antValue < 0)
@@ -694,6 +702,12 @@ namespace Models.Prospect
                 throw new InvalidOperationException($"Invalid BROWN value ({brownValue}) from expression '{BROWN}' on {Clock?.Today:yyyy-MM-dd}. Must be non-negative and not NaN.");
             }
             CurrentParameterValues["BROWN"] = brownValue;
+
+            // Check BROWN range (0-1 unitless)
+            if (brownValue < 0 || brownValue > 1)
+            {
+                Summary.WriteMessage(this, $"ProspectModel: BROWN value ({brownValue}) out of range [0, 1] on {Clock?.Today:yyyy-MM-dd}.", MessageType.Warning);
+            }
 
             double protValue = EvaluateExpression(PROT);
             if (double.IsNaN(protValue) || protValue < 0)
@@ -751,12 +765,12 @@ namespace Models.Prospect
             if (!string.IsNullOrEmpty(PROT) && PROT != "0.0")
                 tags.Add(new AutoDocumentation.Paragraph($"PROT (Protein content, g/cm²): {PROT}", indent));
             if (!string.IsNullOrEmpty(CBC) && CBC != "0.0")
-                tags.Add(new AutoDocumentation.Paragraph($"CBC (Carbon-based constituent content, g/cm²): {CBC}", indent));
+                tags.Add(new AutoDocumentation.Paragraph($"CBC (NonProt Carbon-based constituent content, g/cm²): {CBC}", indent));
             tags.Add(new AutoDocumentation.Paragraph($"Alpha (Incidence angle, degrees): {Alpha}", indent));
 
             tags.Add(new AutoDocumentation.Heading("Outputs", headingLevel + 1));
             tags.Add(new AutoDocumentation.Paragraph("The model provides the following outputs:", indent));
-            tags.Add(new AutoDocumentation.Paragraph("- Full spectrum leaf reflectance and transmittance", indent));
+            tags.Add(new AutoDocumentation.Paragraph("- Full spectrum (400 - 2500 nm) leaf reflectance and transmittance", indent));
 
             if (EnableSQLiteOutput)
             {
