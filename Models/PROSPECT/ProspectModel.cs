@@ -53,9 +53,9 @@ namespace Models.Prospect
         [Description("N - Leaf structure parameter")]
         public string N { get; set; } = "1.5";
 
-        /// <summary>The expression for CHL (Chlorophyll content)</summary>
-        [Description("CHL - Chlorophyll content (μg/cm²)")]
-        public string CHL { get; set; } = "40.0";
+        /// <summary>The expression for CHL (Chlorophyll a + b content)</summary>
+        [Description("CAB - Chlorophyll a + b content (μg/cm²)")]
+        public string CAB { get; set; } = "40.0";
 
         /// <summary>The expression for CAR (Carotenoid content)</summary>
         [Description("CAR - Carotenoid content (μg/cm²)")]
@@ -212,29 +212,6 @@ namespace Models.Prospect
             }
         }
 
-        /// <summary>
-        /// Gets the leaf absorptance spectrum calculated by PROSPECT
-        /// </summary>
-        [Units("unitless")]
-        [Description("Leaf absorptance (0-1)")]
-        public double[] LeafAbsorptance
-        {
-            get
-            {
-                if (Clock == null || cachedResults == null || lastCalculationDate != Clock.Today)
-                {
-                    Summary.WriteMessage(this, $"ProspectModel: LeafAbsorptance accessed without valid cached results on {Clock?.Today:yyyy-MM-dd}. Recalculating.", MessageType.Warning);
-                    var results = CalculateProspect();
-                    cachedResults = results;
-                    lastCalculationDate = Clock.Today;
-                }
-                Vector<double> reflectance = cachedResults.Value.Reflectance;
-                Vector<double> transmittance = cachedResults.Value.Transmittance;
-                Vector<double> cachedAbsorptance = Vector<double>.Build.Dense(reflectance.Count, i => Math.Round(1.0 - reflectance[i] - transmittance[i], 4));
-                return cachedAbsorptance.ToArray();
-            }
-        }
-
         /// <summary>Called when [simulation commencing].</summary>
         /// <param name="sender">The sender.</param>
         /// <param name="e">The <see cref="EventArgs"/> instance containing the event data.</param>
@@ -297,7 +274,7 @@ namespace Models.Prospect
             try
             {
                 // Calculate PROSPECT outputs
-                //Summary.WriteMessage(this, $"ProspectModel: Starting PROSPECT calculation with parameters: N={N}, CHL={CHL}, CAR={CAR}, EWT={EWT}, LMA={LMA}", MessageType.Information);
+                //Summary.WriteMessage(this, $"ProspectModel: Starting PROSPECT calculation with parameters: N={N}, CAB={CAB}, CAR={CAR}, EWT={EWT}, LMA={LMA}", MessageType.Information);
                 var results = CalculateProspect();
                 cachedResults = results; // Cache results
                 lastCalculationDate = Clock.Today;
@@ -394,7 +371,7 @@ namespace Models.Prospect
                         SimulationName TEXT,
                         Date TEXT,
                         N REAL,
-                        CHL REAL,
+                        CAB REAL,
                         CAR REAL,
                         EWT REAL,
                         LMA REAL,
@@ -414,7 +391,6 @@ namespace Models.Prospect
                         WavelengthNM REAL,
                         Reflectance REAL,
                         Transmittance REAL,
-                        Absorptance REAL,
                         PRIMARY KEY (SimulationName, Date, WavelengthNM),
                         FOREIGN KEY (SimulationName, Date) REFERENCES Parameters(SimulationName, Date)
                     )");
@@ -515,8 +491,8 @@ namespace Models.Prospect
                 }
 
                 // Prepare batch INSERT statements
-                StringBuilder paramSql = new StringBuilder("INSERT OR REPLACE INTO Parameters (SimulationName, Date, N, CHL, CAR, EWT, LMA, ANT, BROWN, PROT, CBC, Alpha) VALUES ");
-                StringBuilder spectraSql = new StringBuilder("INSERT OR REPLACE INTO Spectra (SimulationName, Date, WavelengthNM, Reflectance, Transmittance, Absorptance) VALUES ");
+                StringBuilder paramSql = new StringBuilder("INSERT OR REPLACE INTO Parameters (SimulationName, Date, N, CAB, CAR, EWT, LMA, ANT, BROWN, PROT, CBC, Alpha) VALUES ");
+                StringBuilder spectraSql = new StringBuilder("INSERT OR REPLACE INTO Spectra (SimulationName, Date, WavelengthNM, Reflectance, Transmittance) VALUES ");
                 bool firstParam = true;
                 bool firstSpectra = true;
 
@@ -527,7 +503,7 @@ namespace Models.Prospect
                     // Parameters INSERT
                     if (!firstParam)
                         paramSql.Append(",");
-                    paramSql.Append($"('{simulationName}', '{dateStr}', {parameters["N"]}, {parameters["CHL"]}, {parameters["CAR"]}, {parameters["EWT"]}, {parameters["LMA"]}, {parameters["ANT"]}, {parameters["BROWN"]}, {parameters["PROT"]}, {parameters["CBC"]}, {parameters["Alpha"]})");
+                    paramSql.Append($"('{simulationName}', '{dateStr}', {parameters["N"]}, {parameters["CAB"]}, {parameters["CAR"]}, {parameters["EWT"]}, {parameters["LMA"]}, {parameters["ANT"]}, {parameters["BROWN"]}, {parameters["PROT"]}, {parameters["CBC"]}, {parameters["Alpha"]})");
                     firstParam = false;
 
                     // Spectra INSERT
@@ -538,7 +514,7 @@ namespace Models.Prospect
                         {
                             if (!firstSpectra)
                                 spectraSql.Append(",");
-                            spectraSql.Append($"('{simulationName}', '{dateStr}', {wavelength}, {reflectance[i]}, {transmittance[i]}, {1.0 - reflectance[i] - transmittance[i]})");
+                            spectraSql.Append($"('{simulationName}', '{dateStr}', {wavelength}, {reflectance[i]}, {transmittance[i]})");
                             firstSpectra = false;
                         }
                     }
@@ -566,7 +542,7 @@ namespace Models.Prospect
                 {
                     Summary.WriteMessage(this, $"ProspectModel: Saved buffered results for {date:yyyy-MM-dd} to database.", MessageType.Information);
                     Summary.WriteMessage(this, $"  Wavelength range: {startWavelength}-{endWavelength} nm, step: {WavelengthStep} nm", MessageType.Information);
-                    Summary.WriteMessage(this, $"  Parameters: N={parameters["N"]:F2}, CHL={parameters["CHL"]:F1}, CAR={parameters["CAR"]:F1}, EWT={parameters["EWT"]:F4}, LMA={parameters["LMA"]:F4}", MessageType.Information);
+                    Summary.WriteMessage(this, $"  Parameters: N={parameters["N"]:F2}, CAB={parameters["CAB"]:F1}, CAR={parameters["CAR"]:F1}, EWT={parameters["EWT"]:F4}, LMA={parameters["LMA"]:F4}", MessageType.Information);
                 }*/
 
                 //Summary.WriteMessage(this, $"ProspectModel: Flushed {resultBuffer.Count} days to database.", MessageType.Information);
@@ -602,7 +578,7 @@ namespace Models.Prospect
             {
                 if (double.TryParse(expression, out double result))
                 {
-                    Summary.WriteMessage(this, $"ProspectModel: Expression '{expression}' parsed to {result} on {Clock?.Today:yyyy-MM-dd}.", MessageType.Information);
+                    //Summary.WriteMessage(this, $"ProspectModel: Expression '{expression}' parsed to {result} on {Clock?.Today:yyyy-MM-dd}.", MessageType.Information);
                     return result;
                 }
 
@@ -643,6 +619,11 @@ namespace Models.Prospect
         /// <summary>
         /// Calculate leaf optical properties using the PROSPECT model
         /// </summary>
+        /// <remarks>
+        /// The realistic ranges of inputs are from this paper:
+        /// Berger, K., Atzberger, C., Danner, M., D’Urso, G., Mauser, W., Vuolo, F., Hank, T., 2018. Evaluation of the PROSAIL Model Capabilities for Future Hyperspectral Model Environments: 
+        /// A Review Study. Remote Sensing 10, 85. https://doi.org/10.3390/rs10010085
+        /// </remarks>
         /// <returns>A tuple containing reflectance and transmittance vectors</returns>
         public (Vector<double> Reflectance, Vector<double> Transmittance) CalculateProspect()
         {
@@ -661,12 +642,23 @@ namespace Models.Prospect
             }
             CurrentParameterValues["N"] = nValue;
 
-            double chlValue = EvaluateExpression(CHL);
-            if (double.IsNaN(chlValue) || chlValue < 0)
+            // Check the realistic range of N (1.0-2.6 μg/cm²)
+            if (nValue < 1 || nValue > 2.6)
             {
-                throw new InvalidOperationException($"Invalid CHL value ({chlValue}) from expression '{CHL}' on {Clock?.Today:yyyy-MM-dd}. Must be non-negative and not NaN.");
+                Summary.WriteMessage(this, $"ProspectModel: N value ({nValue}) out of range [1.0, 2.6] on {Clock?.Today:yyyy-MM-dd}.", MessageType.Warning);
             }
-            CurrentParameterValues["CHL"] = chlValue;
+
+            double cabValue = EvaluateExpression(CAB);
+            if (double.IsNaN(cabValue) || cabValue < 0)
+            {
+                throw new InvalidOperationException($"Invalid CAB value ({cabValue}) from expression '{CAB}' on {Clock?.Today:yyyy-MM-dd}. Must be non-negative and not NaN.");
+            }
+            CurrentParameterValues["CAB"] = cabValue;
+            // Check CAB realistic range (10-80 μg/cm²)
+            if (cabValue < 10 || cabValue > 80)
+            {
+                Summary.WriteMessage(this, $"ProspectModel: CAB value ({cabValue}) out of range [10, 80] on {Clock?.Today:yyyy-MM-dd}.", MessageType.Warning);
+            }
 
             double carValue = EvaluateExpression(CAR);
             if (double.IsNaN(carValue) || carValue < 0)
@@ -727,7 +719,7 @@ namespace Models.Prospect
             // Run the PROSPECT model with current parameters
             var results = ProspectCore.Run(
                 cachedSpectralConstants,
-                nValue, chlValue, carValue, ewtValue, lmaValue,
+                nValue, cabValue, carValue, ewtValue, lmaValue,
                 antValue, brownValue, protValue, cbcValue, alphaValue);
             //Summary.WriteMessage(this, $"ProspectModel: CalculateProspect completed, Reflectance[{results.Reflectance.Count}], Transmittance[{results.Transmittance.Count}]", MessageType.Information);
             return results;
@@ -742,13 +734,13 @@ namespace Models.Prospect
         public void Document(List<AutoDocumentation.ITag> tags, int headingLevel, int indent)
         {
             tags.Add(new AutoDocumentation.Heading(Name, headingLevel));
-            tags.Add(new AutoDocumentation.Paragraph("The PROSPECT model simulates leaf optical properties (reflectance, transmittance, and absorptance) " +
+            tags.Add(new AutoDocumentation.Paragraph("The PROSPECT model simulates leaf optical properties (reflectance and transmittance) " +
                                                       "based on leaf biochemical and structural properties.", indent));
 
             tags.Add(new AutoDocumentation.Heading("Input Parameters", headingLevel + 1));
             tags.Add(new AutoDocumentation.Paragraph("The following parameters control the leaf optical properties:", indent));
             tags.Add(new AutoDocumentation.Paragraph($"N (Leaf structure parameter): {N}", indent));
-            tags.Add(new AutoDocumentation.Paragraph($"CHL (Chlorophyll content, μg/cm²): {CHL}", indent));
+            tags.Add(new AutoDocumentation.Paragraph($"CAB (Chlorophyll a + b content, μg/cm²): {CAB}", indent));
             tags.Add(new AutoDocumentation.Paragraph($"CAR (Carotenoid content, μg/cm²): {CAR}", indent));
             tags.Add(new AutoDocumentation.Paragraph($"EWT (Equivalent Water Thickness, g/cm²): {EWT}", indent));
             tags.Add(new AutoDocumentation.Paragraph($"LMA (Leaf Mass per Area, g/cm²): {LMA}", indent));
@@ -764,7 +756,7 @@ namespace Models.Prospect
 
             tags.Add(new AutoDocumentation.Heading("Outputs", headingLevel + 1));
             tags.Add(new AutoDocumentation.Paragraph("The model provides the following outputs:", indent));
-            tags.Add(new AutoDocumentation.Paragraph("- Full spectrum leaf reflectance, transmittance, and absorptance", indent));
+            tags.Add(new AutoDocumentation.Paragraph("- Full spectrum leaf reflectance and transmittance", indent));
 
             if (EnableSQLiteOutput)
             {
@@ -773,8 +765,8 @@ namespace Models.Prospect
                 tags.Add(new AutoDocumentation.Paragraph($"- Database file: {SQLiteDatabasePath}", indent));
                 tags.Add(new AutoDocumentation.Paragraph($"- Wavelength range: {OutputWavelengthRange} nm", indent));
                 tags.Add(new AutoDocumentation.Paragraph($"- Wavelength step: {WavelengthStep} nm (1 for full resolution, >1 for downsampling)", indent));
-                tags.Add(new AutoDocumentation.Paragraph($"- Buffer days: {BufferDays} (number of days before writing to database)", indent));
-                tags.Add(new AutoDocumentation.Paragraph("The database contains spectral data for each simulation day when the plant is alive, including reflectance, transmittance, and absorptance values.", indent));
+                //tags.Add(new AutoDocumentation.Paragraph($"- Buffer days: {BufferDays} (number of days before writing to database)", indent));
+                tags.Add(new AutoDocumentation.Paragraph("The database contains spectral data for each simulation day when the plant is alive, including reflectance and transmittance values.", indent));
             }
         }
     }
