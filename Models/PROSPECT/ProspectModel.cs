@@ -24,6 +24,21 @@ namespace Models.Prospect
     public class ProspectModel : Model
     {
         /// <summary>
+        /// Defines the logging verbosity levels
+        /// </summary>
+        public enum LogLevel
+        {
+            /// <summary>Log only errors</summary>
+            Error,
+            /// <summary>Log errors and warnings</summary>
+            Warning,
+            /// <summary>Log errors, warnings, and informational messages</summary>
+            Info,
+            /// <summary>Log all messages, including debug details</summary>
+            Debug
+        }
+
+        /// <summary>
         /// Link to the clock for daily outputs
         /// </summary>
         [Link]
@@ -47,13 +62,20 @@ namespace Models.Prospect
         [Link(IsOptional = true)]
         private Plant ParentPlant = null;
 
+        /// <summary>
+        /// Link to the Wheat Phenology model to check emergence
+        /// </summary>
+        [Link(IsOptional = true, ByName = true)]
+        private IFunction Phenology = null;
+
         /// <summary>Integration</summary>
         [Separator("Expressions to link APSIM variables and PROSPECT inputs")]
+
         // <summary>The expression for N (Leaf structure parameter)</summary>
         [Description("N - Leaf structure parameter (unitless)")]
         public string N { get; set; } = "1.5";
 
-        /// <summary>The expression for CHL (Chlorophyll a + b content)</summary>
+        /// <summary>The expression for CAB (Chlorophyll a + b content)</summary>
         [Description("CAB - Chlorophyll a + b content (μg/cm²)")]
         public string CAB { get; set; } = "40.0";
 
@@ -75,7 +97,7 @@ namespace Models.Prospect
 
         /// <summary>The expression for ANT (Anthocyanin content)</summary>
         [Description("ANT - Anthocyanin content (μg/cm²)")]
-        public string ANT { get; set; } = "0.0";        
+        public string ANT { get; set; } = "0.0";
 
         /// <summary>The expression for PROT (Protein content)</summary>
         [Description("PROT - Protein content (g/cm²)")]
@@ -86,7 +108,7 @@ namespace Models.Prospect
         public string CBC { get; set; } = "0.0";
 
         /// <summary>The expression for alpha (Incidence angle in degrees)</summary>
-        [Description("Alpha - Incidence angle in degrees (°)")]
+        [Description("Alpha - Incidence angle in degrees (°}")]
         public string Alpha { get; set; } = "40.0";
 
         /// <summary>Control</summary>
@@ -121,6 +143,12 @@ namespace Models.Prospect
         /// </summary>
         [Description("Number of days to buffer before writing to database")]
         public int BufferDays { get; set; } = 5;
+
+        /// <summary>
+        /// Logging verbosity level
+        /// </summary>
+        [Description("Logging verbosity level (Error, Warning, Info, Debug)")]
+        public LogLevel LoggingLevel { get; set; } = LogLevel.Info;
 
         /// <summary>
         /// The cached spectral constants loaded at simulation start
@@ -162,7 +190,7 @@ namespace Models.Prospect
             {
                 if (cachedSpectralConstants == null)
                 {
-                    Summary.WriteMessage(this, "ProspectModel: Wavelengths accessed before spectral constants loaded.", MessageType.Warning);
+                    WriteMessage(LogLevel.Warning, "ProspectModel: Wavelengths accessed before spectral constants loaded.");
                     return Array.Empty<double>();
                 }
                 return cachedSpectralConstants.Value.Wavelengths.ToArray();
@@ -185,7 +213,7 @@ namespace Models.Prospect
             {
                 if (Clock == null || cachedResults == null || lastCalculationDate != Clock.Today)
                 {
-                    Summary.WriteMessage(this, $"ProspectModel: LeafReflectance accessed without valid cached results on {Clock?.Today:yyyy-MM-dd}. Recalculating.", MessageType.Warning);
+                    WriteMessage(LogLevel.Warning, $"ProspectModel: LeafReflectance accessed without valid cached results on {Clock?.Today:yyyy-MM-dd}. Recalculating.");
                     var results = CalculateProspect();
                     return results.Reflectance.ToArray();
                 }
@@ -204,11 +232,28 @@ namespace Models.Prospect
             {
                 if (Clock == null || cachedResults == null || lastCalculationDate != Clock.Today)
                 {
-                    Summary.WriteMessage(this, $"ProspectModel: LeafTransmittance accessed without valid cached results on {Clock?.Today:yyyy-MM-dd}. Recalculating.", MessageType.Warning);
+                    WriteMessage(LogLevel.Warning, $"ProspectModel: LeafTransmittance accessed without valid cached results on {Clock?.Today:yyyy-MM-dd}. Recalculating.");
                     var results = CalculateProspect();
                     return results.Transmittance.ToArray();
                 }
                 return cachedResults.Value.Transmittance.ToArray();
+            }
+        }
+
+        /// <summary>
+        /// Helper method to write messages based on logging level
+        /// </summary>
+        private void WriteMessage(LogLevel messageLevel, string message)
+        {
+            if ((int)messageLevel <= (int)LoggingLevel)
+            {
+                MessageType messageType = messageLevel switch
+                {
+                    LogLevel.Error => MessageType.Error,
+                    LogLevel.Warning => MessageType.Warning,
+                    _ => MessageType.Information // Info and Debug map to Information
+                };
+                Summary.WriteMessage(this, message, messageType);
             }
         }
 
@@ -218,14 +263,15 @@ namespace Models.Prospect
         [EventSubscribe("Commencing")]
         private void OnCommencing(object sender, EventArgs e)
         {
+            WriteMessage(LogLevel.Info, "ProspectModel: Simulation commencing.");
             try
             {
                 cachedSpectralConstants = ProspectCore.LoadLocalSpectralData();
-                Summary.WriteMessage(this, $"ProspectModel: Spectral constants loaded, Wavelengths count: {cachedSpectralConstants.Value.Wavelengths.Count}.", MessageType.Information);
+                WriteMessage(LogLevel.Info, $"ProspectModel: Spectral constants loaded, Wavelengths count: {cachedSpectralConstants.Value.Wavelengths.Count}.");
             }
             catch (Exception ex)
             {
-                Summary.WriteMessage(this, $"ProspectModel: Failed to load spectral constants: {ex.Message}", MessageType.Error);
+                WriteMessage(LogLevel.Error, $"ProspectModel: Failed to load spectral constants: {ex.Message}");
                 throw; // Halt simulation if data is missing
             }
 
@@ -241,7 +287,7 @@ namespace Models.Prospect
         [EventSubscribe("DoDailyInitialisation")]
         private void OnDoDailyInitialisation(object sender, EventArgs e)
         {
-            //Summary.WriteMessage(this, $"ProspectModel: OnDoDailyInitialisation called on {Clock?.Today:yyyy-MM-dd}.", MessageType.Information);
+            WriteMessage(LogLevel.Info, $"ProspectModel: OnDoDailyInitialisation called on {Clock?.Today:yyyy-MM-dd}.");
             CurrentParameterValues.Clear();
             // Clear cached results to force recalculation
             cachedResults = null;
@@ -254,27 +300,39 @@ namespace Models.Prospect
         [EventSubscribe("DoManagementCalculations")]
         private void OnDoManagementCalculations(object sender, EventArgs e)
         {
-            //Summary.WriteMessage(this, $"ProspectModel: OnDoManagementCalculations called on {Clock.Today:yyyy-MM-dd}.", MessageType.Information);
+            WriteMessage(LogLevel.Info, $"ProspectModel: OnDoManagementCalculations called on {Clock.Today:yyyy-MM-dd}.");
 
             if (ParentPlant?.IsAlive != true)
             {
-                Summary.WriteMessage(this, $"ProspectModel: Skipping calculations on {Clock.Today:yyyy-MM-dd} as Plant is not alive.", MessageType.Information);
+                WriteMessage(LogLevel.Info, $"ProspectModel: Skipping calculations on {Clock.Today:yyyy-MM-dd} as Plant is not alive.");
                 return;
+            }
+
+            // Check if the plant has emerged
+            bool hasEmerged = false;
+            try
+            {
+                object emergedValue = ExpressionFunction.Evaluate("[Phenology].Emerged", ParentPlant);
+                hasEmerged = emergedValue != null && Convert.ToBoolean(emergedValue);
+            }
+            catch (Exception ex)
+            {
+                WriteMessage(LogLevel.Warning, $"ProspectModel: Failed to check emergence status on {Clock.Today:yyyy-MM-dd}: {ex.Message}. Assuming not emerged.");
             }
 
             try
             {
                 // Calculate PROSPECT outputs
-                //Summary.WriteMessage(this, $"ProspectModel: Starting PROSPECT calculation with parameters: N={N}, CAB={CAB}, CAR={CAR}, EWT={EWT}, LMA={LMA}", MessageType.Information);
+                //WriteMessage(LogLevel.Info, $"ProspectModel: Starting PROSPECT calculation with parameters: N={N}, CAB={CAB}, CAR={CAR}, EWT={EWT}, LMA={LMA}");
                 var results = CalculateProspect();
                 cachedResults = results; // Cache results
                 lastCalculationDate = Clock.Today;
 
-                Summary.WriteMessage(this, $"ProspectModel: PROSPECT calculation completed, Reflectance[{results.Reflectance.Count}], Transmittance[{results.Transmittance.Count}]", MessageType.Information);
+                WriteMessage(LogLevel.Info, $"ProspectModel: PROSPECT calculation completed, Reflectance[{results.Reflectance.Count}], Transmittance[{results.Transmittance.Count}]");
 
                 // Save to database only if enabled
                 if (EnableSQLiteOutput)
-                {                   
+                {
                     // Buffer results
                     resultBuffer.Add((
                         Clock.Today,
@@ -283,23 +341,23 @@ namespace Models.Prospect
                         new Dictionary<string, double>(CurrentParameterValues)
                     ));
 
-                    //Summary.WriteMessage(this, $"ProspectModel: Buffered results for {Clock.Today:yyyy-MM-dd}. Buffer size: {resultBuffer.Count}.", MessageType.Information);
+                    WriteMessage(LogLevel.Info, $"ProspectModel: Buffered results for {Clock.Today:yyyy-MM-dd}. Buffer size: {resultBuffer.Count}.");
 
                     // Flush buffer if full or on last day
                     if (resultBuffer.Count >= BufferDays || Clock.Today == Clock.EndDate)
                     {
-                        //Summary.WriteMessage(this, $"ProspectModel: Flushing buffer with {resultBuffer.Count} days on {Clock.Today:yyyy-MM-dd}.", MessageType.Information);
+                        WriteMessage(LogLevel.Info, $"ProspectModel: Flushing buffer with {resultBuffer.Count} days on {Clock.Today:yyyy-MM-dd}.");
                         FlushBuffer();
                     }
                 }
                 else
                 {
-                    Summary.WriteMessage(this, $"ProspectModel: SQLite output disabled, results not saved to database.", MessageType.Information);
+                    WriteMessage(LogLevel.Info, $"ProspectModel: SQLite output disabled, results not saved to database.");
                 }
             }
             catch (Exception ex)
             {
-                Summary.WriteMessage(this, $"ProspectModel: Error in OnDoManagementCalculations: {ex.Message}", MessageType.Error);
+                WriteMessage(LogLevel.Error, $"ProspectModel: Error in OnDoManagementCalculations: {ex.Message}");
             }
         }
 
@@ -311,7 +369,7 @@ namespace Models.Prospect
         {
             if (EnableSQLiteOutput && resultBuffer.Count > 0)
             {
-                //Summary.WriteMessage(this, $"ProspectModel: Flushing remaining buffer with {resultBuffer.Count} days on simulation completion.", MessageType.Information);
+                WriteMessage(LogLevel.Info, $"ProspectModel: Flushing remaining buffer with {resultBuffer.Count} days on simulation completion.");
                 FlushBuffer();
             }
 
@@ -320,7 +378,7 @@ namespace Models.Prospect
                 dbConnection.CloseDatabase();
                 dbConnection = null;
                 string dbPath = GetFullDatabasePath();
-                Summary.WriteMessage(this, $"PROSPECT results database saved to: {dbPath}", MessageType.Information);
+                WriteMessage(LogLevel.Info, $"PROSPECT results database saved to: {dbPath}");
             }
         }
 
@@ -377,7 +435,7 @@ namespace Models.Prospect
 
                 dbConnection.ExecuteNonQuery(@"
                     CREATE TABLE IF NOT EXISTS Spectra (
-                        SimulationName TEXT,    
+                        SimulationName TEXT,
                         Date TEXT,
                         WavelengthNM REAL,
                         Reflectance REAL,
@@ -391,7 +449,7 @@ namespace Models.Prospect
                     VALUES ('{simulationName}', '{Clock.StartDate:yyyy-MM-dd}', '{Clock.EndDate:yyyy-MM-dd}', '{DateTime.Now:yyyy-MM-dd HH:mm:ss}')";
                 dbConnection.ExecuteNonQuery(sql);
 
-                Summary.WriteMessage(this, $"PROSPECT database initialized: {dbPath}", MessageType.Information);
+                WriteMessage(LogLevel.Info, $"PROSPECT database initialized: {dbPath}");
             }
             catch (Exception ex)
             {
@@ -400,7 +458,7 @@ namespace Models.Prospect
                     dbConnection.CloseDatabase();
                     dbConnection = null;
                 }
-                Summary.WriteMessage(this, $"Failed to initialize PROSPECT database: {ex.Message}", MessageType.Error);
+                WriteMessage(LogLevel.Error, $"Failed to initialize PROSPECT database: {ex.Message}");
                 EnableSQLiteOutput = false;
             }
         }
@@ -430,30 +488,30 @@ namespace Models.Prospect
 
             if (string.IsNullOrWhiteSpace(OutputWavelengthRange))
             {
-                Summary.WriteMessage(this, "ProspectModel: OutputWavelengthRange is empty, using default range 400-2500 nm.", MessageType.Information);
+                WriteMessage(LogLevel.Info, "ProspectModel: OutputWavelengthRange is empty, using default range 400-2500 nm.");
                 return true;
             }
 
             string[] parts = OutputWavelengthRange.Split('-');
             if (parts.Length != 2)
             {
-                Summary.WriteMessage(this, $"ProspectModel: Invalid wavelength range format: {OutputWavelengthRange}.", MessageType.Warning);
+                WriteMessage(LogLevel.Warning, $"ProspectModel: Invalid wavelength range format: {OutputWavelengthRange}.");
                 return false;
             }
 
             if (!double.TryParse(parts[0], out startWavelength) || !double.TryParse(parts[1], out endWavelength))
             {
-                Summary.WriteMessage(this, $"ProspectModel: Failed to parse wavelength range values: {OutputWavelengthRange}.", MessageType.Warning);
+                WriteMessage(LogLevel.Warning, $"ProspectModel: Failed to parse wavelength range values: {OutputWavelengthRange}.");
                 return false;
             }
 
             if (startWavelength < 0 || endWavelength < startWavelength)
             {
-                Summary.WriteMessage(this, $"ProspectModel: Invalid wavelength range values (start < 0 or end < start): {OutputWavelengthRange}.", MessageType.Warning);
+                WriteMessage(LogLevel.Warning, $"ProspectModel: Invalid wavelength range values (start < 0 or end < start): {OutputWavelengthRange}.");
                 return false;
             }
 
-            Summary.WriteMessage(this, $"ProspectModel: Parsed wavelength range: {startWavelength}-{endWavelength} nm.", MessageType.Information);
+            WriteMessage(LogLevel.Info, $"ProspectModel: Parsed wavelength range: {startWavelength}-{endWavelength} nm.");
             return true;
         }
 
@@ -464,7 +522,7 @@ namespace Models.Prospect
         {
             if (dbConnection == null || resultBuffer.Count == 0 || Wavelengths == null)
             {
-                Summary.WriteMessage(this, "ProspectModel: FlushBuffer skipped due to null dbConnection, empty buffer, or null Wavelengths.", MessageType.Warning);
+                WriteMessage(LogLevel.Warning, "ProspectModel: FlushBuffer skipped due to null dbConnection, empty buffer, or null Wavelengths.");
                 return;
             }
 
@@ -478,7 +536,7 @@ namespace Models.Prospect
                 {
                     startWavelength = 0;
                     endWavelength = 10000;
-                    Summary.WriteMessage(this, $"Invalid wavelength range specified: {OutputWavelengthRange}. Using full spectrum (400-2500).", MessageType.Warning);
+                    WriteMessage(LogLevel.Warning, $"Invalid wavelength range specified: {OutputWavelengthRange}. Using full spectrum (400-2500).");
                 }
 
                 // Prepare batch INSERT statements
@@ -517,27 +575,27 @@ namespace Models.Prospect
                 // Execute batch INSERTs
                 if (!firstParam)
                 {
-                    //Summary.WriteMessage(this, $"ProspectModel: Executing Parameters INSERT with {paramSql.Length} characters.", MessageType.Information);
+                    WriteMessage(LogLevel.Debug, $"ProspectModel: Executing Parameters INSERT with {paramSql.Length} characters.");
                     dbConnection.ExecuteNonQuery(paramSql.ToString());
                 }
                 if (!firstSpectra)
                 {
-                    //Summary.WriteMessage(this, $"ProspectModel: Executing Spectra INSERT with {spectraSql.Length} characters.", MessageType.Information);
+                    WriteMessage(LogLevel.Debug, $"ProspectModel: Executing Spectra INSERT with {spectraSql.Length} characters.");
                     dbConnection.ExecuteNonQuery(spectraSql.ToString());
                 }
 
-                dbConnection.ExecuteNonQuery("COMMIT;");                
+                dbConnection.ExecuteNonQuery("COMMIT;");
 
-                //Summary.WriteMessage(this, $"ProspectModel: Flushed {resultBuffer.Count} days to database.", MessageType.Information);
+                WriteMessage(LogLevel.Info, $"ProspectModel: Flushed {resultBuffer.Count} days to database.");
                 resultBuffer.Clear();
             }
             catch (Exception ex)
             {
                 dbConnection.ExecuteNonQuery("ROLLBACK;");
-                Summary.WriteMessage(this, $"ProspectModel: Failed to flush buffer to database: {ex.Message}", MessageType.Error);
+                WriteMessage(LogLevel.Error, $"ProspectModel: Failed to flush buffer to database: {ex.Message}");
                 throw;
             }
-        }              
+        }
 
         /// <summary>
         /// Evaluates an expression and returns its value
@@ -550,40 +608,38 @@ namespace Models.Prospect
             {
                 if (double.TryParse(expression, out double result))
                 {
-                    //Summary.WriteMessage(this, $"ProspectModel: Expression '{expression}' parsed to {result} on {Clock?.Today:yyyy-MM-dd}.", MessageType.Information);
+                    WriteMessage(LogLevel.Debug, $"ProspectModel: Expression '{expression}' parsed to {result} on {Clock?.Today:yyyy-MM-dd}.");
                     return result;
                 }
 
                 object value = ExpressionFunction.Evaluate(expression, this);
                 if (value == null)
                 {
-                    //Summary.WriteMessage(this, $"ProspectModel: Expression '{expression}' evaluated to null on {Clock?.Today:yyyy-MM-dd}.", MessageType.Error);
-                    //return 0.0;
+                    WriteMessage(LogLevel.Error, $"ProspectModel: Expression '{expression}' evaluated to null on {Clock?.Today:yyyy-MM-dd}.");
                     throw new InvalidOperationException($"ProspectModel: Expression '{expression}' evaluated to null on {Clock?.Today:yyyy-MM-dd}.");
                 }
                 if (value is double)
                 {
                     double resultValue = (double)value;
-                    //Summary.WriteMessage(this, $"ProspectModel: Expression '{expression}' evaluated to {resultValue} on {Clock?.Today:yyyy-MM-dd}.", MessageType.Information);
+                    WriteMessage(LogLevel.Debug, $"ProspectModel: Expression '{expression}' evaluated to {resultValue} on {Clock?.Today:yyyy-MM-dd}.");
                     return resultValue;
                 }
                 else if (value is double[] && ((double[])value).Length > 0)
                 {
                     double resultValue = ((double[])value)[0];
-                    Summary.WriteMessage(this, $"ProspectModel: Expression '{expression}' evaluated to array, using first value {resultValue} on {Clock?.Today:yyyy-MM-dd}.", MessageType.Warning);
+                    WriteMessage(LogLevel.Warning, $"ProspectModel: Expression '{expression}' evaluated to array, using first value {resultValue} on {Clock?.Today:yyyy-MM-dd}.");
                     return resultValue;
                 }
                 else
                 {
                     double resultValue = Convert.ToDouble(value);
-                    //Summary.WriteMessage(this, $"ProspectModel: Expression '{expression}' converted to {resultValue} on {Clock?.Today:yyyy-MM-dd}.", MessageType.Information);
+                    WriteMessage(LogLevel.Debug, $"ProspectModel: Expression '{expression}' converted to {resultValue} on {Clock?.Today:yyyy-MM-dd}.");
                     return resultValue;
                 }
             }
             catch (Exception ex)
             {
-                Summary.WriteMessage(this, $"ProspectModel: Failed to evaluate expression '{expression}' on {Clock?.Today:yyyy-MM-dd}: {ex.Message}.", MessageType.Error);
-                //return 0.0;
+                WriteMessage(LogLevel.Error, $"ProspectModel: Failed to evaluate expression '{expression}' on {Clock?.Today:yyyy-MM-dd}: {ex.Message}.");
                 throw new InvalidOperationException($"ProspectModel: Failed to evaluate expression '{expression}' on {Clock?.Today:yyyy-MM-dd}: {ex.Message}.");
             }
         }
@@ -601,10 +657,10 @@ namespace Models.Prospect
         {
             if (cachedSpectralConstants == null)
             {
-                //Summary.WriteMessage(this, $"ProspectModel: CalculateProspect called without spectral constants on {Clock?.Today:yyyy-MM-dd}.", MessageType.Error);
+                WriteMessage(LogLevel.Error, $"ProspectModel: CalculateProspect called without spectral constants on {Clock?.Today:yyyy-MM-dd}.");
                 throw new InvalidOperationException("Spectral constants not loaded when CalculateProspect called.");
             }
-            //Summary.WriteMessage(this, $"ProspectModel: CalculateProspect called on {Clock?.Today:yyyy-MM-dd}.", MessageType.Information);
+            WriteMessage(LogLevel.Info, $"ProspectModel: CalculateProspect called on {Clock?.Today:yyyy-MM-dd}.");
 
             // Evaluate expressions and validate parameter values
             double nValue = EvaluateExpression(N);
@@ -613,11 +669,10 @@ namespace Models.Prospect
                 throw new InvalidOperationException($"Invalid N value ({nValue}) from expression '{N}' on {Clock?.Today:yyyy-MM-dd}. Must be positive and not NaN.");
             }
             CurrentParameterValues["N"] = nValue;
-
             // Check the range of N (1.0-2.6 unitless)
             if (nValue < 1 || nValue > 2.6)
             {
-                Summary.WriteMessage(this, $"ProspectModel: N value ({nValue}) out of range [1.0, 2.6] on {Clock?.Today:yyyy-MM-dd}. Check this paper: https://doi.org/10.3390/rs10010085", MessageType.Warning);
+                WriteMessage(LogLevel.Warning, $"ProspectModel: N value ({nValue}) out of range [1.0, 2.6] on {Clock?.Today:yyyy-MM-dd}. Check this paper: https://doi.org/10.3390/rs10010085");
             }
 
             double cabValue = EvaluateExpression(CAB);
@@ -629,7 +684,7 @@ namespace Models.Prospect
             // Check CAB range (10-80 μg/cm²)
             if (cabValue < 10 || cabValue > 80)
             {
-                Summary.WriteMessage(this, $"ProspectModel: CAB value ({cabValue}) out of range [10, 80] on {Clock?.Today:yyyy-MM-dd}. Check this paper: https://doi.org/10.3390/rs10010085", MessageType.Warning);
+                WriteMessage(LogLevel.Warning, $"ProspectModel: CAB value ({cabValue}) out of range [10, 80] on {Clock?.Today:yyyy-MM-dd}. Check this paper: https://doi.org/10.3390/rs10010085");
             }
 
             double carValue = EvaluateExpression(CAR);
@@ -641,7 +696,7 @@ namespace Models.Prospect
             // Check CAR range (1-24 μg/cm²)
             if (carValue < 1 || carValue > 24)
             {
-                Summary.WriteMessage(this, $"ProspectModel: CAR value ({carValue}) out of range [1, 24] on {Clock?.Today:yyyy-MM-dd}. Check this paper: https://doi.org/10.3390/rs10010085", MessageType.Warning);
+                WriteMessage(LogLevel.Warning, $"ProspectModel: CAR value ({carValue}) out of range [1, 24] on {Clock?.Today:yyyy-MM-dd}. Check this paper: https://doi.org/10.3390/rs10010085");
             }
 
             double ewtValue = EvaluateExpression(EWT);
@@ -650,11 +705,10 @@ namespace Models.Prospect
                 throw new InvalidOperationException($"Invalid EWT value ({ewtValue}) from expression '{EWT}' on {Clock?.Today:yyyy-MM-dd}. Must be non-negative and not NaN.");
             }
             CurrentParameterValues["EWT"] = ewtValue;
-
-            // Check EWT range (0.001-0.08cm)
+            // Check EWT range (0.001-0.08 cm)
             if (ewtValue < 0.001 || ewtValue > 0.08)
             {
-                Summary.WriteMessage(this, $"ProspectModel: EWT value ({ewtValue}) out of range [0.001, 0.08] on {Clock?.Today:yyyy-MM-dd}. Check this paper: https://doi.org/10.3390/rs10010085", MessageType.Warning);
+                WriteMessage(LogLevel.Warning, $"ProspectModel: EWT value ({ewtValue}) out of range [0.001, 0.08] on {Clock?.Today:yyyy-MM-dd}. Check this paper: https://doi.org/10.3390/rs10010085");
             }
 
             double lmaValue = EvaluateExpression(LMA);
@@ -663,11 +717,10 @@ namespace Models.Prospect
                 throw new InvalidOperationException($"Invalid LMA value ({lmaValue}) from expression '{LMA}' on {Clock?.Today:yyyy-MM-dd}. Must be non-negative and not NaN.");
             }
             CurrentParameterValues["LMA"] = lmaValue;
-
-            // Check LMA range (0.001-0.02 g/m²)
+            // Check LMA range (0.001-0.02 g/cm²)
             if (lmaValue < 0.001 || lmaValue > 0.02)
             {
-                Summary.WriteMessage(this, $"ProspectModel: LMA value ({lmaValue}) out of range [0.001, 0.02] on {Clock?.Today:yyyy-MM-dd}. Check this paper: https://doi.org/10.3390/rs10010085", MessageType.Warning);
+                WriteMessage(LogLevel.Warning, $"ProspectModel: LMA value ({lmaValue}) out of range [0.001, 0.02] on {Clock?.Today:yyyy-MM-dd}. Check this paper: https://doi.org/10.3390/rs10010085");
             }
 
             double antValue = EvaluateExpression(ANT);
@@ -683,11 +736,10 @@ namespace Models.Prospect
                 throw new InvalidOperationException($"Invalid BROWN value ({brownValue}) from expression '{BROWN}' on {Clock?.Today:yyyy-MM-dd}. Must be non-negative and not NaN.");
             }
             CurrentParameterValues["BROWN"] = brownValue;
-
             // Check BROWN range (0-1 unitless)
             if (brownValue < 0 || brownValue > 1)
             {
-                Summary.WriteMessage(this, $"ProspectModel: BROWN value ({brownValue}) out of range [0, 1] on {Clock?.Today:yyyy-MM-dd}.", MessageType.Warning);
+                WriteMessage(LogLevel.Warning, $"ProspectModel: BROWN value ({brownValue}) out of range [0, 1] on {Clock?.Today:yyyy-MM-dd}.");
             }
 
             double protValue = EvaluateExpression(PROT);
@@ -716,7 +768,7 @@ namespace Models.Prospect
                 cachedSpectralConstants,
                 nValue, cabValue, carValue, ewtValue, lmaValue,
                 antValue, brownValue, protValue, cbcValue, alphaValue);
-            //Summary.WriteMessage(this, $"ProspectModel: CalculateProspect completed, Reflectance[{results.Reflectance.Count}], Transmittance[{results.Transmittance.Count}]", MessageType.Information);
+            WriteMessage(LogLevel.Info, $"ProspectModel: CalculateProspect completed, Reflectance[{results.Reflectance.Count}], Transmittance[{results.Transmittance.Count}]");
             return results;
         }
 
@@ -760,7 +812,8 @@ namespace Models.Prospect
                 tags.Add(new AutoDocumentation.Paragraph($"- Database file: {SQLiteDatabasePath}", indent));
                 tags.Add(new AutoDocumentation.Paragraph($"- Wavelength range: {OutputWavelengthRange} nm", indent));
                 tags.Add(new AutoDocumentation.Paragraph($"- Wavelength step: {WavelengthStep} nm (1 for full resolution, >1 for downsampling)", indent));
-                //tags.Add(new AutoDocumentation.Paragraph($"- Buffer days: {BufferDays} (number of days before writing to database)", indent));
+                tags.Add(new AutoDocumentation.Paragraph($"- Buffer days: {BufferDays} (number of days before writing to database)", indent));
+                tags.Add(new AutoDocumentation.Paragraph($"- Logging level: {LoggingLevel} (controls verbosity of messages)", indent));
                 tags.Add(new AutoDocumentation.Paragraph("The database contains spectral data for each simulation day when the plant is alive, including reflectance and transmittance values.", indent));
             }
         }
