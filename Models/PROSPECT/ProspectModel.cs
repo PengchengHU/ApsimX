@@ -47,7 +47,9 @@ namespace Models.Prospect
         [Link(IsOptional = true)]
         private Plant ParentPlant = null;
 
-        /// <summary>The expression for N (Leaf structure parameter)</summary>
+        /// <summary>Integration</summary>
+        [Separator("Expressions to link APSIM variables and PROSPECT inputs")]
+        // <summary>The expression for N (Leaf structure parameter)</summary>
         [Description("N - Leaf structure parameter")]
         public string N { get; set; } = "1.5";
 
@@ -87,9 +89,12 @@ namespace Models.Prospect
         [Description("Alpha - Incidence angle in degrees")]
         public string Alpha { get; set; } = "40.0";
 
-        /// <summary>
-        /// Flag to enable daily SQLite database output
-        /// </summary>
+        /// <summary>Control</summary>
+        [Separator("Control the running")]
+
+        // <summary>
+        // Flag to enable daily SQLite database output
+        // </summary>
         [Description("Enable daily output to SQLite database")]
         public bool EnableSQLiteOutput { get; set; } = true;
 
@@ -236,7 +241,7 @@ namespace Models.Prospect
         [EventSubscribe("Commencing")]
         private void OnCommencing(object sender, EventArgs e)
         {
-            Summary.WriteMessage(this, $"ProspectModel: Subscribed to events - Commencing, DoDailyInitialisation, DoManagementCalculations, Completed.", MessageType.Information);
+            /*Summary.WriteMessage(this, $"ProspectModel: Subscribed to events - Commencing, DoDailyInitialisation, DoManagementCalculations, Completed.", MessageType.Information);
             Summary.WriteMessage(this, $"ProspectModel: Clock is {(Clock == null ? "null" : "not null")}.", MessageType.Information);
             Summary.WriteMessage(this, $"ProspectModel: Simulation is {(Simulation == null ? "null" : "not null")}.", MessageType.Information);
             Summary.WriteMessage(this, $"ProspectModel: ParentPlant is {(ParentPlant == null ? "null" : "not null")}.", MessageType.Information);
@@ -244,7 +249,7 @@ namespace Models.Prospect
             Summary.WriteMessage(this, $"ProspectModel: Parent model is {(parent == null ? "null" : parent.GetType().Name)}.", MessageType.Information);
 
             // Load spectral constants at simulation start
-            Summary.WriteMessage(this, "ProspectModel: Loading spectral constants.", MessageType.Information);
+            Summary.WriteMessage(this, "ProspectModel: Loading spectral constants.", MessageType.Information);*/
             try
             {
                 cachedSpectralConstants = ProspectCore.LoadLocalSpectralData();
@@ -268,7 +273,7 @@ namespace Models.Prospect
         [EventSubscribe("DoDailyInitialisation")]
         private void OnDoDailyInitialisation(object sender, EventArgs e)
         {
-            Summary.WriteMessage(this, $"ProspectModel.OnDoDailyInitialisation called on {Clock?.Today:yyyy-MM-dd}.", MessageType.Information);
+            //Summary.WriteMessage(this, $"ProspectModel: OnDoDailyInitialisation called on {Clock?.Today:yyyy-MM-dd}.", MessageType.Information);
             CurrentParameterValues.Clear();
             // Clear cached results to force recalculation
             cachedResults = null;
@@ -281,7 +286,7 @@ namespace Models.Prospect
         [EventSubscribe("DoManagementCalculations")]
         private void OnDoManagementCalculations(object sender, EventArgs e)
         {
-            Summary.WriteMessage(this, $"ProspectModel.OnDoManagementCalculations called on {Clock.Today:yyyy-MM-dd}.", MessageType.Information);
+            //Summary.WriteMessage(this, $"ProspectModel: OnDoManagementCalculations called on {Clock.Today:yyyy-MM-dd}.", MessageType.Information);
 
             if (ParentPlant?.IsAlive != true)
             {
@@ -292,7 +297,7 @@ namespace Models.Prospect
             try
             {
                 // Calculate PROSPECT outputs
-                Summary.WriteMessage(this, $"ProspectModel: Starting PROSPECT calculation with parameters: N={N}, CHL={CHL}, CAR={CAR}, EWT={EWT}, LMA={LMA}", MessageType.Information);
+                //Summary.WriteMessage(this, $"ProspectModel: Starting PROSPECT calculation with parameters: N={N}, CHL={CHL}, CAR={CAR}, EWT={EWT}, LMA={LMA}", MessageType.Information);
                 var results = CalculateProspect();
                 cachedResults = results; // Cache results
                 lastCalculationDate = Clock.Today;
@@ -301,13 +306,7 @@ namespace Models.Prospect
 
                 // Save to database only if enabled
                 if (EnableSQLiteOutput)
-                {
-                    if (Clock == null)
-                    {
-                        Summary.WriteMessage(this, "ProspectModel: Clock is null, cannot proceed with database operations.", MessageType.Error);
-                        return;
-                    }
-
+                {                   
                     // Buffer results
                     resultBuffer.Add((
                         Clock.Today,
@@ -316,12 +315,12 @@ namespace Models.Prospect
                         new Dictionary<string, double>(CurrentParameterValues)
                     ));
 
-                    Summary.WriteMessage(this, $"ProspectModel: Buffered results for {Clock.Today:yyyy-MM-dd}. Buffer size: {resultBuffer.Count}.", MessageType.Information);
+                    //Summary.WriteMessage(this, $"ProspectModel: Buffered results for {Clock.Today:yyyy-MM-dd}. Buffer size: {resultBuffer.Count}.", MessageType.Information);
 
                     // Flush buffer if full or on last day
                     if (resultBuffer.Count >= BufferDays || Clock.Today == Clock.EndDate)
                     {
-                        Summary.WriteMessage(this, $"ProspectModel: Flushing buffer with {resultBuffer.Count} days on {Clock.Today:yyyy-MM-dd}.", MessageType.Information);
+                        //Summary.WriteMessage(this, $"ProspectModel: Flushing buffer with {resultBuffer.Count} days on {Clock.Today:yyyy-MM-dd}.", MessageType.Information);
                         FlushBuffer();
                     }
                 }
@@ -344,7 +343,7 @@ namespace Models.Prospect
         {
             if (EnableSQLiteOutput && resultBuffer.Count > 0)
             {
-                Summary.WriteMessage(this, $"ProspectModel: Flushing remaining buffer with {resultBuffer.Count} days on simulation completion.", MessageType.Information);
+                //Summary.WriteMessage(this, $"ProspectModel: Flushing remaining buffer with {resultBuffer.Count} days on simulation completion.", MessageType.Information);
                 FlushBuffer();
             }
 
@@ -392,8 +391,8 @@ namespace Models.Prospect
 
                 dbConnection.ExecuteNonQuery(@"
                     CREATE TABLE IF NOT EXISTS Parameters (
-                        Date TEXT,
                         SimulationName TEXT,
+                        Date TEXT,
                         N REAL,
                         CHL REAL,
                         CAR REAL,
@@ -404,20 +403,20 @@ namespace Models.Prospect
                         PROT REAL,
                         CBC REAL,
                         Alpha REAL,
-                        PRIMARY KEY (Date, SimulationName),
+                        PRIMARY KEY (SimulationName, Date),
                         FOREIGN KEY (SimulationName) REFERENCES Simulations(SimulationName)
                     )");
 
                 dbConnection.ExecuteNonQuery(@"
                     CREATE TABLE IF NOT EXISTS Spectra (
-                        WavelengthNM REAL,
+                        SimulationName TEXT,    
                         Date TEXT,
-                        SimulationName TEXT,
+                        WavelengthNM REAL,
                         Reflectance REAL,
                         Transmittance REAL,
                         Absorptance REAL,
-                        PRIMARY KEY (WavelengthNM, Date, SimulationName),
-                        FOREIGN KEY (Date, SimulationName) REFERENCES Parameters(Date, SimulationName)
+                        PRIMARY KEY (SimulationName, Date, WavelengthNM),
+                        FOREIGN KEY (SimulationName, Date) REFERENCES Parameters(SimulationName, Date)
                     )");
 
                 string sql = $@"
@@ -512,12 +511,12 @@ namespace Models.Prospect
                 {
                     startWavelength = 0;
                     endWavelength = 10000;
-                    Summary.WriteMessage(this, $"Invalid wavelength range specified: {OutputWavelengthRange}. Using full spectrum.", MessageType.Warning);
+                    Summary.WriteMessage(this, $"Invalid wavelength range specified: {OutputWavelengthRange}. Using full spectrum (400-2500).", MessageType.Warning);
                 }
 
                 // Prepare batch INSERT statements
-                StringBuilder paramSql = new StringBuilder("INSERT OR REPLACE INTO Parameters (Date, SimulationName, N, CHL, CAR, EWT, LMA, ANT, BROWN, PROT, CBC, Alpha) VALUES ");
-                StringBuilder spectraSql = new StringBuilder("INSERT OR REPLACE INTO Spectra (WavelengthNM, Date, SimulationName, Reflectance, Transmittance, Absorptance) VALUES ");
+                StringBuilder paramSql = new StringBuilder("INSERT OR REPLACE INTO Parameters (SimulationName, Date, N, CHL, CAR, EWT, LMA, ANT, BROWN, PROT, CBC, Alpha) VALUES ");
+                StringBuilder spectraSql = new StringBuilder("INSERT OR REPLACE INTO Spectra (SimulationName, Date, WavelengthNM, Reflectance, Transmittance, Absorptance) VALUES ");
                 bool firstParam = true;
                 bool firstSpectra = true;
 
@@ -528,7 +527,7 @@ namespace Models.Prospect
                     // Parameters INSERT
                     if (!firstParam)
                         paramSql.Append(",");
-                    paramSql.Append($"('{dateStr}', '{simulationName}', {parameters["N"]}, {parameters["CHL"]}, {parameters["CAR"]}, {parameters["EWT"]}, {parameters["LMA"]}, {parameters["ANT"]}, {parameters["BROWN"]}, {parameters["PROT"]}, {parameters["CBC"]}, {parameters["Alpha"]})");
+                    paramSql.Append($"('{simulationName}', '{dateStr}', {parameters["N"]}, {parameters["CHL"]}, {parameters["CAR"]}, {parameters["EWT"]}, {parameters["LMA"]}, {parameters["ANT"]}, {parameters["BROWN"]}, {parameters["PROT"]}, {parameters["CBC"]}, {parameters["Alpha"]})");
                     firstParam = false;
 
                     // Spectra INSERT
@@ -539,7 +538,7 @@ namespace Models.Prospect
                         {
                             if (!firstSpectra)
                                 spectraSql.Append(",");
-                            spectraSql.Append($"({wavelength}, '{dateStr}', '{simulationName}', {reflectance[i]}, {transmittance[i]}, {1.0 - reflectance[i] - transmittance[i]})");
+                            spectraSql.Append($"('{simulationName}', '{dateStr}', {wavelength}, {reflectance[i]}, {transmittance[i]}, {1.0 - reflectance[i] - transmittance[i]})");
                             firstSpectra = false;
                         }
                     }
@@ -551,26 +550,26 @@ namespace Models.Prospect
                 // Execute batch INSERTs
                 if (!firstParam)
                 {
-                    Summary.WriteMessage(this, $"ProspectModel: Executing Parameters INSERT with {paramSql.Length} characters.", MessageType.Information);
+                    //Summary.WriteMessage(this, $"ProspectModel: Executing Parameters INSERT with {paramSql.Length} characters.", MessageType.Information);
                     dbConnection.ExecuteNonQuery(paramSql.ToString());
                 }
                 if (!firstSpectra)
                 {
-                    Summary.WriteMessage(this, $"ProspectModel: Executing Spectra INSERT with {spectraSql.Length} characters.", MessageType.Information);
+                    //Summary.WriteMessage(this, $"ProspectModel: Executing Spectra INSERT with {spectraSql.Length} characters.", MessageType.Information);
                     dbConnection.ExecuteNonQuery(spectraSql.ToString());
                 }
 
                 dbConnection.ExecuteNonQuery("COMMIT;");
 
-                // Log each saved day
+                /*// Log each saved day
                 foreach (var (date, _, _, parameters) in resultBuffer)
                 {
                     Summary.WriteMessage(this, $"ProspectModel: Saved buffered results for {date:yyyy-MM-dd} to database.", MessageType.Information);
                     Summary.WriteMessage(this, $"  Wavelength range: {startWavelength}-{endWavelength} nm, step: {WavelengthStep} nm", MessageType.Information);
                     Summary.WriteMessage(this, $"  Parameters: N={parameters["N"]:F2}, CHL={parameters["CHL"]:F1}, CAR={parameters["CAR"]:F1}, EWT={parameters["EWT"]:F4}, LMA={parameters["LMA"]:F4}", MessageType.Information);
-                }
+                }*/
 
-                Summary.WriteMessage(this, $"ProspectModel: Flushed {resultBuffer.Count} days to database.", MessageType.Information);
+                //Summary.WriteMessage(this, $"ProspectModel: Flushed {resultBuffer.Count} days to database.", MessageType.Information);
                 resultBuffer.Clear();
             }
             catch (Exception ex)
@@ -579,20 +578,7 @@ namespace Models.Prospect
                 Summary.WriteMessage(this, $"ProspectModel: Failed to flush buffer to database: {ex.Message}", MessageType.Error);
                 throw;
             }
-        }
-
-        /// <summary>
-        /// Save PROSPECT results to SQLite database (for compatibility, not used with buffering)
-        /// </summary>
-        /// <param name="reflectance">Reflectance spectrum</param>
-        /// <param name="transmittance">Transmittance spectrum</param>
-        /// <param name="startWavelength">Start wavelength in nm</param>
-        /// <param name="endWavelength">End wavelength in nm</param>
-        private void SaveResultsToDatabase(double[] reflectance, double[] transmittance, double startWavelength, double endWavelength)
-        {
-            // Deprecated: Use FlushBuffer instead
-            Summary.WriteMessage(this, "ProspectModel: SaveResultsToDatabase called, but buffering is enabled. Ignoring.", MessageType.Warning);
-        }
+        }              
 
         /// <summary>
         /// Evaluates an expression and returns its value
@@ -601,7 +587,7 @@ namespace Models.Prospect
         /// <returns>The evaluated expression value</returns>
         private double EvaluateExpression(string expression)
         {
-            if (double.TryParse(expression, out double result))
+            /*if (double.TryParse(expression, out double result))
                 return result;
 
             object value = ExpressionFunction.Evaluate(expression, this);
@@ -610,7 +596,48 @@ namespace Models.Prospect
             else if (value is double[] && ((double[])value).Length > 0)
                 return ((double[])value)[0];
             else
-                return Convert.ToDouble(value);
+                return Convert.ToDouble(value);*/
+
+            try
+            {
+                if (double.TryParse(expression, out double result))
+                {
+                    Summary.WriteMessage(this, $"ProspectModel: Expression '{expression}' parsed to {result} on {Clock?.Today:yyyy-MM-dd}.", MessageType.Information);
+                    return result;
+                }
+
+                object value = ExpressionFunction.Evaluate(expression, this);
+                if (value == null)
+                {
+                    //Summary.WriteMessage(this, $"ProspectModel: Expression '{expression}' evaluated to null on {Clock?.Today:yyyy-MM-dd}.", MessageType.Error);
+                    //return 0.0;
+                    throw new InvalidOperationException($"ProspectModel: Expression '{expression}' evaluated to null on {Clock?.Today:yyyy-MM-dd}.");
+                }
+                if (value is double)
+                {
+                    double resultValue = (double)value;
+                    //Summary.WriteMessage(this, $"ProspectModel: Expression '{expression}' evaluated to {resultValue} on {Clock?.Today:yyyy-MM-dd}.", MessageType.Information);
+                    return resultValue;
+                }
+                else if (value is double[] && ((double[])value).Length > 0)
+                {
+                    double resultValue = ((double[])value)[0];
+                    Summary.WriteMessage(this, $"ProspectModel: Expression '{expression}' evaluated to array, using first value {resultValue} on {Clock?.Today:yyyy-MM-dd}.", MessageType.Warning);
+                    return resultValue;
+                }
+                else
+                {
+                    double resultValue = Convert.ToDouble(value);
+                    //Summary.WriteMessage(this, $"ProspectModel: Expression '{expression}' converted to {resultValue} on {Clock?.Today:yyyy-MM-dd}.", MessageType.Information);
+                    return resultValue;
+                }
+            }
+            catch (Exception ex)
+            {
+                Summary.WriteMessage(this, $"ProspectModel: Failed to evaluate expression '{expression}' on {Clock?.Today:yyyy-MM-dd}: {ex.Message}.", MessageType.Error);
+                //return 0.0;
+                throw new InvalidOperationException($"ProspectModel: Failed to evaluate expression '{expression}' on {Clock?.Today:yyyy-MM-dd}: {ex.Message}.");
+            }
         }
 
         /// <summary>
@@ -621,10 +648,10 @@ namespace Models.Prospect
         {
             if (cachedSpectralConstants == null)
             {
-                Summary.WriteMessage(this, $"ProspectModel: CalculateProspect called without spectral constants on {Clock?.Today:yyyy-MM-dd}.", MessageType.Error);
-                throw new InvalidOperationException("Spectral constants not loaded.");
+                //Summary.WriteMessage(this, $"ProspectModel: CalculateProspect called without spectral constants on {Clock?.Today:yyyy-MM-dd}.", MessageType.Error);
+                throw new InvalidOperationException("Spectral constants not loaded when CalculateProspect called.");
             }
-            Summary.WriteMessage(this, $"ProspectModel: CalculateProspect called on {Clock?.Today:yyyy-MM-dd}.", MessageType.Information);
+            //Summary.WriteMessage(this, $"ProspectModel: CalculateProspect called on {Clock?.Today:yyyy-MM-dd}.", MessageType.Information);
 
             // Evaluate expressions and validate parameter values
             double nValue = EvaluateExpression(N);
@@ -702,7 +729,7 @@ namespace Models.Prospect
                 cachedSpectralConstants,
                 nValue, chlValue, carValue, ewtValue, lmaValue,
                 antValue, brownValue, protValue, cbcValue, alphaValue);
-            Summary.WriteMessage(this, $"ProspectModel: CalculateProspect completed, Reflectance[{results.Reflectance.Count}], Transmittance[{results.Transmittance.Count}]", MessageType.Information);
+            //Summary.WriteMessage(this, $"ProspectModel: CalculateProspect completed, Reflectance[{results.Reflectance.Count}], Transmittance[{results.Transmittance.Count}]", MessageType.Information);
             return results;
         }
 
