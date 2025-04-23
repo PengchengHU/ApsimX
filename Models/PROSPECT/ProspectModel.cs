@@ -61,13 +61,7 @@ namespace Models.Prospect
         /// </summary>
         [Link(IsOptional = true)]
         private Plant ParentPlant = null;
-
-        /// <summary>
-        /// Link to the Wheat Phenology model to check emergence
-        /// </summary>
-        [Link(IsOptional = true, ByName = true)]
-        private IFunction Phenology = null;
-
+              
         /// <summary>Integration</summary>
         [Separator("Expressions to link APSIM variables and PROSPECT inputs")]
 
@@ -308,17 +302,11 @@ namespace Models.Prospect
                 return;
             }
 
-            // Check if the plant has emerged
-            bool hasEmerged = false;
-            try
+            if (ParentPlant?.IsEmerged != true)
             {
-                object emergedValue = ExpressionFunction.Evaluate("[Phenology].Emerged", ParentPlant);
-                hasEmerged = emergedValue != null && Convert.ToBoolean(emergedValue);
-            }
-            catch (Exception ex)
-            {
-                WriteMessage(LogLevel.Warning, $"ProspectModel: Failed to check emergence status on {Clock.Today:yyyy-MM-dd}: {ex.Message}. Assuming not emerged.");
-            }
+                WriteMessage(LogLevel.Info, $"ProspectModel: Skipping calculations on {Clock.Today:yyyy-MM-dd} as Plant has not emerged.");
+                return;
+            }            
 
             try
             {
@@ -639,7 +627,13 @@ namespace Models.Prospect
             }
             catch (Exception ex)
             {
-                WriteMessage(LogLevel.Error, $"ProspectModel: Failed to evaluate expression '{expression}' on {Clock?.Today:yyyy-MM-dd}: {ex.Message}.");
+                if (ex.Message.Contains("Divide by Zero", StringComparison.OrdinalIgnoreCase))
+                {
+                    WriteMessage(LogLevel.Warning, $"ProspectModel: Divide by Zero in expression '{expression}' on {Clock?.Today:yyyy-MM-dd}. Setting the expression to 0.");
+                    return 0.0;
+                }
+
+                //WriteMessage(LogLevel.Error, $"ProspectModel: Failed to evaluate expression '{expression}' on {Clock?.Today:yyyy-MM-dd}: {ex.Message}.");
                 throw new InvalidOperationException($"ProspectModel: Failed to evaluate expression '{expression}' on {Clock?.Today:yyyy-MM-dd}: {ex.Message}.");
             }
         }
