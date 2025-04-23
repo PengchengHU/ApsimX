@@ -50,7 +50,7 @@ namespace Models.Prospect
         /// <summary>Integration</summary>
         [Separator("Expressions to link APSIM variables and PROSPECT inputs")]
         // <summary>The expression for N (Leaf structure parameter)</summary>
-        [Description("N - Leaf structure parameter")]
+        [Description("N - Leaf structure parameter (unitless)")]
         public string N { get; set; } = "1.5";
 
         /// <summary>The expression for CHL (Chlorophyll a + b content)</summary>
@@ -62,20 +62,20 @@ namespace Models.Prospect
         public string CAR { get; set; } = "8.0";
 
         /// <summary>The expression for EWT (Equivalent Water Thickness)</summary>
-        [Description("EWT - Equivalent Water Thickness (g/cm²)")]
+        [Description("EWT or CW - Equivalent Water Thickness or Water depth (cm)")]
         public string EWT { get; set; } = "0.01";
 
         /// <summary>The expression for LMA (Leaf Mass per Area)</summary>
-        [Description("LMA - Leaf Mass per Area (g/cm²)")]
+        [Description("LMA or CM - Leaf Mass per Area or Dry matter content (g/cm²)")]
         public string LMA { get; set; } = "0.008";
+
+        /// <summary>The expression for BROWN (Brown pigment content)</summary>
+        [Description("BROWN - Brown pigment content (unitless)")]
+        public string BROWN { get; set; } = "0.0";
 
         /// <summary>The expression for ANT (Anthocyanin content)</summary>
         [Description("ANT - Anthocyanin content (μg/cm²)")]
-        public string ANT { get; set; } = "0.0";
-
-        /// <summary>The expression for BROWN (Brown pigment content)</summary>
-        [Description("BROWN - Brown pigment content (Arbitrary units)")]
-        public string BROWN { get; set; } = "0.0";
+        public string ANT { get; set; } = "0.0";        
 
         /// <summary>The expression for PROT (Protein content)</summary>
         [Description("PROT - Protein content (g/cm²)")]
@@ -86,11 +86,11 @@ namespace Models.Prospect
         public string CBC { get; set; } = "0.0";
 
         /// <summary>The expression for alpha (Incidence angle in degrees)</summary>
-        [Description("Alpha - Incidence angle in degrees")]
+        [Description("Alpha - Incidence angle in degrees (°)")]
         public string Alpha { get; set; } = "40.0";
 
         /// <summary>Control</summary>
-        [Separator("Control the running")]
+        [Separator("Control the outputs")]
 
         // <summary>
         // Flag to enable daily SQLite database output
@@ -526,15 +526,7 @@ namespace Models.Prospect
                     dbConnection.ExecuteNonQuery(spectraSql.ToString());
                 }
 
-                dbConnection.ExecuteNonQuery("COMMIT;");
-
-                /*// Log each saved day
-                foreach (var (date, _, _, parameters) in resultBuffer)
-                {
-                    Summary.WriteMessage(this, $"ProspectModel: Saved buffered results for {date:yyyy-MM-dd} to database.", MessageType.Information);
-                    Summary.WriteMessage(this, $"  Wavelength range: {startWavelength}-{endWavelength} nm, step: {WavelengthStep} nm", MessageType.Information);
-                    Summary.WriteMessage(this, $"  Parameters: N={parameters["N"]:F2}, CAB={parameters["CAB"]:F1}, CAR={parameters["CAR"]:F1}, EWT={parameters["EWT"]:F4}, LMA={parameters["LMA"]:F4}", MessageType.Information);
-                }*/
+                dbConnection.ExecuteNonQuery("COMMIT;");                
 
                 //Summary.WriteMessage(this, $"ProspectModel: Flushed {resultBuffer.Count} days to database.", MessageType.Information);
                 resultBuffer.Clear();
@@ -554,17 +546,6 @@ namespace Models.Prospect
         /// <returns>The evaluated expression value</returns>
         private double EvaluateExpression(string expression)
         {
-            /*if (double.TryParse(expression, out double result))
-                return result;
-
-            object value = ExpressionFunction.Evaluate(expression, this);
-            if (value is double)
-                return (double)value;
-            else if (value is double[] && ((double[])value).Length > 0)
-                return ((double[])value)[0];
-            else
-                return Convert.ToDouble(value);*/
-
             try
             {
                 if (double.TryParse(expression, out double result))
@@ -633,10 +614,10 @@ namespace Models.Prospect
             }
             CurrentParameterValues["N"] = nValue;
 
-            // Check the range of N (1.0-2.6 μg/cm²)
+            // Check the range of N (1.0-2.6 unitless)
             if (nValue < 1 || nValue > 2.6)
             {
-                Summary.WriteMessage(this, $"ProspectModel: N value ({nValue}) out of range [1.0, 2.6] on {Clock?.Today:yyyy-MM-dd}.", MessageType.Warning);
+                Summary.WriteMessage(this, $"ProspectModel: N value ({nValue}) out of range [1.0, 2.6] on {Clock?.Today:yyyy-MM-dd}. Check this paper: https://doi.org/10.3390/rs10010085", MessageType.Warning);
             }
 
             double cabValue = EvaluateExpression(CAB);
@@ -648,7 +629,7 @@ namespace Models.Prospect
             // Check CAB range (10-80 μg/cm²)
             if (cabValue < 10 || cabValue > 80)
             {
-                Summary.WriteMessage(this, $"ProspectModel: CAB value ({cabValue}) out of range [10, 80] on {Clock?.Today:yyyy-MM-dd}.", MessageType.Warning);
+                Summary.WriteMessage(this, $"ProspectModel: CAB value ({cabValue}) out of range [10, 80] on {Clock?.Today:yyyy-MM-dd}. Check this paper: https://doi.org/10.3390/rs10010085", MessageType.Warning);
             }
 
             double carValue = EvaluateExpression(CAR);
@@ -660,7 +641,7 @@ namespace Models.Prospect
             // Check CAR range (1-24 μg/cm²)
             if (carValue < 1 || carValue > 24)
             {
-                Summary.WriteMessage(this, $"ProspectModel: CAB value ({carValue}) out of range [1, 24] on {Clock?.Today:yyyy-MM-dd}.", MessageType.Warning);
+                Summary.WriteMessage(this, $"ProspectModel: CAR value ({carValue}) out of range [1, 24] on {Clock?.Today:yyyy-MM-dd}. Check this paper: https://doi.org/10.3390/rs10010085", MessageType.Warning);
             }
 
             double ewtValue = EvaluateExpression(EWT);
@@ -673,7 +654,7 @@ namespace Models.Prospect
             // Check EWT range (0.001-0.08cm)
             if (ewtValue < 0.001 || ewtValue > 0.08)
             {
-                Summary.WriteMessage(this, $"ProspectModel: EWT value ({ewtValue}) out of range [0.001, 0.08] on {Clock?.Today:yyyy-MM-dd}.", MessageType.Warning);
+                Summary.WriteMessage(this, $"ProspectModel: EWT value ({ewtValue}) out of range [0.001, 0.08] on {Clock?.Today:yyyy-MM-dd}. Check this paper: https://doi.org/10.3390/rs10010085", MessageType.Warning);
             }
 
             double lmaValue = EvaluateExpression(LMA);
@@ -686,7 +667,7 @@ namespace Models.Prospect
             // Check LMA range (0.001-0.02 g/m²)
             if (lmaValue < 0.001 || lmaValue > 0.02)
             {
-                Summary.WriteMessage(this, $"ProspectModel: LMA value ({lmaValue}) out of range [0.001, 0.02] on {Clock?.Today:yyyy-MM-dd}.", MessageType.Warning);
+                Summary.WriteMessage(this, $"ProspectModel: LMA value ({lmaValue}) out of range [0.001, 0.02] on {Clock?.Today:yyyy-MM-dd}. Check this paper: https://doi.org/10.3390/rs10010085", MessageType.Warning);
             }
 
             double antValue = EvaluateExpression(ANT);
