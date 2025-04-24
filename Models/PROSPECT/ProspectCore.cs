@@ -28,8 +28,8 @@ namespace Models.Prospect
             public Vector<double> Wavelengths;      
             /// <summary>Refractive index spectrum</summary>
             public Vector<double> RefractiveIndex;   
-            /// <summary>Specific absorption coefficient for chlorophyll</summary>
-            public Vector<double> SAC_CHL;          
+            /// <summary>Specific absorption coefficient for a + b chlorophyll</summary>
+            public Vector<double> SAC_CAB;          
             /// <summary>Specific absorption coefficient for carotenoids</summary>
             public Vector<double> SAC_CAR;          
             /// <summary>Specific absorption coefficient for water</summary>
@@ -50,13 +50,6 @@ namespace Models.Prospect
             public Vector<double> SAC_CBC;    
         }
 
-        /// <summary>
-        /// Default path to the local spectral data file in JSON format.
-        /// </summary>
-
-        // Relative path from APSIM root
-        // private static readonly string RelativeSpectralDataPath = ".\\Models\\PROSPECT\\SpecPROSPECT_FullRange.json";
-        
         // Relative path from APSIM bin directory to Models\PROSPECT
         private static readonly string RelativeSpectralDataPath = "..\\..\\..\\Models\\PROSPECT\\SpecPROSPECT_FullRange.json";
         private static string DefaultSpectralDataPath => PathUtilities.GetAbsolutePath(RelativeSpectralDataPath, AppDomain.CurrentDomain.BaseDirectory);
@@ -64,9 +57,9 @@ namespace Models.Prospect
         /// <summary>
         /// Runs the PROSPECT model to calculate leaf reflectance and transmittance
         /// </summary>
-        /// <param name="spec">Spectral constants container</param>
+        /// <param name="Spec">Spectral constants container</param>
         /// <param name="N">Leaf structure parameter (unitless)</param>
-        /// <param name="CHL">Chlorophyll content (μg/cm²)</param>
+        /// <param name="CAB">Chlorophyll a + b content (μg/cm²)</param>
         /// <param name="CAR">Carotenoid content (μg/cm²)</param>
         /// <param name="EWT">Equivalent Water Thickness (g/cm²)</param>
         /// <param name="LMA">Leaf Mass per Area (g/cm²)</param>
@@ -74,12 +67,12 @@ namespace Models.Prospect
         /// <param name="BROWN">Brown pigment content (Arbitrary units)</param>
         /// <param name="PROT">Protein content (g/cm²)</param>
         /// <param name="CBC">NonProt Carbon-based constituent content (g/cm²)</param>
-        /// <param name="alpha">Incidence angle in degrees</param>
+        /// <param name="Alpha">Incidence angle in degrees</param>
         /// <returns>Tuple containing reflectance and transmittance spectra</returns>
         public static (Vector<double> Reflectance, Vector<double> Transmittance) Run(
-            SpectralConstants? spec = null, // Optional parameter with null default
+            SpectralConstants? Spec = null, // Optional parameter with null default
             double N = 1.5,
-            double CHL = 40.0,
+            double CAB = 40.0,
             double CAR = 8.0,
             double EWT = 0.01,
             double LMA = 0.008,
@@ -87,21 +80,21 @@ namespace Models.Prospect
             double BROWN = 0.0,
             double PROT = 0.0,
             double CBC = 0.0,
-            double alpha = 40.0)
+            double Alpha = 40.0)
         {
             // Load spectral constants if not provided
-            SpectralConstants spectralData = spec ?? LoadLocalSpectralData();
+            SpectralConstants spectralData = Spec ?? LoadLocalSpectralData();
 
             // Input validation
             if (N <= 0) throw new ArgumentException("Leaf structure parameter N must be positive");
-            if (CHL < 0 || CAR < 0 || EWT < 0 || LMA < 0 || ANT < 0 || BROWN < 0 || PROT < 0 || CBC < 0)
+            if (CAB < 0 || CAR < 0 || EWT < 0 || LMA < 0 || ANT < 0 || BROWN < 0 || PROT < 0 || CBC < 0)
                 throw new ArgumentException("Leaf constituents must be non-negative");
-            if (alpha < 0 || alpha > 90)
+            if (Alpha < 0 || Alpha > 90)
                 throw new ArgumentException("Incidence angle must be between 0 and 90 degrees");
 
             // Compute total absorption corresponding to each homogeneous layer
             // Kall = (sum of constituent absorptions) / N
-            Vector<double> Kall = (CHL * spectralData.SAC_CHL +
+            Vector<double> Kall = (CAB * spectralData.SAC_CAB +
                                  CAR * spectralData.SAC_CAR +
                                  EWT * spectralData.SAC_EWT +
                                  LMA * spectralData.SAC_LMA +
@@ -114,7 +107,7 @@ namespace Models.Prospect
             Vector<double> tau = ComputeTau(Kall);
 
             // reflectivity and transmissivity at the interface
-            Vector<double> talf = alpha == 40 ? spectralData.Tav40 : ComputeTav(alpha, spectralData.RefractiveIndex);
+            Vector<double> talf = Alpha == 40 ? spectralData.Tav40 : ComputeTav(Alpha, spectralData.RefractiveIndex);
             Vector<double> ralf = 1.0 - talf;
             Vector<double> t12 = spectralData.Tav90;
             Vector<double> r12 = 1.0 - t12;
@@ -229,11 +222,17 @@ namespace Models.Prospect
             });
         }
 
-        // computation of transmissivity of a dielectric plane surface, averaged over all directions of incidence and over all polarizations.
-        private static Vector<double> ComputeTav(double alpha, Vector<double> nr)
+        /// <summary>
+        /// Computes transmissivity of a dielectric plane surface, averaged over all directions
+        /// of incidence and over all polarizations.
+        /// </summary>
+        /// <param name="Alpha">Incidence angle in degrees</param>
+        /// <param name="nr">Refractive index vector</param>
+        /// <returns>Transmissivity vector</returns>
+        private static Vector<double> ComputeTav(double Alpha, Vector<double> nr)
         {
             double rd = Math.PI / 180.0;
-            double sa = Math.Sin(alpha * rd);
+            double sa = Math.Sin(Alpha * rd);
             double sa2 = sa * sa;
 
             return nr.Map(n =>
@@ -244,7 +243,7 @@ namespace Models.Prospect
                 double a = (n + 1) * (n + 1) / 2;
                 double k = -(n2 - 1) * (n2 - 1) / 4;
                 double b2 = sa2 - np / 2;
-                double b1 = alpha == 90 ? 0 : Math.Sqrt(b2 * b2 + k);
+                double b1 = Alpha == 90 ? 0 : Math.Sqrt(b2 * b2 + k);
                 double b = b1 - b2;
                 double b3 = b * b * b;
                 double a3 = a * a * a;
@@ -269,7 +268,7 @@ namespace Models.Prospect
             string path = DefaultSpectralDataPath;
             if (!File.Exists(path))
             {
-                throw new FileNotFoundException($"Spectral data file not found at {path}. Please provide a valid spec or ensure the file exists.");
+                throw new FileNotFoundException($"Spectral data file not found at {path}. Please provide a valid Spec or ensure the file exists.");
             }
 
             try
@@ -281,7 +280,7 @@ namespace Models.Prospect
                 {
                     Wavelengths = Vector<double>.Build.DenseOfArray(data.Wavelengths),
                     RefractiveIndex = Vector<double>.Build.DenseOfArray(data.RefractiveIndex),
-                    SAC_CHL = Vector<double>.Build.DenseOfArray(data.SAC_CHL),
+                    SAC_CAB = Vector<double>.Build.DenseOfArray(data.SAC_CAB),
                     SAC_CAR = Vector<double>.Build.DenseOfArray(data.SAC_CAR),
                     SAC_EWT = Vector<double>.Build.DenseOfArray(data.SAC_EWT),
                     SAC_LMA = Vector<double>.Build.DenseOfArray(data.SAC_LMA),
@@ -304,7 +303,7 @@ namespace Models.Prospect
         {
             public double[] Wavelengths { get; set; }
             public double[] RefractiveIndex { get; set; }
-            public double[] SAC_CHL { get; set; }
+            public double[] SAC_CAB { get; set; }
             public double[] SAC_CAR { get; set; }
             public double[] SAC_EWT { get; set; }
             public double[] SAC_LMA { get; set; }
