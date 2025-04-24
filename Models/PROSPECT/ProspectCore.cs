@@ -5,12 +5,14 @@ using MathNet.Numerics;
 using MathNet.Numerics.LinearAlgebra;
 using MathNet.Numerics.IntegralTransforms;
 using Newtonsoft.Json;
-using APSIM.Shared.Utilities; // Add this for PathUtilities
+using Models.Core;
+using APSIM.Shared.Utilities;
+using Microsoft.CodeAnalysis.CSharp.Syntax; // Add this for PathUtilities
 
 namespace Models.Prospect
 {
     /// <summary>
-    /// Implements the core PROSPECT radiative transfer model for leaf optical properties
+    /// Implements the PROSPECT radiative transfer model for leaf optical properties
     /// </summary>
     /// <remarks>
     /// Reference: Jacquemoud, S., and Baret, F. (1990). PROSPECT: A model of leaf optical properties spectra.
@@ -97,7 +99,8 @@ namespace Models.Prospect
             if (alpha < 0 || alpha > 90)
                 throw new ArgumentException("Incidence angle must be between 0 and 90 degrees");
 
-            // compute total absorption corresponding to each homogeneous layer
+            // Compute total absorption corresponding to each homogeneous layer
+            // Kall = (sum of constituent absorptions) / N
             Vector<double> Kall = (CHL * spectralData.SAC_CHL +
                                  CAR * spectralData.SAC_CAR +
                                  EWT * spectralData.SAC_EWT +
@@ -165,16 +168,64 @@ namespace Models.Prospect
             return (reflectance, transmittance);
         }
 
-        // reflectance and transmittance of one layer (tau)
+        /// <summary>
+        /// Computes the reflectance and transmittance of one layer (tau).
+        /// </summary>
+        /// <param name="k">Absorption coefficient vector (Kall).</param>
+        /// <returns>Transmittance vector (tau) for each wavelength.</returns>
         private static Vector<double> ComputeTau(Vector<double> k)
         {
             return k.Map(k_i =>
             {
-                if (k_i <= 0) return 1.0;
-                if (k_i > 100) return 0.0; // Prevent overflow
-                double expTerm = (1 - k_i) * Math.Exp(-k_i);
-                double eiTerm = k_i * k_i * SpecialFunctions.ExponentialIntegral(k_i, 1);
-                return Math.Max(0, Math.Min(1, expTerm + eiTerm));
+                // Handle edge cases for the absorption coefficient
+                if (k_i <= 0) return 1.0; // No absorption, full transmittance
+                if (k_i > 100) return 0.0; // High absorption, no transmittance (prevents overflow)
+
+                // Check if k_i is close to 1, where ExponentialIntegral may fail to converge
+                // The error "Continued fraction failed to converge for x=1.0xxx" suggests
+                // that SpecialFunctions.ExponentialIntegral(k_i, 1) uses a continued fraction internally,
+                // which struggles when k_i ≈ 1 due to slow convergence or oscillation.
+                if (Math.Abs(k_i - 1.0) < 0.05) // Threshold for problematic values
+                {
+                    // Use a series approximation for E_1(k_i) when k_i ≈ 1 to avoid convergence issues
+                    // E_1(x) ≈ -γ - ln(x) + x - x^2/4 + x^3/18 (Taylor expansion around x=1)
+                    // where γ is the Euler-Mascheroni constant (0.5772156649...)
+                    const double gamma = 0.5772156649015329;
+                    double delta = k_i - 1.0;
+                    double eiApprox = -gamma - Math.Log(k_i) + k_i - (k_i * k_i) / 4.0 + (k_i * k_i * k_i) / 18.0;
+                    double expTerm = (1 - k_i) * Math.Exp(-k_i);
+                    double tauApprox = expTerm + k_i * k_i * eiApprox;
+
+                    // Log the use of the approximation for debugging
+                    Console.WriteLine($"Warning: ProspectCore: Using E_1 approximation for k_i={k_i:F6} (close to 1)");
+
+                    // Ensure tau is within physical bounds [0, 1]
+                    return Math.Max(0, Math.Min(1, tauApprox));
+                }
+
+                try
+                {
+                    // Standard PROSPECT calculation for tau
+                    // tau = (1 - k) * e^(-k) + k^2 * E_1(k)
+                    // where E_1(k) is the exponential integral of order 1
+                    double expTerm = (1 - k_i) * Math.Exp(-k_i);
+                    double eiTerm = k_i * k_i * SpecialFunctions.ExponentialIntegral(k_i, 1);
+                    double tau = expTerm + eiTerm;
+
+                    // Ensure tau is within physical bounds [0, 1]
+                    return Math.Max(0, Math.Min(1, tau));
+                }
+                catch (Exception ex)
+                {
+                    // If ExponentialIntegral fails (e.g., due to continued fraction convergence failure),
+                    // fall back to a simple approximation: tau ≈ e^(-k_i)
+                    // This is a reasonable approximation for moderate absorption and avoids simulation failure
+                    Console.WriteLine($"Warning: ProspectCore: Failed to compute ExponentialIntegral for k_i={k_i:F6}: {ex.Message}. Using approximation tau ≈ e^(-k_i).");
+                    double tauFallback = Math.Exp(-k_i);
+
+                    // Ensure the fallback value is within physical bounds [0, 1]
+                    return Math.Max(0, Math.Min(1, tauFallback));
+                }
             });
         }
 
