@@ -24,21 +24,6 @@ namespace Models.Prospect
     public class ProspectModel : Model
     {
         /// <summary>
-        /// Defines the logging verbosity levels
-        /// </summary>
-        public enum LogLevel
-        {
-            /// <summary>Log only errors</summary>
-            Error,
-            /// <summary>Log errors and warnings</summary>
-            Warning,
-            /// <summary>Log errors, warnings, and informational messages</summary>
-            Info,
-            /// <summary>Log all messages, including debug details</summary>
-            Debug
-        }
-
-        /// <summary>
         /// Link to the clock for daily outputs
         /// </summary>
         [Link]
@@ -61,7 +46,7 @@ namespace Models.Prospect
         /// </summary>
         [Link(IsOptional = true)]
         private Plant ParentPlant = null;
-              
+
         /// <summary>Integration</summary>
         [Separator("Expressions to link APSIM variables and PROSPECT inputs")]
 
@@ -137,6 +122,21 @@ namespace Models.Prospect
         /// </summary>
         [Description("Number of days to buffer before writing to database")]
         public int BufferDays { get; set; } = 5;
+
+        /// <summary>
+        /// Defines the logging verbosity levels
+        /// </summary>
+        public enum LogLevel
+        {
+            /// <summary>Log only errors</summary>
+            Error,
+            /// <summary>Log errors and warnings</summary>
+            Warning,
+            /// <summary>Log errors, warnings, and informational messages</summary>
+            Info,
+            /// <summary>Log all messages, including debug details</summary>
+            Debug
+        }
 
         /// <summary>
         /// Logging verbosity level
@@ -294,6 +294,7 @@ namespace Models.Prospect
             }
 
             WriteMessage(LogLevel.Info, $"ProspectModel: OnEndOfDay called on {Clock.Today:yyyy-MM-dd}.");
+            // Initialize 
             CurrentParameterValues.Clear();
             // Clear cached results to force recalculation
             cachedResults = null;
