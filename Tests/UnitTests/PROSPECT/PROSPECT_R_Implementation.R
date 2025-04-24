@@ -14,7 +14,7 @@ if (!exists("run_prospect_r")) {
     reflectance <- rep(0.1, length(wavelengths))
     transmittance <- rep(0.1, length(wavelengths))
     
-    res <- prospect::PROSPECT(N = params$N, CHL = params$CHL, CAR = params$CAR, 
+    res <- prospect::PROSPECT(N = params$N, CHL = params$CAB, CAR = params$CAR, 
                               EWT = params$EWT, LMA = params$LMA, alpha = params$Alpha)
     
     list(

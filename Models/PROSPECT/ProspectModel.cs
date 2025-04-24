@@ -750,9 +750,9 @@ namespace Models.Prospect
 
             // Run the PROSPECT model with current parameters
             var results = ProspectCore.Run(
-                cachedSpectralConstants,
-                nValue, cabValue, carValue, ewtValue, lmaValue,
-                antValue, brownValue, protValue, cbcValue, alphaValue);
+                Spec: cachedSpectralConstants,
+                N: nValue, CAB: cabValue, CAR: carValue, EWT: ewtValue, LMA: lmaValue,
+                ANT: antValue, BROWN: brownValue, PROT: protValue, CBC: cbcValue, Alpha: alphaValue);
             WriteMessage(LogLevel.Info, $"ProspectModel: CalculateProspect completed, Reflectance[{results.Reflectance.Count}], Transmittance[{results.Transmittance.Count}]");
             return results;
         }

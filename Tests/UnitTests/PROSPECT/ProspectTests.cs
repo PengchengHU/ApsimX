@@ -22,7 +22,7 @@ namespace UnitTests
         {
             public string Name { get; set; }
             public double N { get; set; }
-            public double CHL { get; set; }
+            public double CAB { get; set; }
             public double CAR { get; set; }
             public double EWT { get; set; }
             public double LMA { get; set; }
@@ -56,7 +56,7 @@ namespace UnitTests
         {
             try
             {
-                return ProspectCore.Run(N: testCase.N, CHL: testCase.CHL, CAR: testCase.CAR, EWT: testCase.EWT, LMA: testCase.LMA, alpha: testCase.Alpha);
+                return ProspectCore.Run(N: testCase.N, CAB: testCase.CAB, CAR: testCase.CAR, EWT: testCase.EWT, LMA: testCase.LMA, Alpha: testCase.Alpha);
             }
             catch (Exception ex)
             {
