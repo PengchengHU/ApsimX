@@ -275,27 +275,12 @@ namespace Models.Prospect
             }
         }
 
-        /// <summary>Called when [do daily initialization].</summary>
-        /// <param name="sender">The sender.</param>
-        /// <param name="e">The <see cref="EventArgs"/> instance containing the event data.</param>
-        [EventSubscribe("DoDailyInitialisation")]
-        private void OnDoDailyInitialisation(object sender, EventArgs e)
-        {
-            WriteMessage(LogLevel.Info, $"ProspectModel: OnDoDailyInitialisation called on {Clock?.Today:yyyy-MM-dd}.");
-            CurrentParameterValues.Clear();
-            // Clear cached results to force recalculation
-            cachedResults = null;
-            lastCalculationDate = null;
-        }
-
         /// <summary>Called when [do management calculations].</summary>
         /// <param name="sender">The sender.</param>
         /// <param name="e">The <see cref="EventArgs"/> instance containing the event data.</param>
-        [EventSubscribe("DoManagementCalculations")]
-        private void OnDoManagementCalculations(object sender, EventArgs e)
+        [EventSubscribe("EndOfDay")]
+        private void OnEndOfDay(object sender, EventArgs e)
         {
-            WriteMessage(LogLevel.Info, $"ProspectModel: OnDoManagementCalculations called on {Clock.Today:yyyy-MM-dd}.");
-
             if (ParentPlant?.IsAlive != true)
             {
                 WriteMessage(LogLevel.Info, $"ProspectModel: Skipping calculations on {Clock.Today:yyyy-MM-dd} as Plant is not alive.");
@@ -306,8 +291,13 @@ namespace Models.Prospect
             {
                 WriteMessage(LogLevel.Info, $"ProspectModel: Skipping calculations on {Clock.Today:yyyy-MM-dd} as Plant has not emerged.");
                 return;
-            }            
+            }
 
+            WriteMessage(LogLevel.Info, $"ProspectModel: OnEndOfDay called on {Clock.Today:yyyy-MM-dd}.");
+            CurrentParameterValues.Clear();
+            // Clear cached results to force recalculation
+            cachedResults = null;
+            lastCalculationDate = null;
             try
             {
                 // Calculate PROSPECT outputs
