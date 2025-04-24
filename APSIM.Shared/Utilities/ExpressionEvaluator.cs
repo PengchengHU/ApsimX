@@ -227,7 +227,16 @@ namespace APSIM.Shared.Utilities
                         }
                         else
                         {
-                            ctSymbol.m_name = equation[i].ToString();
+                            // Check for two-character operators (>=, <=) before single-character ones
+                            string operatorName = equation[i].ToString();
+                            if (i + 1 < equation.Length && (equation[i] == '>' || equation[i] == '<') && equation[i + 1] == '=')
+                            {
+                                operatorName = equation[i].ToString() + "=";
+                                i++; // Skip the '=' character
+                            }
+                            ctSymbol.m_name = operatorName;
+
+                            //ctSymbol.m_name = equation[i].ToString();
                             ctSymbol.m_value = 0;
                             switch (ctSymbol.m_name)
                             {
@@ -249,6 +258,12 @@ namespace APSIM.Shared.Utilities
                                         // I have arbitrarily chosen to use -- for unary minus.
                                         ctSymbol.m_name = "--";
                                     }
+                                    break;
+                                case ">":    // Added
+                                case "<":    // Added
+                                case ">=":   // Added
+                                case "<=":   // Added
+                                    ctSymbol.m_type = ExpressionType.Operator;
                                     break;
                                 default:
                                     ctSymbol.m_type = ExpressionType.Operator;
@@ -267,7 +282,17 @@ namespace APSIM.Shared.Utilities
                             ctSymbol.m_value = Double.Parse(temp.ToString(), CultureInfo.InvariantCulture);
                             ctSymbol.m_type = ExpressionType.Value;
                             m_equation.Add(ctSymbol);
-                            ctSymbol.m_name = equation[i].ToString();
+
+                            // Check for two-character operators (>=, <=)
+                            string operatorName = equation[i].ToString();
+                            if (i + 1 < equation.Length && (equation[i] == '>' || equation[i] == '<') && equation[i + 1] == '=')
+                            {
+                                operatorName = equation[i].ToString() + "=";
+                                i++; // Skip the '=' character
+                            }
+                            ctSymbol.m_name = operatorName;
+
+                            //ctSymbol.m_name = equation[i].ToString();
                             ctSymbol.m_value = 0;
                             switch (ctSymbol.m_name)
                             {
@@ -290,6 +315,14 @@ namespace APSIM.Shared.Utilities
                                         ctSymbol.m_name = "--";
                                     }
                                     break;
+
+                                case ">":    // Added
+                                case "<":    // Added
+                                case ">=":   // Added
+                                case "<=":   // Added
+                                    ctSymbol.m_type = ExpressionType.Operator;
+                                    break;
+
                                 default:
                                     ctSymbol.m_type = ExpressionType.Operator;
                                     break;
@@ -320,7 +353,17 @@ namespace APSIM.Shared.Utilities
                                 ctSymbol.m_type = ExpressionType.Variable;
                             }
                             m_equation.Add(ctSymbol);
-                            ctSymbol.m_name = equation[i].ToString();
+
+                            // Check for two-character operators (>=, <=)
+                            string operatorName = equation[i].ToString();
+                            if (i + 1 < equation.Length && (equation[i] == '>' || equation[i] == '<') && equation[i + 1] == '=')
+                            {
+                                operatorName = equation[i].ToString() + "=";
+                                i++; // Skip the '=' character
+                            }
+                            ctSymbol.m_name = operatorName;
+
+                            //ctSymbol.m_name = equation[i].ToString();
                             ctSymbol.m_value = 0;
                             switch (ctSymbol.m_name)
                             {
@@ -343,6 +386,14 @@ namespace APSIM.Shared.Utilities
                                         ctSymbol.m_name = "--";
                                     }
                                     break;
+
+                                case ">":    // Added
+                                case "<":    // Added
+                                case ">=":   // Added
+                                case "<=":   // Added
+                                    ctSymbol.m_type = ExpressionType.Operator;
+                                    break;
+
                                 default:
                                     ctSymbol.m_type = ExpressionType.Operator;
                                     break;
@@ -548,6 +599,12 @@ namespace APSIM.Shared.Utilities
                 case "+":
                 case "-":
                     return 1;
+
+                case ">":    // Added
+                case "<":    // Added
+                case ">=":   // Added
+                case "<=":   // Added
+                    return 1; // Same precedence as + and -
             }
             return -1;
         }
@@ -646,6 +703,19 @@ namespace APSIM.Shared.Utilities
                     else
                         result.m_value = sym2.m_value * -1;
                     break;
+
+                case ">":    // Added
+                    result.m_value = sym1.m_value > sym2.m_value ? 1.0 : 0.0;
+                    break;
+                case "<":    // Added
+                    result.m_value = sym1.m_value < sym2.m_value ? 1.0 : 0.0;
+                    break;
+                case ">=":   // Added
+                    result.m_value = sym1.m_value >= sym2.m_value ? 1.0 : 0.0;
+                    break;
+                case "<=":   // Added
+                    result.m_value = sym1.m_value <= sym2.m_value ? 1.0 : 0.0;
+                    break;
                 default:
                     result.m_type = ExpressionType.Error;
                     result.m_name = "Undefine operator: " + opr.m_name + ".";
@@ -667,6 +737,34 @@ namespace APSIM.Shared.Utilities
             result.m_values = null;
             switch (name.ToLower())
             {
+                case "iif":    // Added
+                    if (args.Length == 3)
+                    {
+                        // IIF(condition, valueIfTrue, valueIfFalse)
+                        // Condition evaluates to 1.0 (true) or 0.0 (false) from comparison operators
+                        double condition = args[0].m_value;
+                        if (Math.Abs(condition - 1.0) < 1E-12) // True (1.0)
+                        {
+                            result.m_value = args[1].m_value;
+                            result.m_name = $"IIF({args[0].m_name}, {args[1].m_name}, {args[2].m_name})";
+                        }
+                        else if (Math.Abs(condition) < 1E-12) // False (0.0)
+                        {
+                            result.m_value = args[2].m_value;
+                            result.m_name = $"IIF({args[0].m_name}, {args[1].m_name}, {args[2].m_name})";
+                        }
+                        else
+                        {
+                            result.m_name = "IIF condition must evaluate to 1.0 (true) or 0.0 (false). Got: " + condition;
+                            result.m_type = ExpressionType.Error;
+                        }
+                    }
+                    else
+                    {
+                        result.m_name = "Invalid number of parameters in: " + name + ". Expected 3, got " + args.Length + ".";
+                        result.m_type = ExpressionType.Error;
+                    }
+                    break;
                 case "value":
                     if (args.Length == 1)
                     {
