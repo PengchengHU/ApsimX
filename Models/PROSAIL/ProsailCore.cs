@@ -1,71 +1,281 @@
-﻿using System;
+﻿
+using System;
+using System.IO;
+using System.Collections.Generic;
 using System.Linq;
-using MathNet.Numerics.LinearAlgebra;
-using Models.Prospect;
-using Models.Sail;
+using Newtonsoft.Json;
+using Models.Sail; // Added for SailUtils.ProspectInput
+using static Models.Sail.SailUtilities;
+using static Models.Prospect.ProspectCore;
 
-namespace Models.Prosail
+namespace Models.Prospect
 {
     /// <summary>
-    /// Integrates PROSPECT leaf optical model with SAIL canopy reflectance model to simulate canopy reflectance
+    /// Implements the PRO4SAIL model combining PROSPECT and SAIL for canopy reflectance simulation.
     /// </summary>
     /// <remarks>
-    /// PROSAIL combines PROSPECT (Jacquemoud and Baret, 1990) with SAIL (Verhoef, 1984) models.
-    /// Reference: Jacquemoud, S., et al. (2009). PROSPECT + SAIL models: A review of use for vegetation characterization.
+    /// This class integrates PROSPECT for leaf optical properties and SAIL (4SAIL or 4SAIL2) for canopy reflectance.
+    /// Based on the PRO4SAIL function from Lib_PROSAIL.R by Jean-Baptiste Feret and Florian de Boissieu.
+    /// Reference: Feret, J.-B., et al. (2019). PROSAIL model.
     /// </remarks>
-    public static class ProsailCore
+    public class ProsailCore
     {
-       /// <summary>
-        /// Runs the PROSAIL model (PROSPECT + SAIL canopy reflectance model)
+        /// <summary>
+        /// Structure to hold brown leaf optical properties.
         /// </summary>
-        /// <param name="prospectParams">PROSPECT input parameters</param>
-        /// <param name="sailParams">SAIL canopy parameters</param>
-        /// <param name="specSensor">Spectral properties (optional, uses default if null)</param>
-        /// <param name="leafBrown">Optional leaf optical properties for brown vegetation (4SAIL2 only)</param>
-        /// <returns>Canopy reflectance factors</returns>
-        /// <exception cref="ArgumentException">Thrown if inputs are invalid</exception>
-        public static ProsailResult RunProsail(
-            ProspectParameters prospectParams,
-            SailParameters sailParams,
-            ProspectCore.SpectralConstants? specSensor = null,
-            LeafOptics? leafBrown = null)
+        public struct BrownLOP
         {
-            if (prospectParams.N < 1.0)
-                throw new ArgumentException("Leaf structure parameter N must be >= 1.0");
-            if (sailParams.LAI < 0)
-                throw new ArgumentException("LAI must be non-negative");
-            if (sailParams.TTS < 0 || sailParams.TTS > 90 || sailParams.TTO < 0 || sailParams.TTO > 90)
-                throw new ArgumentException("Solar and observer zenith angles must be between 0 and 90 degrees");
-            if (sailParams.FractionBrown < 0 || sailParams.FractionBrown > 1)
-                throw new ArgumentException("FractionBrown must be between 0 and 1");
-            if (sailParams.SoilReflectance == null)
-                throw new ArgumentException("Soil reflectance cannot be null");
+            /// <summary>Wavelengths in nanometers.</summary>
+            public double[] WVL;
+            /// <summary>Reflectance spectrum.</summary>
+            public double[] Reflectance;
+            /// <summary>Transmittance spectrum.</summary>
+            public double[] Transmittance;
+        }
 
-            // Run PROSPECT to get leaf optical properties
-            var (reflectance, transmittance) = ProspectCore.Run(
-                specSensor,
-                prospectParams.N,
-                prospectParams.CHL,
-                prospectParams.CAR,
-                prospectParams.EWT,
-                prospectParams.LMA,
-                prospectParams.ANT,
-                prospectParams.BROWN,
-                prospectParams.PROT,
-                prospectParams.CBC,
-                prospectParams.Alpha);
+        /// <summary>
+        /// Runs the PRO4SAIL simulation to compute canopy reflectance factors.
+        /// </summary>
+        /// <param name="specSensor">Spectral constants for PROSPECT. If null, loads default from file.</param>
+        /// <param name="inputProspect">PROSPECT input parameters from SailUtils. If null, uses individual parameters.</param>
+        /// <param name="N">Leaf structure parameter (unitless). Default is 1.5.</param>
+        /// <param name="CAB">Chlorophyll a + b content (μg/cm²). Default is 40.0.</param>
+        /// <param name="CAR">Carotenoid content (μg/cm²). Default is 8.0.</param>
+        /// <param name="ANT">Anthocyanin content (μg/cm²). Default is 0.0.</param>
+        /// <param name="BROWN">Brown pigment content (arbitrary units). Default is 0.0.</param>
+        /// <param name="EWT">Equivalent Water Thickness (g/cm²). Default is 0.01.</param>
+        /// <param name="LMA">Leaf Mass per Area (g/cm²). Default is 0.008.</param>
+        /// <param name="PROT">Protein content (g/cm²). Default is 0.0.</param>
+        /// <param name="CBC">Non-protein carbon-based constituent content (g/cm²). Default is 0.0.</param>
+        /// <param name="alpha">Incidence angle in degrees. Default is 40.0.</param>
+        /// <param name="typeLidf">Type of leaf inclination distribution function (1 for Verhoef, 2 for Campbell). Default is 2.</param>
+        /// <param name="lidfA">LIDF parameter a (average leaf slope if typeLidf=1, angle if typeLidf=2). Default is 60.</param>
+        /// <param name="lidfB">LIDF parameter b (bimodality if typeLidf=1, null if typeLidf=2). Default is null.</param>
+        /// <param name="lai">Leaf Area Index. Default is 3.0.</param>
+        /// <param name="q">Hot Spot parameter. Default is 0.1.</param>
+        /// <param name="tts">Sun zenith angle in degrees. Default is 30.0.</param>
+        /// <param name="tto">Observer zenith angle in degrees. Default is 0.0.</param>
+        /// <param name="psi">Relative azimuth angle between sun and observer in degrees. Default is 60.0.</param>
+        /// <param name="rsoil">Soil reflectance spectrum. If null, uses default dry soil reflectance.</param>
+        /// <param name="fractionBrown">Fraction of brown leaf area (0-1). Default is 0.0.</param>
+        /// <param name="diss">Layer dissociation factor (0-1). Default is 0.0.</param>
+        /// <param name="cv">Vertical crown cover percentage (0-1). Default is 1.0.</param>
+        /// <param name="zeta">Tree shape factor (ratio of crown diameter to height). Default is 1.0.</param>
+        /// <param name="sailVersion">SAIL version to use ('4SAIL' or '4SAIL2'). Default is '4SAIL'.</param>
+        /// <param name="brownLOP">Brown leaf optical properties. If null, generated by PROSPECT for 4SAIL2. Default is null.</param>
+        /// <returns>A SailResult object containing canopy reflectance factors (rdot, rsot, rddt, rsdt, fCover, abs_dir, abs_hem, rsdstar, rddstar).</returns>
+        /// <exception cref="ArgumentException">Thrown if input parameters are invalid or array lengths mismatch.</exception>
+        /// <exception cref="ArgumentNullException">Thrown if required inputs are null for specific configurations.</exception>
+        /// <exception cref="FileNotFoundException">Thrown if spectral data file is missing when specSensor is null.</exception>
+        public SailResult PRO4SAIL(
+            SpectralConstants? specSensor = null,
+            ProspectInput? inputProspect = null, 
+            double N = 1.5,
+            double CAB = 40.0,
+            double CAR = 8.0,
+            double ANT = 0.0,
+            double BROWN = 0.0,
+            double EWT = 0.01,
+            double LMA = 0.008,
+            double PROT = 0.0,
+            double CBC = 0.0,
+            double alpha = 40.0,
+            int typeLidf = 2,
+            double lidfA = 60.0,
+            double? lidfB = null,
+            double lai = 3.0,
+            double q = 0.1,
+            double tts = 30.0,
+            double tto = 0.0,
+            double psi = 60.0,
+            double[] rsoil = null,
+            double fractionBrown = 0.0,
+            double diss = 0.0,
+            double cv = 1.0,
+            double zeta = 1.0,
+            string sailVersion = "4SAIL",
+            BrownLOP? brownLOP = null)
+        {
+            // Validate inputs
+            if (!new[] { "4SAIL", "4SAIL2" }.Contains(sailVersion))
+                throw new ArgumentException("SAILversion must be '4SAIL' or '4SAIL2'.");
+            if (fractionBrown < 0 || fractionBrown > 1)
+                throw new ArgumentOutOfRangeException(nameof(fractionBrown), "fractionBrown must be between 0 and 1.");
+            if (diss < 0 || diss > 1)
+                throw new ArgumentOutOfRangeException(nameof(diss), "diss must be between 0 and 1.");
+            if (cv < 0 || cv > 1)
+                throw new ArgumentOutOfRangeException(nameof(cv), "Cv must be between 0 and 1.");
+            if (zeta < 0)
+                throw new ArgumentOutOfRangeException(nameof(zeta), "Zeta cannot be negative.");
+            if (typeLidf != 1 && typeLidf != 2)
+                throw new ArgumentException("TypeLidf must be 1 (Verhoef) or 2 (Campbell).");
+            if (typeLidf == 1 && !lidfB.HasValue)
+                throw new ArgumentException("LIDFb is required when TypeLidf is 1.");
 
-            var leafGreen = new LeafOptics
+            // Load spectral constants if not provided
+            ProspectCore.SpectralConstants spectralData = specSensor ?? ProspectCore.LoadLocalSpectralData();
+
+            // Default soil reflectance (mimicking SpecSOIL$Dry_Soil from R)
+            if (rsoil == null)
             {
-                Reflectance = reflectance,
-                Transmittance = transmittance,
-                Wavelengths = specSensor?.Wavelengths ?? ProspectCore.LoadLocalSpectralData().Wavelengths
+                // Assuming dry soil reflectance is a flat 0.2 across all wavelengths (simplified)
+                // In practice, load from a predefined dataset or file matching SpecSOIL$Dry_Soil
+                rsoil = Enumerable.Repeat(0.2, spectralData.Wavelength.Count).ToArray();
+            }
+
+            // Validate rsoil length
+            if (rsoil.Length != spectralData.Wavelength.Count)
+                throw new ArgumentException("Soil reflectance array length must match spectral data wavelengths.");
+
+            // Prepare PROSPECT inputs using SailUtils.ProspectInput
+            ProspectInput prospectInput = inputProspect ?? new ProspectInput
+            {
+                N = N,
+                CAB = CAB,
+                CAR = CAR,
+                ANT = ANT,
+                BROWN = BROWN,
+                EWT = EWT,
+                LMA = LMA,
+                PROT = PROT,
+                CBC = CBC,
+                Alpha = alpha
             };
 
-            // Run appropriate SAIL version
-            return sailParams.SAILVersion == SailVersion.FourSAIL2
-                ? SailModel.FourSAIL2(leafGreen, sailParams, leafBrown)
-                : SailModel.FourSAIL(leafGreen, sailParams);
+            // Adjust PROSPECT inputs for SAIL (mimics adjust_PROSPECT_2_SAIL in R)
+            (LeafOptics greenLOP, LeafOptics brownLOPAdjusted) = AdjustProspectToSail(
+                sailVersion, spectralData, prospectInput, brownLOP, fractionBrown);
+
+            // Prepare soil properties
+            var soilProperties = new SoilProperties { Reflectance = rsoil };
+
+            // Run SAIL simulation based on version
+            SailResult result;
+            if (sailVersion == "4SAIL")
+            {
+                result = SailCore.FourSAIL(
+                    leafOptics: greenLOP,
+                    typeLidf: typeLidf,
+                    lidfA: lidfA,
+                    lidfB: lidfB,
+                    lai: lai,
+                    q: q,
+                    tts: tts,
+                    tto: tto,
+                    psi: psi,
+                    soilProperties: soilProperties);
+            }
+            else // 4SAIL2
+            {
+                result = SailCore.FourSAIL2(
+                    leafGreen: greenLOP,
+                    leafBrown: brownLOPAdjusted,
+                    typeLidf: typeLidf,
+                    lidfA: lidfA,
+                    lidfB: lidfB,
+                    lai: lai,
+                    q: q,
+                    tts: tts,
+                    tto: tto,
+                    psi: psi,
+                    soilProperties: soilProperties,
+                    fractionBrown: fractionBrown,
+                    diss: diss,
+                    cv: cv,
+                    zeta: zeta);
+            }
+
+            return result;
+        }
+
+        /// <summary>
+        /// Adjusts PROSPECT outputs to prepare leaf optical properties for SAIL models.
+        /// </summary>
+        /// <param name="sailVersion">SAIL version ('4SAIL' or '4SAIL2').</param>
+        /// <param name="specSensor">Spectral constants for PROSPECT.</param>
+        /// <param name="inputProspect">PROSPECT input parameters from SailUtils.</param>
+        /// <param name="brownLOP">Brown leaf optical properties. If null, generated for 4SAIL2.</param>
+        /// <param name="fractionBrown">Fraction of brown leaf area (0-1).</param>
+        /// <returns>A tuple containing green and brown leaf optical properties.</returns>
+        /// <exception cref="ArgumentException">Thrown if brownLOP is null for 4SAIL or wavelengths mismatch.</exception>
+        private (LeafOptics GreenLOP, LeafOptics BrownLOP) AdjustProspectToSail(
+            string sailVersion,
+            ProspectCore.SpectralConstants specSensor,
+            ProspectInput inputProspect, // Updated to use SailUtils.ProspectInput
+            BrownLOP? brownLOP,
+            double fractionBrown)
+        {
+            // Run PROSPECT for green leaves
+            var (greenReflectance, greenTransmittance) = ProspectCore.Run(
+                Spec: specSensor,
+                N: inputProspect.N,
+                CAB: inputProspect.CAB,
+                CAR: inputProspect.CAR,
+                ANT: inputProspect.ANT,
+                BROWN: inputProspect.BROWN,
+                EWT: inputProspect.EWT,
+                LMA: inputProspect.LMA,
+                PROT: inputProspect.PROT,
+                CBC: inputProspect.CBC,
+                Alpha: inputProspect.Alpha);
+
+            var greenLOP = new LeafOptics
+            {
+                Reflectance = greenReflectance.ToArray(),
+                Transmittance = greenTransmittance.ToArray()
+            };
+
+            LeafOptics brownLOPResult;
+
+            if (sailVersion == "4SAIL")
+            {
+                // For 4SAIL, brownLOP is not used; return greenLOP as brownLOP
+                if (brownLOP.HasValue)
+                    Console.WriteLine("Warning: BrownLOP provided but ignored for 4SAIL.");
+                brownLOPResult = greenLOP;
+            }
+            else // 4SAIL2
+            {
+                if (brownLOP.HasValue)
+                {
+                    // Use provided brownLOP
+                    var brown = brownLOP.Value;
+                    if (brown.WVL.Length != specSensor.Wavelength.Count ||
+                        brown.Reflectance.Length != specSensor.Wavelength.Count ||
+                        brown.Transmittance.Length != specSensor.Wavelength.Count)
+                        throw new ArgumentException("BrownLOP arrays must match spectral data wavelengths.");
+
+                    brownLOPResult = new LeafOptics
+                    {
+                        Reflectance = brown.Reflectance,
+                        Transmittance = brown.Transmittance
+                    };
+                }
+                else
+                {
+                    // Generate brown leaf optical properties using PROSPECT with high brown pigment
+                    var (brownReflectance, brownTransmittance) = ProspectCore.Run(
+                        Spec: specSensor,
+                        N: inputProspect.N,
+                        CAB: 0.0, // No chlorophyll for brown leaves
+                        CAR: 0.0, // No carotenoids
+                        ANT: inputProspect.ANT,
+                        BROWN: 1.0, // High brown pigment
+                        EWT: inputProspect.EWT,
+                        LMA: inputProspect.LMA,
+                        PROT: inputProspect.PROT,
+                        CBC: inputProspect.CBC,
+                        Alpha: inputProspect.Alpha);
+
+                    brownLOPResult = new LeafOptics
+                    {
+                        Reflectance = brownReflectance.ToArray(),
+                        Transmittance = brownTransmittance.ToArray()
+                    };
+                }
+            }
+
+            return (greenLOP, brownLOPResult);
         }
     }
 }
