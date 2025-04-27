@@ -2,6 +2,7 @@
 using System.Collections.Generic;
 using System.Linq;
 using System.Numerics; // Required for Complex numbers if needed, though not directly used in this translation.
+using Models.Prospect;
 
 namespace Models.Sail
 {
@@ -23,7 +24,7 @@ namespace Models.Sail
             /// <summary>
             /// Wavelengths (nm). Corresponds to SpecATM_Sensor$lambda.
             /// </summary>
-            public double[] Lambda { get; set; }
+            public double[] Wavelength { get; set; }
 
             /// <summary>
             /// Direct solar radiation. Corresponds to SpecATM_Sensor$Direct_Light.
@@ -45,7 +46,7 @@ namespace Models.Sail
             /// <summary>
             /// Wavelengths (nm). Corresponds to LeafOptics$WVL or inferred from context.
             /// </summary>
-            public double[] Lambda { get; set; }
+            public double[] Wavelength { get; set; }
 
             /// <summary>
             /// Leaf reflectance. Corresponds to LeafOptics$Reflectance.
@@ -63,50 +64,28 @@ namespace Models.Sail
         /// Corresponds to the 'Input_PROSPECT' list/dataframe in R.
         /// Needs specific fields like N, CHL, CAR, etc.
         /// </summary>
-        public class ProspectInput
+        public struct ProspectInput
         {
             /// <summary>Leaf structure parameter (unitless)</summary>
-            public double N { get; set; } = 1.5;
+            public double N;
             /// <summary>Chlorophyll a + b content (μg/cm²)</summary>
-            public double CHL { get; set; } = 40.0;
+            public double CHL;
             /// <summary>Carotenoid content (μg/cm²)</summary>
-            public double CAR { get; set; } = 8.0;
+            public double CAR;
             /// <summary>Anthocyanin content (μg/cm²)</summary>
-            public double ANT { get; set; } = 0.0;
+            public double ANT;
             /// <summary>Brown pigment content (Arbitrary units)</summary>
-            public double BROWN { get; set; } = 0.0;
+            public double BROWN;
             /// <summary>Equivalent Water Thickness (g/cm²)</summary>
-            public double EWT { get; set; } = 0.01;
+            public double EWT;
             /// <summary>Leaf Mass per Area (g/cm²)</summary>
-            public double LMA { get; set; } // Nullable if not always provided
+            public double LMA; // Nullable if not always provided
             /// <summary>Protein content (g/cm²)</summary>
-            public double PROT { get; set; } = 0.0;
+            public double PROT;
             /// <summary>NonProt Carbon-based constituent content (g/cm²)</summary>
-            public double CBC { get; set; } = 0.0;
+            public double CBC;
             /// <summary>Incidence angle in degrees</summary>
-            public double Alpha { get; set; } = 40.0;
-
-
-            /// <summary>Helper to create an input instance easily</summary>
-            public static ProspectInput Create(
-                double n = 1.5, double chl = 40.0, double car = 8.0, double ant = 0.0,
-                double brown = 0.0, double ewt = 0.01, double lma = 0.008,
-                double prot = 0.0, double cbc = 0.0, double alpha = 40.0)
-            {
-                return new ProspectInput
-                {
-                    N = n,
-                    CHL = chl,
-                    CAR = car,
-                    ANT = ant,
-                    BROWN = brown,
-                    EWT = ewt,
-                    LMA = lma,
-                    PROT = prot,
-                    CBC = cbc,
-                    Alpha = alpha
-                };
-            }
+            public double Alpha;
         }
 
 
@@ -132,7 +111,7 @@ namespace Models.Sail
             /// <summary>
             /// Wavelengths (nm). Corresponds to SpecSOIL$lambda.
             /// </summary>
-            public double[] Lambda { get; set; }
+            public double[] Wavelength { get; set; }
 
             /// <summary>
             /// Soil reflectance spectrum. Corresponds to rsoil or SpecSOIL$Dry_Soil etc.
@@ -351,7 +330,7 @@ namespace Models.Sail
             // ############################## #
             double[] Es = specAtmSensor.DirectLight; //
             double[] Ed = specAtmSensor.DiffuseLight; //
-            double[] lambda = specAtmSensor.Lambda; //
+            double[] lambda = specAtmSensor.Wavelength; //
 
             if (abs_dir.Length != abs_hem.Length || abs_dir.Length != Es.Length || abs_dir.Length != Ed.Length || abs_dir.Length != lambda.Length)
             {
@@ -419,7 +398,7 @@ namespace Models.Sail
             // ############################## #
             double[] Es = specAtmSensor.DirectLight; //
             double[] Ed = specAtmSensor.DiffuseLight; //
-            double[] lambda = specAtmSensor.Lambda; //
+            double[] lambda = specAtmSensor.Wavelength; //
 
             if (rsdstar.Length != rddstar.Length || rsdstar.Length != Es.Length || rsdstar.Length != Ed.Length || rsdstar.Length != lambda.Length)
             {
@@ -1224,9 +1203,9 @@ namespace Models.Sail
         public static void check_SpectralSampling(SpectralProperties specPROSPECT, SoilProperties specSOIL, SpecAtmSensor specATM)
         {
             double[] l1 = specPROSPECT?.Lambda; //
-            double[] l2 = specSOIL?.Lambda; //
+            double[] l2 = specSOIL?.Wavelength; //
                                             // Assuming SpecAtmSensor is the replacement for SpecATM list from R
-            double[] l3 = specATM?.Lambda; //
+            double[] l3 = specATM?.Wavelength; //
 
             // Basic null checks
             if (l1 == null || l2 == null || l3 == null)
@@ -1283,7 +1262,7 @@ namespace Models.Sail
             if (brownLOP != null) //
             {
                 // Check required fields (assuming LeafOptics class has these properties)
-                if (brownLOP.Lambda == null || brownLOP.Reflectance == null || brownLOP.Transmittance == null) //
+                if (brownLOP.Wavelength == null || brownLOP.Reflectance == null || brownLOP.Transmittance == null) //
                 {
                     string msg = "BrownLOP must include non-null 'Lambda', 'Reflectance' and 'Transmittance' arrays."; //
                     Console.WriteLine(msg); //
@@ -1296,7 +1275,7 @@ namespace Models.Sail
                     throw new ArgumentNullException(nameof(lambda), "Reference lambda array cannot be null when checking BrownLOP.");
                 }
 
-                if (brownLOP.Lambda.Length != lambda.Length || !brownLOP.Lambda.SequenceEqual(lambda)) //
+                if (brownLOP.Wavelength.Length != lambda.Length || !brownLOP.Wavelength.SequenceEqual(lambda)) //
                 {
                     string msg = "Spectral domain mismatch: BrownLOP wavelengths do not match the reference wavelengths (e.g., Spec_Sensor)."; //
                     Console.WriteLine(msg); //
@@ -1349,7 +1328,9 @@ namespace Models.Sail
             ProspectInput greenProspectInput = inputProspectList[0]; //
                                                                      // Placeholder for the actual PROSPECT call
                                                                      // You need to implement or call your C# version of the PROSPECT model here
-            LeafOptics greenLOP = RunProspectSimulation(specSensor, greenProspectInput); //
+            LeafOptics greenLOP = ProspectCore.Run(specSensor, N: greenProspectInput.N, CAB: greenProspectInput.CHL, CAR: greenProspectInput.CAR,
+                EWT: greenProspectInput.EWT, LMA: greenProspectInput.LMA, ANT: greenProspectInput.ANT, BROWN:greenProspectInput.BROWN, 
+                PROT: greenProspectInput.PROT, Alpha: greenProspectInput.Alpha); 
             if (greenLOP == null)
             {
                 throw new InvalidOperationException("PROSPECT simulation failed to return Green LOP.");
@@ -1407,7 +1388,9 @@ namespace Models.Sail
                             // Simulate Brown LOP using the second input set
                             ProspectInput brownProspectInput = inputProspectList[1]; //
                                                                                      // Placeholder for the actual PROSPECT call
-                            finalBrownLOP = RunProspectSimulation(specSensor, brownProspectInput); //
+                            finalBrownLOP = ProspectCore.Run(specSensor, N: brownProspectInput.N, CAB: brownProspectInput.CHL, CAR: brownProspectInput.CAR,
+                                EWT: brownProspectInput.EWT, LMA: brownProspectInput.LMA, ANT: brownProspectInput.ANT, BROWN: brownProspectInput.BROWN, 
+                                PROT: brownProspectInput.PROT, Alpha: brownProspectInput.Alpha); //
                             if (finalBrownLOP == null)
                             {
                                 throw new InvalidOperationException("PROSPECT simulation failed to return Brown LOP.");
@@ -1422,40 +1405,6 @@ namespace Models.Sail
             }
 
             return new AdjustedProspectResult { GreenLOP = greenLOP, BrownLOP = finalBrownLOP }; //
-        }
-
-
-        // --- Helper / Placeholder Methods ---
-
-        /// <summary>
-        /// Placeholder for the actual C# implementation of the PROSPECT model.
-        /// Made private as it's an internal detail of the utility class.
-        /// </summary>
-        /// <param name="specProps">Spectral properties/constants.</param>
-        /// <param name="inputs">PROSPECT input parameters.</param>
-        /// <returns>Simulated Leaf Optics.</returns>
-        private static LeafOptics RunProspectSimulation(SpectralProperties specProps, ProspectInput inputs)
-        {
-            // --- !!! IMPLEMENT YOUR PROSPECT MODEL CALL HERE !!! ---
-            // This function needs to take the spectral properties and input parameters
-            // and return the calculated leaf reflectance and transmittance spectra.
-
-            Console.WriteLine($"--- Running PROSPECT Simulation (Placeholder) ---");
-            Console.WriteLine($"    N={inputs.N}, CHL={inputs.CHL}, CAR={inputs.CAR}, BROWN={inputs.BROWN}, EWT={inputs.EWT}, LMA={inputs.LMA}");
-
-            // Example: Return dummy data matching the spectral properties wavelength count
-            if (specProps?.Lambda == null) return null;
-            int nLambda = specProps.Lambda.Length;
-            if (nLambda == 0) return null;
-
-            var random = new Random(); // Note: creating Random here is inefficient if called frequently. Consider passing one in or using a thread-static instance.
-            return new LeafOptics
-            {
-                Lambda = specProps.Lambda,
-                Reflectance = Enumerable.Range(0, nLambda).Select(i => 0.1 + 0.3 * random.NextDouble()).ToArray(), // Dummy reflectance
-                Transmittance = Enumerable.Range(0, nLambda).Select(i => 0.05 + 0.2 * random.NextDouble()).ToArray() // Dummy transmittance
-            };
-            // throw new NotImplementedException("PROSPECT model simulation is not implemented in C# yet.");
         }
     }
 }
