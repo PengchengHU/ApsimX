@@ -187,7 +187,7 @@ namespace Models.Prospect
                     WriteMessage(LogLevel.Warning, "ProspectModel: Wavelengths accessed before spectral constants loaded.");
                     return Array.Empty<double>();
                 }
-                return cachedSpectralConstants.Value.Wavelengths.ToArray();
+                return cachedSpectralConstants.Value.Wavelength.ToArray();
             }
         }
 
@@ -261,7 +261,7 @@ namespace Models.Prospect
             try
             {
                 cachedSpectralConstants = ProspectCore.LoadLocalSpectralData();
-                WriteMessage(LogLevel.Info, $"ProspectModel: Spectral constants loaded, Wavelengths count: {cachedSpectralConstants.Value.Wavelengths.Count}.");
+                WriteMessage(LogLevel.Info, $"ProspectModel: Spectral constants loaded, Wavelengths count: {cachedSpectralConstants.Value.Wavelength.Count}.");
             }
             catch (Exception ex)
             {

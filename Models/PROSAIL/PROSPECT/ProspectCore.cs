@@ -25,7 +25,7 @@ namespace Models.Prospect
         public struct SpectralConstants
         {
             /// <summary>Wavelength array in nanometers</summary>
-            public Vector<double> Wavelengths;      
+            public Vector<double> Wavelength;      
             /// <summary>Refractive index spectrum</summary>
             public Vector<double> RefractiveIndex;   
             /// <summary>Specific absorption coefficient for a + b chlorophyll</summary>
@@ -278,7 +278,7 @@ namespace Models.Prospect
 
                 return new SpectralConstants
                 {
-                    Wavelengths = Vector<double>.Build.DenseOfArray(data.Wavelengths),
+                    Wavelength = Vector<double>.Build.DenseOfArray(data.Wavelength),
                     RefractiveIndex = Vector<double>.Build.DenseOfArray(data.RefractiveIndex),
                     SAC_CAB = Vector<double>.Build.DenseOfArray(data.SAC_CAB),
                     SAC_CAR = Vector<double>.Build.DenseOfArray(data.SAC_CAR),
@@ -301,7 +301,7 @@ namespace Models.Prospect
         // Helper class for JSON deserialization
         private class SpectralDataJson
         {
-            public double[] Wavelengths { get; set; }
+            public double[] Wavelength { get; set; }
             public double[] RefractiveIndex { get; set; }
             public double[] SAC_CAB { get; set; }
             public double[] SAC_CAR { get; set; }
