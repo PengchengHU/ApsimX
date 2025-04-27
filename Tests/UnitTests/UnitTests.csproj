@@ -28,6 +28,10 @@
   </ItemGroup>
 
   <ItemGroup>
+    <Compile Remove="PROSPECT\ProspectModelTests.cs" />
+  </ItemGroup>
+
+  <ItemGroup>
     <None Remove="Resources\totalc.apsimx" />
   </ItemGroup>
 
