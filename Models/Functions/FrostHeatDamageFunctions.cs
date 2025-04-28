@@ -458,7 +458,7 @@ namespace Models.Functions
         private void OnDoSowing(object sender, EventArgs e)
         {
             // initialize
-            Summary.WriteMessage(this, "FrostHeatDamageFunctions will be performed.", Core.MessageType.Warning);
+            Summary.WriteMessage(this, "FrostHeatDamageFunctions will be performed.", Core.MessageType.Information);
 
             FrostPotentialReductionRatio = 0;
             FrostSensitivity = 0;
