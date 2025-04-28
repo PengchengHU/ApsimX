@@ -6,7 +6,6 @@ using Models.PMF.Organs;
 using Models.Climate;
 using System.Reflection;
 using System.Collections.Generic;
-using static Models.Core.Simulation;
 
 namespace Models.Functions
 {
@@ -428,20 +427,37 @@ namespace Models.Functions
             return sens;
         }
 
-        /// <summary>Initializing the variables</summary>
+        /// <summary>Validate inputs</summary>
         /// <param name="sender">The sender.</param>
         /// <param name="e">The <see cref="EventArgs"/> instance containing the event data.</param>
+        [EventSubscribe("Commencing")]
+        private void OnDoCommencing(object sender, EventArgs e)
+        {
+            // Don't run if no valid crop type is selected
+            if (CropType == CropTypes.SelectCrop)
+            {
+                throw new Exception($"Please select a crop type in the FrostHeatDamageFunctions before running.");
+            }
+
+            // Check if the selected crop type matches the plant type in the simulation
+            string actualPlantType = Plant.Name;
+            string selectedCropType = CropType.ToString();
+
+            // Compare the selected crop type with the plant type in simulation
+            if (!actualPlantType.Equals(selectedCropType, StringComparison.OrdinalIgnoreCase))
+            {
+                throw new Exception($"The selected crop type '{selectedCropType}' in the FrostHeatDamageFunctions does not match the plant type '{actualPlantType}' in the simulation. " +
+                    $"Please select the correct crop type in the FrostHeatDamageFunctions.");
+            }
+        }
+
+        /// <summary>Initializing the variables</summary>
+        /// <param name="sender">The sender.</param>
+        /// <param name="e">The <see cref="EventArgs"/> instance containing the event data.</param>    
         [EventSubscribe("Sowing")]
         private void OnDoSowing(object sender, EventArgs e)
         {
-
             // initialize
-            // Don't initialize if no valid crop type is selected
-            if (CropType == CropTypes.SelectCrop)
-            {
-                Summary.WriteMessage(this, "Please select a crop type in FrostHeatDamageFunctions before running.", Core.MessageType.Warning);
-                return;
-            }
             Summary.WriteMessage(this, "FrostHeatDamageFunctions will be performed.", Core.MessageType.Warning);
 
             FrostPotentialReductionRatio = 0;
@@ -467,14 +483,9 @@ namespace Models.Functions
         [EventSubscribe("DoManagementCalculations")]
         private void OnDoManagementCalculations(object sender, EventArgs e)
         {
+            // run when plant is alive
             if (!Plant.IsAlive)
             {
-                return;
-            }
-
-            if (CropType == CropTypes.SelectCrop)
-            {
-                Summary.WriteMessage(this, "No crop type selected. FrostHeatDamageFunctions will not be performed.", Core.MessageType.Warning);
                 return;
             }
 
