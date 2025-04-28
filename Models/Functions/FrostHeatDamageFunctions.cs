@@ -6,6 +6,7 @@ using Models.PMF.Organs;
 using Models.Climate;
 using System.Reflection;
 using System.Collections.Generic;
+using static Models.Core.Simulation;
 
 namespace Models.Functions
 {
@@ -52,12 +53,18 @@ namespace Models.Functions
         Zone zone = null;
         [Link]
         Plant Plant = null;
+        [Link]
+        private ISummary Summary = null;
 
         // Define parameters
 
         /// <summary>Define the enum for crop types</summary>
+        // Update the enum to include a default option
         public enum CropTypes
         {
+            /// <summary>Default option - please choose crop type.</summary>
+            [Description("Please choose crop type")]
+            SelectCrop,
             /// <summary>Wheat crop type.</summary>
             [Description("Wheat")]
             Wheat,
@@ -163,8 +170,6 @@ namespace Models.Functions
 
 
         // Internal variables
-        //private string CropType;
-
         /// <summary>Overall remainng ratio after frost events.</summary>
         double FrostOverallRemaining;
 
@@ -284,7 +289,20 @@ namespace Models.Functions
         // Function to set default values using reflection
         private void SetDefaultValues()
         {
-            if (cropDefaults.TryGetValue(CropType, out var defaults))
+            if (CropType == CropTypes.SelectCrop)
+            {
+                // Clear all parameters when the default option is selected
+                Type thisType = this.GetType();
+                foreach (var cropDefProperty in cropDefaults[CropTypes.Wheat].Keys) // Using Wheat just to get property names
+                {
+                    PropertyInfo prop = thisType.GetProperty(cropDefProperty);
+                    if (prop != null && prop.CanWrite)
+                    {
+                        prop.SetValue(this, 0.0); // Set to default value (0.0)
+                    }
+                }
+            }
+            else if (cropDefaults.TryGetValue(CropType, out var defaults))
             {
                 Type thisType = this.GetType();
                 foreach (var kvp in defaults)
@@ -298,34 +316,9 @@ namespace Models.Functions
             }
             else
             {
-                throw new ArgumentException($"Unknown crop type: {CropType}");
+                Summary.WriteMessage(this, $"Unknown crop type: {CropType}", Core.MessageType.Error);
             }
-        }
-
-
-        [EventSubscribe("Sowing")]
-        private void OnDoSowing(object sender, EventArgs e)
-        {
-            // initialize
-            //CropType = Plant.PlantType;
-            //CropType = PlantType.PlantType;
-
-            FrostPotentialReductionRatio = 0;
-            FrostSensitivity = 0;
-            FrostReductionRatio = 0;
-            HeatPotentialReductionRatio = 0;
-            HeatSensitivity = 0;
-            HeatReductionRatio = 0;
-            FrostHeatReductionRatio = 0;
-            FrostOverallRemaining = 1;
-            HeatOverallRemaining = 1;
-            CumulativeFrostReductionRatio = 0;
-            CumulativeHeatReductionRatio = 0;
-            CumulativeFrostHeatReductionRatio = 0;
-            FrostHeatYield = 0;
-            FrostEventNumber = 0;
-            HeatEventNumber = 0;
-        }
+        }        
 
         /// <summary>Caculates daily potential yield reduction ratio induced by a frost event.</summary>
         private double FrostPotentialReductionRatioFun(double t)
@@ -435,6 +428,39 @@ namespace Models.Functions
             return sens;
         }
 
+        /// <summary>Initializing the variables</summary>
+        /// <param name="sender">The sender.</param>
+        /// <param name="e">The <see cref="EventArgs"/> instance containing the event data.</param>
+        [EventSubscribe("Sowing")]
+        private void OnDoSowing(object sender, EventArgs e)
+        {
+
+            // initialize
+            // Don't initialize if no valid crop type is selected
+            if (CropType == CropTypes.SelectCrop)
+            {
+                Summary.WriteMessage(this, "Please select a crop type in FrostHeatDamageFunctions before running.", Core.MessageType.Warning);
+                return;
+            }
+            Summary.WriteMessage(this, "FrostHeatDamageFunctions will be performed.", Core.MessageType.Warning);
+
+            FrostPotentialReductionRatio = 0;
+            FrostSensitivity = 0;
+            FrostReductionRatio = 0;
+            HeatPotentialReductionRatio = 0;
+            HeatSensitivity = 0;
+            HeatReductionRatio = 0;
+            FrostHeatReductionRatio = 0;
+            FrostOverallRemaining = 1;
+            HeatOverallRemaining = 1;
+            CumulativeFrostReductionRatio = 0;
+            CumulativeHeatReductionRatio = 0;
+            CumulativeFrostHeatReductionRatio = 0;
+            FrostHeatYield = 0;
+            FrostEventNumber = 0;
+            HeatEventNumber = 0;
+        }
+
         /// <summary>Does the calculations of multiplers and sensitivities of frost and heat stresses.</summary>
         /// <param name="sender">The sender.</param>
         /// <param name="e">The <see cref="EventArgs"/> instance containing the event data.</param>
@@ -445,6 +471,13 @@ namespace Models.Functions
             {
                 return;
             }
+
+            if (CropType == CropTypes.SelectCrop)
+            {
+                Summary.WriteMessage(this, "No crop type selected. FrostHeatDamageFunctions will not be performed.", Core.MessageType.Warning);
+                return;
+            }
+
             Phenology phen = (Phenology)zone.Get("[" + CropType + "].Phenology");
             ReproductiveOrgan organs = (ReproductiveOrgan)zone.Get("[" + CropType + "].Grain");
 
