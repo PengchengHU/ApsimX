@@ -11,7 +11,7 @@ using Models.Prospect;
 namespace UnitTests
 {
     [TestFixture]
-    public class ProspectValidationTests
+    public class ProspecCoreTests
     {
         private readonly string RScriptPath = @"C:\Program Files\R\R-4.4.1\bin\Rscript.exe";
         private readonly string RProspectScript = @"D:\ApsimX\Tests\UnitTests\PROSPECT\PROSPECT_R_Implementation.R";
