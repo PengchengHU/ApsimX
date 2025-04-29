@@ -47,12 +47,12 @@ namespace Models.Sail
         /// Corresponds to the 'LeafOptics', 'GreenLOP', 'BrownLOP' lists/dataframes in R.
         /// Typically output from the PROSPECT model.
         /// </summary>
-        public class LeafOptics // Renamed from SailUtilities.LeafOptics
+        public class LeafOptics 
         {
             /// <summary>
             /// Wavelengths (nm). Should match the simulation wavelengths.
             /// </summary>
-            public double[] Wavelength { get; set; } // Renamed from Lambda
+            public double[] Wavelength { get; set; } 
 
             /// <summary>
             /// Leaf reflectance spectrum (unitless fraction).
@@ -69,12 +69,12 @@ namespace Models.Sail
         /// Holds PROSPECT model input parameters.
         /// Corresponds to the 'Input_PROSPECT' list/dataframe in R.
         /// </summary>
-        public struct ProspectInput // Renamed from SailUtilities.ProspectInput
+        public struct ProspectInput 
         {
             /// <summary>Leaf structure parameter N (unitless, avg number of layers).</summary>
             public double N;
             /// <summary>Chlorophyll a + b content (μg/cm²).</summary>
-            public double CAB; // Renamed from CHL for consistency with ProspectCore
+            public double CAB; 
             /// <summary>Total carotenoid content (μg/cm²).</summary>
             public double CAR;
             /// <summary>Anthocyanin content (μg/cm²).</summary>
@@ -118,12 +118,12 @@ namespace Models.Sail
         /// Holds soil spectral data (wavelengths and reflectance).
         /// Corresponds to 'SpecSOIL' in R.
         /// </summary>
-        public class SoilProperties // Renamed from SailUtilities.SoilProperties
+        public class SoilProperties 
         {
             /// <summary>
             /// Wavelengths (nm). Should match simulation wavelengths.
             /// </summary>
-            public double[] Wavelength { get; set; } // Renamed from Lambda
+            public double[] Wavelength { get; set; } 
 
             /// <summary>
             /// Soil reflectance spectrum (unitless fraction).
@@ -134,7 +134,7 @@ namespace Models.Sail
         /// <summary>
         /// Represents the result of the Campbell or Dladgen function for Leaf Inclination Distribution (LIDF).
         /// </summary>
-        public struct FoliarDistributionResult // Renamed from SailUtilities.FoliarDistributionResult
+        public struct FoliarDistributionResult 
         {
             /// <summary>
             /// Leaf Inclination Distribution Function values (frequencies for each angle bin).
@@ -151,7 +151,7 @@ namespace Models.Sail
         /// Represents the result of the Volscatt function (volume scattering components).
         /// These are angle-dependent factors used in SAIL calculations.
         /// </summary>
-        public struct VolscattResult // Renamed from SailUtilities.VolscattResult
+        public struct VolscattResult
         {
             /// <summary>
             /// Interception function (average projection factor G) for solar direction.
@@ -178,7 +178,7 @@ namespace Models.Sail
         /// Represents the result of NonConservativeScattering or ConservativeScattering functions.
         /// Contains various layer reflectance and transmittance factors used in SAIL layer combination.
         /// </summary>
-        public struct ScatteringResult // Renamed from SailUtilities.ScatteringResult
+        public struct ScatteringResult 
         {
             /// <summary>Bi-hemispherical transmittance (Tdd).</summary>
             public double[] Tdd { get; set; }
@@ -201,7 +201,7 @@ namespace Models.Sail
         /// potentially containing separate optics for green and brown leaves.
         /// Used as input to the SAIL core functions.
         /// </summary>
-        public struct AdjustedProspectResult // Renamed from SailUtilities.AdjustedProspectResult
+        public struct AdjustedProspectResult 
         {
             /// <summary>Green leaf optical properties.</summary>
             public LeafOptics GreenLOP { get; set; }
@@ -213,7 +213,7 @@ namespace Models.Sail
         /// Represents the output of the SAIL models (FourSAIL, FourSAIL2).
         /// Contains various reflectance factors and derived quantities like fCover and absorptance.
         /// </summary>
-        public class SailResult // Renamed from SailUtilities.SailResult
+        public class SailResult 
         {
             /// <summary>Hemispherical-directional reflectance factor in viewing direction (R_o).</summary>
             public double[] Rdot { get; set; }
