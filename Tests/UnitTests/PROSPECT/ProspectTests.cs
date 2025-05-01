@@ -14,7 +14,7 @@ namespace UnitTests
     public class ProspecCoreTests
     {
         private readonly string RScriptPath = @"C:\Program Files\R\R-4.4.1\bin\Rscript.exe";
-        private readonly string RProspectScript = @"D:\ApsimX\Tests\UnitTests\PROSPECT\PROSPECT_R_Implementation.R";
+        private readonly string RProspectScript = @"D:\ApsimX\Tests\UnitTests\PROSPECT\ProspectImplementation.R";
         private readonly string TestCasesFile = @"D:\ApsimX\Tests\UnitTests\\PROSPECT\ProspectTestCases.json";
         private readonly double Tolerance = 1e-2;
 
