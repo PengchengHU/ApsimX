@@ -51,7 +51,7 @@ namespace Models.Prospect
         }
 
         // Relative path from APSIM bin directory to Models\PROSPECT
-        private static readonly string RelativeSpectralDataPath = "..\\..\\..\\Models\\PROSPECT\\SpecPROSPECT_FullRange.json";
+        private static readonly string RelativeSpectralDataPath = "..\\..\\..\\Models\\PROSAIL\\PROSPECT\\SpecPROSPECT_FullRange.json";
         private static string DefaultSpectralDataPath => PathUtilities.GetAbsolutePath(RelativeSpectralDataPath, AppDomain.CurrentDomain.BaseDirectory);
 
         /// <summary>
