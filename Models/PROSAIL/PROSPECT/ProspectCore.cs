@@ -7,7 +7,8 @@ using MathNet.Numerics.IntegralTransforms;
 using Newtonsoft.Json;
 using Models.Core;
 using APSIM.Shared.Utilities;
-using Microsoft.CodeAnalysis.CSharp.Syntax; // Add this for PathUtilities
+using Microsoft.CodeAnalysis.CSharp.Syntax;
+using System.Collections.Generic; // Add this for PathUtilities
 
 namespace Models.Prospect
 {
@@ -47,7 +48,9 @@ namespace Models.Prospect
             /// <summary>Specific absorption coefficient for protein</summary>
             public Vector<double> SAC_PROT;   
             /// <summary>Specific absorption coefficient for non-protein carbon-based constituent</summary>
-            public Vector<double> SAC_CBC;    
+            public Vector<double> SAC_CBC;
+            /// <summary>Dictionary mapping wavelengths to their indices in the Wavelength array (for optimized filtering).</summary>
+            public Dictionary<double, int> WavelengthToIndex;
         }
 
         // Relative path from APSIM bin directory to Models\PROSPECT
@@ -68,6 +71,7 @@ namespace Models.Prospect
         /// <param name="PROT">Protein content (g/cm²)</param>
         /// <param name="CBC">NonProt Carbon-based constituent content (g/cm²)</param>
         /// <param name="Alpha">Incidence angle in degrees</param>
+        /// <param name="Wavelengths">Array of specific wavelengths to simulate (subset of SpectralConstants.Wavelength, optional; defaults to all wavelengths).</param>
         /// <returns>Tuple containing reflectance and transmittance spectra</returns>
         public static (Vector<double> Reflectance, Vector<double> Transmittance) Run(
             SpectralConstants? Spec = null, // Optional parameter with null default
@@ -80,7 +84,8 @@ namespace Models.Prospect
             double BROWN = 0.0,
             double PROT = 0.0,
             double CBC = 0.0,
-            double Alpha = 40.0)
+            double Alpha = 40.0,
+            double[] Wavelengths = null)
         {
             // Load spectral constants if not provided
             SpectralConstants spectralData = Spec ?? LoadLocalSpectralData();
@@ -91,6 +96,43 @@ namespace Models.Prospect
                 throw new ArgumentException("Leaf constituents must be non-negative");
             if (Alpha < 0 || Alpha > 90)
                 throw new ArgumentException("Incidence angle must be between 0 and 90 degrees");
+
+            // Handle custom wavelengths
+            Vector<double> SpecifiedWavelengths = spectralData.Wavelength;
+            if (Wavelengths != null)
+            {
+                // Validate that all specified wavelengths are in SpectralConstants.Wavelength using the precomputed dictionary
+                foreach (double w in Wavelengths)
+                {
+                    if (!spectralData.WavelengthToIndex.ContainsKey(w))
+                        throw new ArgumentException($"Wavelength {w} is not in SpectralConstants.Wavelength.");
+                }
+
+                // Filter spectral data to match the specified wavelengths
+                var indices = new int[Wavelengths.Length];
+                for (int i = 0; i < Wavelengths.Length; i++)
+                {
+                    indices[i] = spectralData.WavelengthToIndex[Wavelengths[i]];
+                }
+
+                SpecifiedWavelengths = Vector<double>.Build.DenseOfArray(Wavelengths);
+                spectralData = new SpectralConstants
+                {
+                    Wavelength = SpecifiedWavelengths,
+                    RefractiveIndex = Vector<double>.Build.DenseOfIndexed(Wavelengths.Length, indices.Select(i => (i, spectralData.RefractiveIndex[i]))),
+                    SAC_CAB = Vector<double>.Build.DenseOfIndexed(Wavelengths.Length, indices.Select(i => (i, spectralData.SAC_CAB[i]))),
+                    SAC_CAR = Vector<double>.Build.DenseOfIndexed(Wavelengths.Length, indices.Select(i => (i, spectralData.SAC_CAR[i]))),
+                    SAC_EWT = Vector<double>.Build.DenseOfIndexed(Wavelengths.Length, indices.Select(i => (i, spectralData.SAC_EWT[i]))),
+                    SAC_LMA = Vector<double>.Build.DenseOfIndexed(Wavelengths.Length, indices.Select(i => (i, spectralData.SAC_LMA[i]))),
+                    Tav40 = Vector<double>.Build.DenseOfIndexed(Wavelengths.Length, indices.Select(i => (i, spectralData.Tav40[i]))),
+                    Tav90 = Vector<double>.Build.DenseOfIndexed(Wavelengths.Length, indices.Select(i => (i, spectralData.Tav90[i]))),
+                    SAC_ANT = Vector<double>.Build.DenseOfIndexed(Wavelengths.Length, indices.Select(i => (i, spectralData.SAC_ANT[i]))),
+                    SAC_BROWN = Vector<double>.Build.DenseOfIndexed(Wavelengths.Length, indices.Select(i => (i, spectralData.SAC_BROWN[i]))),
+                    SAC_PROT = Vector<double>.Build.DenseOfIndexed(Wavelengths.Length, indices.Select(i => (i, spectralData.SAC_PROT[i]))),
+                    SAC_CBC = Vector<double>.Build.DenseOfIndexed(Wavelengths.Length, indices.Select(i => (i, spectralData.SAC_CBC[i]))),
+                    WavelengthToIndex = spectralData.WavelengthToIndex // Preserve the mapping
+                };
+            }
 
             // Compute total absorption corresponding to each homogeneous layer
             // Kall = (sum of constituent absorptions) / N
@@ -276,6 +318,13 @@ namespace Models.Prospect
                 string json = File.ReadAllText(path);
                 var data = JsonConvert.DeserializeObject<SpectralDataJson>(json);
 
+                // Create the wavelength-to-index mapping
+                var wavelengthToIndex = new Dictionary<double, int>();
+                for (int i = 0; i < data.Wavelength.Length; i++)
+                {
+                    wavelengthToIndex[data.Wavelength[i]] = i;
+                }
+
                 return new SpectralConstants
                 {
                     Wavelength = Vector<double>.Build.DenseOfArray(data.Wavelength),
@@ -289,7 +338,8 @@ namespace Models.Prospect
                     SAC_ANT = Vector<double>.Build.DenseOfArray(data.SAC_ANT),
                     SAC_BROWN = Vector<double>.Build.DenseOfArray(data.SAC_BROWN),
                     SAC_PROT = Vector<double>.Build.DenseOfArray(data.SAC_PROT),
-                    SAC_CBC = Vector<double>.Build.DenseOfArray(data.SAC_CBC)
+                    SAC_CBC = Vector<double>.Build.DenseOfArray(data.SAC_CBC),
+                    WavelengthToIndex = wavelengthToIndex
                 };
             }
             catch (Exception ex)
