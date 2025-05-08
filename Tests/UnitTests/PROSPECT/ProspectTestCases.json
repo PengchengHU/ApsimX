@@ -5,10 +5,16 @@
     "CAR": 8.0,
     "EWT": 0.01,
     "LMA": 0.008,
-    "Alpha": 40.0,
-    "ExpectedResults": {
-      "Reflectance": [0.1, 0.12, 0.09],
-      "Transmittance": [0.05, 0.06, 0.04]
+    "Alpha": 40.0
+    }
+  },
+  {
+    "N": 2.0,
+    "CAB": 30.0,
+    "CAR": 5.0,
+    "EWT": 0.02,
+    "LMA": 0.01,
+    "Alpha": 40.0
     }
   },
   {
@@ -18,9 +24,7 @@
     "EWT": 0.02,
     "LMA": 0.01,
     "Alpha": 40.0,
-    "ExpectedResults": {
-      "Reflectance": [0.08, 0.1, 0.07],
-      "Transmittance": [0.06, 0.07, 0.05]
+    "Wavelengths": [ 400.0, 680.0, 800.0 ]
     }
   }
 ]
