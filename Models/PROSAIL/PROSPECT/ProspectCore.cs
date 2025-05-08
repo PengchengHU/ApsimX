@@ -21,13 +21,13 @@ namespace Models.Prospect
     public static class ProspectCore
     {
         /// <summary>
-        /// Contains spectral constants required for PROSPECT calculations
+        /// Contains leaf optical constants required for PROSPECT calculations
         /// </summary>
-        public struct SpectralConstants
+        public struct LeafOpticalConstants
         {
-            /// <summary>Wavelength array in nanometers</summary>
+            /// <summary>Wavelength array in nanometers (nm)</summary>
             public Vector<double> Wavelength;      
-            /// <summary>Refractive index spectrum</summary>
+            /// <summary>Refractive index</summary>
             public Vector<double> RefractiveIndex;   
             /// <summary>Specific absorption coefficient for a + b chlorophyll</summary>
             public Vector<double> SAC_CAB;          
@@ -53,14 +53,14 @@ namespace Models.Prospect
             public Dictionary<double, int> WavelengthToIndex;
         }
 
-        // Relative path from APSIM bin directory to Models\PROSPECT
+        // Relative path from APSIM bin directory to Models\PROSAIL\PROSPECT
         private static readonly string RelativeSpectralDataPath = "..\\..\\..\\Models\\PROSAIL\\PROSPECT\\SpecPROSPECT_FullRange.json";
         private static string DefaultSpectralDataPath => PathUtilities.GetAbsolutePath(RelativeSpectralDataPath, AppDomain.CurrentDomain.BaseDirectory);
 
         /// <summary>
         /// Runs the PROSPECT model to calculate leaf reflectance and transmittance
         /// </summary>
-        /// <param name="Spec">Spectral constants container</param>
+        /// <param name="LeafOpticalProperties">Leaf optical constants container (optional)</param>
         /// <param name="N">Leaf structure parameter (unitless)</param>
         /// <param name="CAB">Chlorophyll a + b content (μg/cm²)</param>
         /// <param name="CAR">Carotenoid content (μg/cm²)</param>
@@ -71,10 +71,10 @@ namespace Models.Prospect
         /// <param name="PROT">Protein content (g/cm²)</param>
         /// <param name="CBC">NonProt Carbon-based constituent content (g/cm²)</param>
         /// <param name="Alpha">Incidence angle in degrees</param>
-        /// <param name="Wavelengths">Array of specific wavelengths to simulate (subset of SpectralConstants.Wavelength, optional; defaults to all wavelengths).</param>
+        /// <param name="Wavelengths">Array of specific wavelengths to simulate (subset of LeafOpticalConstants.Wavelength, optional; defaults to all wavelengths).</param>
         /// <returns>Tuple containing reflectance and transmittance spectra</returns>
         public static (Vector<double> Reflectance, Vector<double> Transmittance) Run(
-            SpectralConstants? Spec = null, // Optional parameter with null default
+            LeafOpticalConstants? LeafOpticalProperties = null, // Optional parameter with null default
             double N = 1.5,
             double CAB = 40.0,
             double CAR = 8.0,
@@ -88,7 +88,7 @@ namespace Models.Prospect
             double[] Wavelengths = null)
         {
             // Load spectral constants if not provided
-            SpectralConstants spectralData = Spec ?? LoadLocalSpectralData();
+            LeafOpticalConstants OpticalConstants = LeafOpticalProperties ?? LoadLocalOpticalData();
 
             // Input validation
             if (N <= 0) throw new ArgumentException("Leaf structure parameter N must be positive");
@@ -98,62 +98,62 @@ namespace Models.Prospect
                 throw new ArgumentException("Incidence angle must be between 0 and 90 degrees");
 
             // Handle custom wavelengths
-            Vector<double> SpecifiedWavelengths = spectralData.Wavelength;
+            Vector<double> SpecifiedWavelengths = OpticalConstants.Wavelength;
             if (Wavelengths != null)
             {
-                // Validate that all specified wavelengths are in SpectralConstants.Wavelength using the precomputed dictionary
+                // Validate that all specified wavelengths are in LeafOpticalConstants.Wavelength using the precomputed dictionary
                 foreach (double w in Wavelengths)
                 {
-                    if (!spectralData.WavelengthToIndex.ContainsKey(w))
-                        throw new ArgumentException($"Wavelength {w} is not in SpectralConstants.Wavelength.");
+                    if (!OpticalConstants.WavelengthToIndex.ContainsKey(w))
+                        throw new ArgumentException($"Wavelength {w} is not in LeafOpticalConstants.Wavelength.");
                 }
 
                 // Filter spectral data to match the specified wavelengths
                 var indices = new int[Wavelengths.Length];
                 for (int i = 0; i < Wavelengths.Length; i++)
                 {
-                    indices[i] = spectralData.WavelengthToIndex[Wavelengths[i]];
+                    indices[i] = OpticalConstants.WavelengthToIndex[Wavelengths[i]];
                 }
 
                 SpecifiedWavelengths = Vector<double>.Build.DenseOfArray(Wavelengths);
-                spectralData = new SpectralConstants
+                OpticalConstants = new LeafOpticalConstants
                 {
                     Wavelength = SpecifiedWavelengths,
-                    RefractiveIndex = Vector<double>.Build.DenseOfIndexed(Wavelengths.Length, indices.Select(i => (i, spectralData.RefractiveIndex[i]))),
-                    SAC_CAB = Vector<double>.Build.DenseOfIndexed(Wavelengths.Length, indices.Select(i => (i, spectralData.SAC_CAB[i]))),
-                    SAC_CAR = Vector<double>.Build.DenseOfIndexed(Wavelengths.Length, indices.Select(i => (i, spectralData.SAC_CAR[i]))),
-                    SAC_EWT = Vector<double>.Build.DenseOfIndexed(Wavelengths.Length, indices.Select(i => (i, spectralData.SAC_EWT[i]))),
-                    SAC_LMA = Vector<double>.Build.DenseOfIndexed(Wavelengths.Length, indices.Select(i => (i, spectralData.SAC_LMA[i]))),
-                    Tav40 = Vector<double>.Build.DenseOfIndexed(Wavelengths.Length, indices.Select(i => (i, spectralData.Tav40[i]))),
-                    Tav90 = Vector<double>.Build.DenseOfIndexed(Wavelengths.Length, indices.Select(i => (i, spectralData.Tav90[i]))),
-                    SAC_ANT = Vector<double>.Build.DenseOfIndexed(Wavelengths.Length, indices.Select(i => (i, spectralData.SAC_ANT[i]))),
-                    SAC_BROWN = Vector<double>.Build.DenseOfIndexed(Wavelengths.Length, indices.Select(i => (i, spectralData.SAC_BROWN[i]))),
-                    SAC_PROT = Vector<double>.Build.DenseOfIndexed(Wavelengths.Length, indices.Select(i => (i, spectralData.SAC_PROT[i]))),
-                    SAC_CBC = Vector<double>.Build.DenseOfIndexed(Wavelengths.Length, indices.Select(i => (i, spectralData.SAC_CBC[i]))),
-                    WavelengthToIndex = spectralData.WavelengthToIndex // Preserve the mapping
+                    RefractiveIndex = Vector<double>.Build.DenseOfIndexed(Wavelengths.Length, indices.Select(i => (i, OpticalConstants.RefractiveIndex[i]))),
+                    SAC_CAB = Vector<double>.Build.DenseOfIndexed(Wavelengths.Length, indices.Select(i => (i, OpticalConstants.SAC_CAB[i]))),
+                    SAC_CAR = Vector<double>.Build.DenseOfIndexed(Wavelengths.Length, indices.Select(i => (i, OpticalConstants.SAC_CAR[i]))),
+                    SAC_EWT = Vector<double>.Build.DenseOfIndexed(Wavelengths.Length, indices.Select(i => (i, OpticalConstants.SAC_EWT[i]))),
+                    SAC_LMA = Vector<double>.Build.DenseOfIndexed(Wavelengths.Length, indices.Select(i => (i, OpticalConstants.SAC_LMA[i]))),
+                    Tav40 = Vector<double>.Build.DenseOfIndexed(Wavelengths.Length, indices.Select(i => (i, OpticalConstants.Tav40[i]))),
+                    Tav90 = Vector<double>.Build.DenseOfIndexed(Wavelengths.Length, indices.Select(i => (i, OpticalConstants.Tav90[i]))),
+                    SAC_ANT = Vector<double>.Build.DenseOfIndexed(Wavelengths.Length, indices.Select(i => (i, OpticalConstants.SAC_ANT[i]))),
+                    SAC_BROWN = Vector<double>.Build.DenseOfIndexed(Wavelengths.Length, indices.Select(i => (i, OpticalConstants.SAC_BROWN[i]))),
+                    SAC_PROT = Vector<double>.Build.DenseOfIndexed(Wavelengths.Length, indices.Select(i => (i, OpticalConstants.SAC_PROT[i]))),
+                    SAC_CBC = Vector<double>.Build.DenseOfIndexed(Wavelengths.Length, indices.Select(i => (i, OpticalConstants.SAC_CBC[i]))),
+                    WavelengthToIndex = OpticalConstants.WavelengthToIndex // Preserve the mapping
                 };
             }
 
             // Compute total absorption corresponding to each homogeneous layer
             // Kall = (sum of constituent absorptions) / N
-            Vector<double> Kall = (CAB * spectralData.SAC_CAB +
-                                 CAR * spectralData.SAC_CAR +
-                                 EWT * spectralData.SAC_EWT +
-                                 LMA * spectralData.SAC_LMA +
-                                 ANT * spectralData.SAC_ANT +
-                                 BROWN * spectralData.SAC_BROWN +
-                                 PROT * spectralData.SAC_PROT +
-                                 CBC * spectralData.SAC_CBC) / N;
+            Vector<double> Kall = (CAB * OpticalConstants.SAC_CAB +
+                                 CAR * OpticalConstants.SAC_CAR +
+                                 EWT * OpticalConstants.SAC_EWT +
+                                 LMA * OpticalConstants.SAC_LMA +
+                                 ANT * OpticalConstants.SAC_ANT +
+                                 BROWN * OpticalConstants.SAC_BROWN +
+                                 PROT * OpticalConstants.SAC_PROT +
+                                 CBC * OpticalConstants.SAC_CBC) / N;
 
             // reflectance and transmittance of one layer (tau)
             Vector<double> tau = ComputeTau(Kall);
 
             // reflectivity and transmissivity at the interface
-            Vector<double> talf = Alpha == 40 ? spectralData.Tav40 : ComputeTav(Alpha, spectralData.RefractiveIndex);
+            Vector<double> talf = Alpha == 40 ? OpticalConstants.Tav40 : ComputeTav(Alpha, OpticalConstants.RefractiveIndex);
             Vector<double> ralf = 1.0 - talf;
-            Vector<double> t12 = spectralData.Tav90;
+            Vector<double> t12 = OpticalConstants.Tav90;
             Vector<double> r12 = 1.0 - t12;
-            Vector<double> t21 = t12.PointwiseDivide(spectralData.RefractiveIndex.PointwisePower(2));
+            Vector<double> t21 = t12.PointwiseDivide(OpticalConstants.RefractiveIndex.PointwisePower(2));
             Vector<double> r21 = 1.0 - t21;
 
             // top surface side
@@ -305,51 +305,51 @@ namespace Models.Prospect
         /// <summary>
         /// Load spectral data from a local JSON file
         /// </summary>
-        public static SpectralConstants LoadLocalSpectralData()
+        public static LeafOpticalConstants LoadLocalOpticalData()
         {
             string path = DefaultSpectralDataPath;
             if (!File.Exists(path))
             {
-                throw new FileNotFoundException($"Spectral data file not found at {path}. Please provide a valid Spec or ensure the file exists.");
+                throw new FileNotFoundException($"Leaf optical data file not found at {path}. Please provide a valid LeafOpticalProperties or ensure the file exists.");
             }
 
             try
             {
                 string json = File.ReadAllText(path);
-                var data = JsonConvert.DeserializeObject<SpectralDataJson>(json);
+                var OpticalData = JsonConvert.DeserializeObject<OpticalDataJason>(json);
 
-                // Create the wavelength-to-index mapping
+                // Create the wavelength-to-index mapping for speeding up the subset of the specified wavelengths
                 var wavelengthToIndex = new Dictionary<double, int>();
-                for (int i = 0; i < data.Wavelength.Length; i++)
+                for (int i = 0; i < OpticalData.Wavelength.Length; i++)
                 {
-                    wavelengthToIndex[data.Wavelength[i]] = i;
+                    wavelengthToIndex[OpticalData.Wavelength[i]] = i;
                 }
 
-                return new SpectralConstants
+                return new LeafOpticalConstants
                 {
-                    Wavelength = Vector<double>.Build.DenseOfArray(data.Wavelength),
-                    RefractiveIndex = Vector<double>.Build.DenseOfArray(data.RefractiveIndex),
-                    SAC_CAB = Vector<double>.Build.DenseOfArray(data.SAC_CAB),
-                    SAC_CAR = Vector<double>.Build.DenseOfArray(data.SAC_CAR),
-                    SAC_EWT = Vector<double>.Build.DenseOfArray(data.SAC_EWT),
-                    SAC_LMA = Vector<double>.Build.DenseOfArray(data.SAC_LMA),
-                    Tav40 = Vector<double>.Build.DenseOfArray(data.Tav40),
-                    Tav90 = Vector<double>.Build.DenseOfArray(data.Tav90),
-                    SAC_ANT = Vector<double>.Build.DenseOfArray(data.SAC_ANT),
-                    SAC_BROWN = Vector<double>.Build.DenseOfArray(data.SAC_BROWN),
-                    SAC_PROT = Vector<double>.Build.DenseOfArray(data.SAC_PROT),
-                    SAC_CBC = Vector<double>.Build.DenseOfArray(data.SAC_CBC),
+                    Wavelength = Vector<double>.Build.DenseOfArray(OpticalData.Wavelength),
+                    RefractiveIndex = Vector<double>.Build.DenseOfArray(OpticalData.RefractiveIndex),
+                    SAC_CAB = Vector<double>.Build.DenseOfArray(OpticalData.SAC_CAB),
+                    SAC_CAR = Vector<double>.Build.DenseOfArray(OpticalData.SAC_CAR),
+                    SAC_EWT = Vector<double>.Build.DenseOfArray(OpticalData.SAC_EWT),
+                    SAC_LMA = Vector<double>.Build.DenseOfArray(OpticalData.SAC_LMA),
+                    Tav40 = Vector<double>.Build.DenseOfArray(OpticalData.Tav40),
+                    Tav90 = Vector<double>.Build.DenseOfArray(OpticalData.Tav90),
+                    SAC_ANT = Vector<double>.Build.DenseOfArray(OpticalData.SAC_ANT),
+                    SAC_BROWN = Vector<double>.Build.DenseOfArray(OpticalData.SAC_BROWN),
+                    SAC_PROT = Vector<double>.Build.DenseOfArray(OpticalData.SAC_PROT),
+                    SAC_CBC = Vector<double>.Build.DenseOfArray(OpticalData.SAC_CBC),
                     WavelengthToIndex = wavelengthToIndex
                 };
             }
             catch (Exception ex)
             {
-                throw new Exception($"Failed to load spectral data from {DefaultSpectralDataPath}: {ex.Message}", ex);
+                throw new Exception($"Failed to load leaf optical data from {DefaultSpectralDataPath}: {ex.Message}", ex);
             }
         }
 
         // Helper class for JSON deserialization
-        private class SpectralDataJson
+        private class OpticalDataJason
         {
             public double[] Wavelength { get; set; }
             public double[] RefractiveIndex { get; set; }
