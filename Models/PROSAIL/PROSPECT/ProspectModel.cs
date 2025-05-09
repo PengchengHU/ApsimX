@@ -455,43 +455,96 @@ namespace Models.Prospect
         }
 
         /// <summary>
-        /// Parse the wavelength range from the specified string
+        /// Parses the wavelength range from the specified string and returns the list of wavelengths.
         /// </summary>
-        /// <param name="startWavelength">Output start wavelength</param>
-        /// <param name="endWavelength">Output end wavelength</param>
-        /// <returns>True if parsing was successful</returns>
-        private bool ParseWavelengthRange(out double startWavelength, out double endWavelength)
+        /// <returns>A sorted list of wavelengths (in nm) parsed from the input string. Returns an empty list if parsing fails.</returns>
+        private List<double> ParseWavelengthRange()
         {
-            startWavelength = 400;
-            endWavelength = 2500;
+            List<double> wavelengths = new List<double>();
 
+            // Default range if input is empty
             if (string.IsNullOrWhiteSpace(OutputWavelengthRange))
             {
                 WriteMessage(LogLevel.Info, "ProspectModel: OutputWavelengthRange is empty, using default range 400-2500 nm.");
-                return true;
+                for (int wl = 400; wl <= 2500; wl++)
+                {
+                    wavelengths.Add(wl);
+                }
+                return wavelengths;
             }
 
-            string[] parts = OutputWavelengthRange.Split('-');
-            if (parts.Length != 2)
+            // Split by commas to handle multiple parts (e.g., "500-600, 700-800")
+            string[] parts = OutputWavelengthRange.Split(',', StringSplitOptions.TrimEntries);
+            if (parts.Length == 0)
             {
-                WriteMessage(LogLevel.Warning, $"ProspectModel: Invalid wavelength range format: {OutputWavelengthRange}.");
-                return false;
+                WriteMessage(LogLevel.Warning, "ProspectModel: OutputWavelengthRange is empty after splitting.");
+                return wavelengths; // Empty list
             }
 
-            if (!double.TryParse(parts[0], out startWavelength) || !double.TryParse(parts[1], out endWavelength))
+            foreach (string part in parts)
             {
-                WriteMessage(LogLevel.Warning, $"ProspectModel: Failed to parse wavelength range values: {OutputWavelengthRange}.");
-                return false;
+                // Check if the part is a range (contains a "-")
+                if (part.Contains('-'))
+                {
+                    string[] rangeParts = part.Split('-', StringSplitOptions.TrimEntries);
+                    if (rangeParts.Length != 2)
+                    {
+                        WriteMessage(LogLevel.Warning, $"ProspectModel: Invalid wavelength range format: {part}.");
+                        continue;
+                    }
+
+                    if (!double.TryParse(rangeParts[0], out double startWavelength) || !double.TryParse(rangeParts[1], out double endWavelength))
+                    {
+                        WriteMessage(LogLevel.Warning, $"ProspectModel: Failed to parse wavelength range values: {part}.");
+                        continue;
+                    }
+
+                    if (startWavelength < 0 || endWavelength < startWavelength)
+                    {
+                        WriteMessage(LogLevel.Warning, $"ProspectModel: Invalid wavelength range values (start < 0 or end < start): {part}.");
+                        continue;
+                    }
+
+                    // Add all integer wavelengths in the range (inclusive)
+                    for (int wl = (int)Math.Ceiling(startWavelength); wl <= (int)Math.Floor(endWavelength); wl++)
+                    {
+                        wavelengths.Add(wl);
+                    }
+                    WriteMessage(LogLevel.Info, $"ProspectModel: Parsed wavelength range: {startWavelength}-{endWavelength} nm.");
+                }
+                else
+                {
+                    // Parse as a single wavelength
+                    if (!double.TryParse(part, out double wavelength))
+                    {
+                        WriteMessage(LogLevel.Warning, $"ProspectModel: Failed to parse wavelength value: {part}.");
+                        continue;
+                    }
+
+                    if (wavelength < 0)
+                    {
+                        WriteMessage(LogLevel.Warning, $"ProspectModel: Invalid wavelength value (wavelength < 0): {part}.");
+                        continue;
+                    }
+
+                    wavelengths.Add(wavelength);
+                    WriteMessage(LogLevel.Info, $"ProspectModel: Parsed single wavelength: {wavelength} nm.");
+                }
             }
 
-            if (startWavelength < 0 || endWavelength < startWavelength)
+            // Remove duplicates and sort
+            wavelengths = wavelengths.Distinct().OrderBy(w => w).ToList();
+
+            if (wavelengths.Count == 0)
             {
-                WriteMessage(LogLevel.Warning, $"ProspectModel: Invalid wavelength range values (start < 0 or end < start): {OutputWavelengthRange}.");
-                return false;
+                WriteMessage(LogLevel.Warning, $"ProspectModel: No valid wavelengths parsed from: {OutputWavelengthRange}.");
+            }
+            else
+            {
+                WriteMessage(LogLevel.Info, $"ProspectModel: Total wavelengths parsed: {wavelengths.Count}, range: {wavelengths.First()}-{wavelengths.Last()} nm.");
             }
 
-            WriteMessage(LogLevel.Info, $"ProspectModel: Parsed wavelength range: {startWavelength}-{endWavelength} nm.");
-            return true;
+            return wavelengths;
         }
 
         /// <summary>
@@ -510,13 +563,15 @@ namespace Models.Prospect
                 dbConnection.ExecuteNonQuery("BEGIN TRANSACTION;");
 
                 // Parse wavelength range
-                bool hasRange = ParseWavelengthRange(out double startWavelength, out double endWavelength);
-                if (!hasRange)
+                List<double> outputWavelengths = ParseWavelengthRange();
+                if (outputWavelengths.Count == 0)
                 {
-                    startWavelength = 0;
-                    endWavelength = 10000;
-                    WriteMessage(LogLevel.Warning, $"Invalid wavelength range specified: {OutputWavelengthRange}. Using full spectrum (400-2500).");
+                    WriteMessage(LogLevel.Warning, $"ProspectModel: No valid wavelengths to save, skipping database flush.");
+                    return;
                 }
+
+                // Create a dictionary for fast lookup of output wavelengths
+                var outputWavelengthSet = new HashSet<double>(outputWavelengths);
 
                 // Prepare batch INSERT statements
                 StringBuilder paramSql = new StringBuilder("INSERT OR REPLACE INTO Parameters (SimulationName, Date, N, CAB, CAR, EWT, LMA, ANT, BROWN, PROT, CBC, Alpha) VALUES ");
@@ -538,7 +593,7 @@ namespace Models.Prospect
                     for (int i = 0; i < Wavelengths.Length; i += WavelengthStep)
                     {
                         double wavelength = Wavelengths[i];
-                        if (wavelength >= startWavelength && wavelength <= endWavelength)
+                        if (outputWavelengthSet.Contains(wavelength))
                         {
                             if (!firstSpectra)
                                 spectraSql.Append(",");
@@ -643,7 +698,7 @@ namespace Models.Prospect
             if (cachedOpticalConstants == null)
             {
                 WriteMessage(LogLevel.Error, $"ProspectModel: CalculateProspect called without leaf optical constants on {Clock?.Today:yyyy-MM-dd}.");
-                throw new InvalidOperationException("Spectral constants not loaded when CalculateProspect called.");
+                throw new InvalidOperationException("Leaf optica constants not loaded when CalculateProspect called.");
             }
             WriteMessage(LogLevel.Info, $"ProspectModel: CalculateProspect called on {Clock?.Today:yyyy-MM-dd}.");
 
@@ -748,11 +803,15 @@ namespace Models.Prospect
             }
             CurrentParameterValues["Alpha"] = alphaValue;
 
+            // Parse the wavelength range from OutputWavelengthRange
+            double[] wavelengths = ParseWavelengthRange().ToArray();
+
             // Run the PROSPECT model with current parameters
             var results = ProspectCore.Prospect(
                 LeafOpticalConstants: cachedOpticalConstants,
                 N: nValue, CAB: cabValue, CAR: carValue, EWT: ewtValue, LMA: lmaValue,
-                ANT: antValue, BROWN: brownValue, PROT: protValue, CBC: cbcValue, Alpha: alphaValue);
+                ANT: antValue, BROWN: brownValue, PROT: protValue, CBC: cbcValue, Alpha: alphaValue,
+                Wavelengths: wavelengths.Length > 0 ? wavelengths : null);
             WriteMessage(LogLevel.Info, $"ProspectModel: CalculateProspect completed, Reflectance[{results.Reflectance.Count}], Transmittance[{results.Transmittance.Count}]");
             return results;
         }
@@ -795,7 +854,7 @@ namespace Models.Prospect
                 tags.Add(new AutoDocumentation.Heading("Database Output", headingLevel + 1));
                 tags.Add(new AutoDocumentation.Paragraph("Spectral data is saved to a SQLite database with the following details:", indent));
                 tags.Add(new AutoDocumentation.Paragraph($"- Database file: {SQLiteDatabasePath}", indent));
-                tags.Add(new AutoDocumentation.Paragraph($"- Wavelength range: {OutputWavelengthRange} nm", indent));
+                tags.Add(new AutoDocumentation.Paragraph($"- Wavelengths: {OutputWavelengthRange} (supports ranges like '400-500', lists like '400, 500, 600', or mixed formats like '400, 500-600, 700')", indent));
                 tags.Add(new AutoDocumentation.Paragraph($"- Wavelength step: {WavelengthStep} nm (1 for full resolution, >1 for downsampling)", indent));
                 tags.Add(new AutoDocumentation.Paragraph($"- Buffer days: {BufferDays} (number of days before writing to database)", indent));
                 tags.Add(new AutoDocumentation.Paragraph($"- Logging level: {LoggingLevel} (controls verbosity of messages)", indent));
