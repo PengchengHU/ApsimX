@@ -96,14 +96,10 @@ namespace Models.Prospect
         // <summary>
         // Flag to enable daily SQLite database output
         // </summary>
-        [Description("Enable daily output to SQLite database")]
+        [Description("Enable output to SQLite database")]
         public bool EnableSQLiteOutput { get; set; } = true;
 
-        /// <summary>
-        /// Path to the SQLite database file (relative to simulation directory)
-        /// </summary>
-        [Description("Path to SQLite database file (relative to simulation directory)")]
-        public string SQLiteDatabasePath { get; set; } = "ProspectResults.db";
+        
 
         /// <summary>
         /// Spectral range to save (start-end in nm)
@@ -143,6 +139,11 @@ namespace Models.Prospect
         /// </summary>
         [Description("Logging verbosity level (Error, Warning, Info, Debug)")]
         public LogLevel LoggingLevel { get; set; } = LogLevel.Info;
+
+        /// <summary>
+        /// Path to the SQLite database file (relative to simulation directory)
+        /// </summary>
+        private string ProspectSQLiteDatabasePath;
 
         /// <summary>
         /// The cached spectral constants loaded at simulation start
@@ -271,6 +272,11 @@ namespace Models.Prospect
 
             if (EnableSQLiteOutput)
             {
+                // Set default ProspectSQLiteDatabasePath based on simulation file name
+                string simulationFileName = Path.GetFileNameWithoutExtension(Simulation.FileName);
+                ProspectSQLiteDatabasePath = $"{simulationFileName}_Prospect.db";
+                WriteMessage(LogLevel.Info, $"ProspectModel: Prospect simulations were saved to : {ProspectSQLiteDatabasePath}");
+
                 InitializeDatabase();
             }
         }
@@ -448,10 +454,10 @@ namespace Models.Prospect
         private string GetFullDatabasePath()
         {
             string simDir = Path.GetDirectoryName(Simulation.FileName);
-            if (Path.IsPathRooted(SQLiteDatabasePath))
-                return SQLiteDatabasePath;
+            if (Path.IsPathRooted(ProspectSQLiteDatabasePath))
+                return ProspectSQLiteDatabasePath;
             else
-                return Path.Combine(simDir, SQLiteDatabasePath);
+                return Path.Combine(simDir, ProspectSQLiteDatabasePath);
         }
 
         /// <summary>
@@ -853,7 +859,7 @@ namespace Models.Prospect
             {
                 tags.Add(new AutoDocumentation.Heading("Database Output", headingLevel + 1));
                 tags.Add(new AutoDocumentation.Paragraph("Spectral data is saved to a SQLite database with the following details:", indent));
-                tags.Add(new AutoDocumentation.Paragraph($"- Database file: {SQLiteDatabasePath}", indent));
+                tags.Add(new AutoDocumentation.Paragraph($"- Database file: {ProspectSQLiteDatabasePath}", indent));
                 tags.Add(new AutoDocumentation.Paragraph($"- Wavelengths: {OutputWavelengthRange} (supports ranges like '400-500', lists like '400, 500, 600', or mixed formats like '400, 500-600, 700')", indent));
                 tags.Add(new AutoDocumentation.Paragraph($"- Wavelength step: {WavelengthStep} nm (1 for full resolution, >1 for downsampling)", indent));
                 tags.Add(new AutoDocumentation.Paragraph($"- Buffer days: {BufferDays} (number of days before writing to database)", indent));
