@@ -147,7 +147,7 @@ namespace Models.Prospect
         /// <summary>
         /// The cached spectral constants loaded at simulation start
         /// </summary>
-        private ProspectCore.SpectralConstants? cachedSpectralConstants = null;
+        private ProspectCore.OpticalConstants? cachedOpticalConstants = null;
 
         /// <summary>
         /// Cached PROSPECT results for the current day
@@ -182,12 +182,12 @@ namespace Models.Prospect
         {
             get
             {
-                if (cachedSpectralConstants == null)
+                if (cachedOpticalConstants == null)
                 {
-                    WriteMessage(LogLevel.Warning, "ProspectModel: Wavelengths accessed before spectral constants loaded.");
+                    WriteMessage(LogLevel.Warning, "ProspectModel: Wavelengths accessed before leaf optical constants loaded.");
                     return Array.Empty<double>();
                 }
-                return cachedSpectralConstants.Value.Wavelength.ToArray();
+                return cachedOpticalConstants.Value.Wavelength.ToArray();
             }
         }
 
@@ -260,12 +260,12 @@ namespace Models.Prospect
             WriteMessage(LogLevel.Info, "ProspectModel: Simulation commencing.");
             try
             {
-                cachedSpectralConstants = ProspectCore.LoadLocalSpectralData();
-                WriteMessage(LogLevel.Info, $"ProspectModel: Spectral constants loaded, Wavelengths count: {cachedSpectralConstants.Value.Wavelength.Count}.");
+                cachedOpticalConstants = ProspectCore.LoadLocalOpticalData();
+                WriteMessage(LogLevel.Info, $"ProspectModel: Leaf optical constants loaded, Wavelengths count: {cachedOpticalConstants.Value.Wavelength.Count}.");
             }
             catch (Exception ex)
             {
-                WriteMessage(LogLevel.Error, $"ProspectModel: Failed to load spectral constants: {ex.Message}");
+                WriteMessage(LogLevel.Error, $"ProspectModel: Failed to load leaf optical  constants: {ex.Message}");
                 throw; // Halt simulation if data is missing
             }
 
@@ -640,9 +640,9 @@ namespace Models.Prospect
         /// <returns>A tuple containing reflectance and transmittance vectors</returns>
         public (Vector<double> Reflectance, Vector<double> Transmittance) CalculateProspect()
         {
-            if (cachedSpectralConstants == null)
+            if (cachedOpticalConstants == null)
             {
-                WriteMessage(LogLevel.Error, $"ProspectModel: CalculateProspect called without spectral constants on {Clock?.Today:yyyy-MM-dd}.");
+                WriteMessage(LogLevel.Error, $"ProspectModel: CalculateProspect called without leaf optical constants on {Clock?.Today:yyyy-MM-dd}.");
                 throw new InvalidOperationException("Spectral constants not loaded when CalculateProspect called.");
             }
             WriteMessage(LogLevel.Info, $"ProspectModel: CalculateProspect called on {Clock?.Today:yyyy-MM-dd}.");
@@ -749,8 +749,8 @@ namespace Models.Prospect
             CurrentParameterValues["Alpha"] = alphaValue;
 
             // Run the PROSPECT model with current parameters
-            var results = ProspectCore.Run(
-                Spec: cachedSpectralConstants,
+            var results = ProspectCore.Prospect(
+                LeafOpticalConstants: cachedOpticalConstants,
                 N: nValue, CAB: cabValue, CAR: carValue, EWT: ewtValue, LMA: lmaValue,
                 ANT: antValue, BROWN: brownValue, PROT: protValue, CBC: cbcValue, Alpha: alphaValue);
             WriteMessage(LogLevel.Info, $"ProspectModel: CalculateProspect completed, Reflectance[{results.Reflectance.Count}], Transmittance[{results.Transmittance.Count}]");
