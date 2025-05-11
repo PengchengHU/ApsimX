@@ -1187,7 +1187,7 @@ namespace Models.Sail
         /// <param name="prospectConstants">PROSPECT spectral constants object (must contain Wavelength vector).</param>
         /// <param name="soilProperties">Soil spectral properties object (must contain Wavelength array).</param>
         /// <param name="specAtm">Atmosphere spectral properties object (must contain Wavelength array).</param>
-        public static void check_SpectralSampling(ProspectCore.SpectralConstants prospectConstants, SoilProperties soilProperties, SpecAtmSensor specAtm) // Method made static
+        public static void check_SpectralSampling(ProspectCore.OpticalConstants prospectConstants, SoilProperties soilProperties, SpecAtmSensor specAtm) // Method made static
         {
             // Extract wavelength arrays
             // Note: ProspectCore uses Vector<double>, others use double[]
@@ -1306,7 +1306,7 @@ namespace Models.Sail
         /// <exception cref="InvalidOperationException">Thrown if ProspectCore.Run fails internally.</exception>
         public static AdjustedProspectResult adjust_PROSPECT_2_SAIL( // Method made static
             string sailVersion,
-            ProspectCore.SpectralConstants prospectConstants, // Use ProspectCore's struct type
+            ProspectCore.OpticalConstants prospectConstants, // Use ProspectCore's struct type
             List<ProspectInput> inputProspectList,            // Use SailUtilities' struct type
             double fraction_brown,
             LeafOptics brownLOP = null)                       // Use SailUtilities' class type
@@ -1334,8 +1334,8 @@ namespace Models.Sail
             {
                 // Call the static Run method from ProspectCore
                 // Use named arguments for clarity and robustness against parameter order changes.
-                (Vector<double> refl_g, Vector<double> trans_g) = ProspectCore.Run(
-                    Spec: prospectConstants, // Pass the full constants struct
+                (Vector<double> refl_g, Vector<double> trans_g) = ProspectCore.Prospect(
+                    LeafOpticalConstants: prospectConstants, // Pass the full constants struct
                     N: greenIn.N,           // Pass individual parameters from the input struct
                     CAB: greenIn.CAB,       // Use CAB (consistent with ProspectCore)
                     CAR: greenIn.CAR,
@@ -1412,8 +1412,8 @@ namespace Models.Sail
                             try
                             {
                                 // Call ProspectCore.Run for the brown leaf parameters
-                                (Vector<double> refl_b, Vector<double> trans_b) = ProspectCore.Run(
-                                     Spec: prospectConstants, // Use same spectral constants
+                                (Vector<double> refl_b, Vector<double> trans_b) = ProspectCore.Prospect(
+                                     LeafOpticalConstants: prospectConstants, // Use same spectral constants
                                      N: brownIn.N, CAB: brownIn.CAB, CAR: brownIn.CAR, ANT: brownIn.ANT,
                                      BROWN: brownIn.BROWN, EWT: brownIn.EWT, LMA: brownIn.LMA,
                                      PROT: brownIn.PROT, CBC: brownIn.CBC, Alpha: brownIn.Alpha);

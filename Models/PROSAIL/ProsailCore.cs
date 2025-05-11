@@ -68,7 +68,7 @@ namespace Models.Prospect
         /// <exception cref="ArgumentNullException">Thrown if required inputs are null for specific configurations.</exception>
         /// <exception cref="FileNotFoundException">Thrown if spectral data file is missing when specSensor is null.</exception>
         public SailResult PRO4SAIL(
-            SpectralConstants? specSensor = null,
+            OpticalConstants? specSensor = null,
             ProspectInput? inputProspect = null, 
             double N = 1.5,
             double CAB = 40.0,
@@ -113,7 +113,7 @@ namespace Models.Prospect
                 throw new ArgumentException("LIDFb is required when TypeLidf is 1.");
 
             // Load spectral constants if not provided
-            ProspectCore.SpectralConstants spectralData = specSensor ?? ProspectCore.LoadLocalSpectralData();
+            ProspectCore.OpticalConstants spectralData = specSensor ?? ProspectCore.LoadLocalOpticalData();
 
             // Default soil reflectance (mimicking SpecSOIL$Dry_Soil from R)
             if (rsoil == null)
@@ -200,14 +200,14 @@ namespace Models.Prospect
         /// <exception cref="ArgumentException">Thrown if brownLOP is null for 4SAIL or wavelengths mismatch.</exception>
         private (LeafOptics GreenLOP, LeafOptics BrownLOP) AdjustProspectToSail(
             string sailVersion,
-            ProspectCore.SpectralConstants specSensor,
+            ProspectCore.OpticalConstants specSensor,
             ProspectInput inputProspect, // Updated to use SailUtils.ProspectInput
             BrownLOP? brownLOP,
             double fractionBrown)
         {
             // Run PROSPECT for green leaves
-            var (greenReflectance, greenTransmittance) = ProspectCore.Run(
-                Spec: specSensor,
+            var (greenReflectance, greenTransmittance) = ProspectCore.Prospect(
+                LeafOpticalConstants: specSensor,
                 N: inputProspect.N,
                 CAB: inputProspect.CAB,
                 CAR: inputProspect.CAR,
@@ -254,8 +254,8 @@ namespace Models.Prospect
                 else
                 {
                     // Generate brown leaf optical properties using PROSPECT with high brown pigment
-                    var (brownReflectance, brownTransmittance) = ProspectCore.Run(
-                        Spec: specSensor,
+                    var (brownReflectance, brownTransmittance) = ProspectCore.Prospect(
+                        LeafOpticalConstants: specSensor,
                         N: inputProspect.N,
                         CAB: 0.0, // No chlorophyll for brown leaves
                         CAR: 0.0, // No carotenoids

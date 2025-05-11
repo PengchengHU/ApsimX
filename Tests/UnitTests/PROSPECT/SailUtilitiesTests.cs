@@ -63,11 +63,11 @@ namespace UnitTests
         }
 
         // Helper to create sample PROSPECT constants (loads real data if possible)
-        private ProspectCore.SpectralConstants CreateSampleProspectConstants(double[] wavelengths)
+        private ProspectCore.OpticalConstants CreateSampleProspectConstants(double[] wavelengths)
         {
             try
             {
-                var constants = ProspectCore.LoadLocalSpectralData();
+                var constants = ProspectCore.LoadLocalOpticalData();
                 // TODO: Add logic here to interpolate or select wavelengths from loaded 'constants'
                 //       to exactly match the input 'wavelengths' array if needed.
                 //       This example assumes they match or the test handles potential mismatch.
@@ -82,7 +82,7 @@ namespace UnitTests
                 TestContext.Progress.WriteLine($"WARNING: Failed to load real spectral data for tests: {ex.Message}. Using dummy data.");
                 int n = wavelengths.Length;
                 // Fallback to basic dummy data structure
-                return new ProspectCore.SpectralConstants { /* ... (dummy data as before) ... */ };
+                return new ProspectCore.OpticalConstants { /* ... (dummy data as before) ... */ };
             }
         }
 
