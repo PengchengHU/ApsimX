@@ -54,8 +54,8 @@ namespace Models.Prospect
         }
 
         // Relative path from APSIM bin directory to Models\PROSAIL\PROSPECT
-        private static readonly string RelativeSpectralDataPath = "..\\..\\..\\Models\\PROSAIL\\PROSPECT\\SpecPROSPECT_FullRange.json";
-        private static string DefaultSpectralDataPath => PathUtilities.GetAbsolutePath(RelativeSpectralDataPath, AppDomain.CurrentDomain.BaseDirectory);
+        private static readonly string RelativeOpticallDataPath = "..\\..\\..\\Models\\PROSAIL\\PROSPECT\\SpecPROSPECT_FullRange.json";
+        private static string DefaultOpticalDataPath => PathUtilities.GetAbsolutePath(RelativeOpticallDataPath, AppDomain.CurrentDomain.BaseDirectory);
 
         /// <summary>
         /// Runs the PROSPECT model to calculate leaf reflectance and transmittance
@@ -307,7 +307,7 @@ namespace Models.Prospect
         /// </summary>
         public static OpticalConstants LoadLocalOpticalData()
         {
-            string path = DefaultSpectralDataPath;
+            string path = DefaultOpticalDataPath;
             if (!File.Exists(path))
             {
                 throw new FileNotFoundException($"Leaf optical data file not found at {path}. Please provide a valid LeafOpticalConstants or ensure the file exists.");
@@ -344,7 +344,7 @@ namespace Models.Prospect
             }
             catch (Exception ex)
             {
-                throw new Exception($"Failed to load leaf optical data from {DefaultSpectralDataPath}: {ex.Message}", ex);
+                throw new Exception($"Failed to load leaf optical data from {DefaultOpticalDataPath}: {ex.Message}", ex);
             }
         }
 
