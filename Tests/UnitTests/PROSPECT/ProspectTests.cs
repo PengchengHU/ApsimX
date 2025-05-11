@@ -56,7 +56,7 @@ namespace UnitTests
         {
             try
             {
-                return ProspectCore.Run(N: testCase.N, CAB: testCase.CAB, CAR: testCase.CAR, EWT: testCase.EWT, LMA: testCase.LMA, Alpha: testCase.Alpha);
+                return ProspectCore.Prospect(N: testCase.N, CAB: testCase.CAB, CAR: testCase.CAR, EWT: testCase.EWT, LMA: testCase.LMA, Alpha: testCase.Alpha);
             }
             catch (Exception ex)
             {
