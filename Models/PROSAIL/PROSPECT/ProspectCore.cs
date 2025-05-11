@@ -73,6 +73,8 @@ namespace Models.Prospect
         /// <param name="Alpha">Incidence angle in degrees</param>
         /// <param name="Wavelengths">Array of specific wavelengths to simulate (subset of OpticalConstants.Wavelength, optional; defaults to all wavelengths).</param>
         /// <returns>Tuple containing reflectance and transmittance spectra</returns>
+        /// <exception cref="ArgumentException">Thrown if input parameters are invalid or array lengths mismatch.</exception>
+        /// <exception cref="FileNotFoundException">Thrown if the file for leaf optical constants is missing.</exception>
         public static (Vector<double> Reflectance, Vector<double> Transmittance) Prospect(
             OpticalConstants? LeafOpticalConstants = null, // Optional parameter with null default
             double N = 1.5,
@@ -91,46 +93,44 @@ namespace Models.Prospect
             OpticalConstants LeafConstants = LeafOpticalConstants ?? LoadLocalOpticalData();
 
             // Input validation
-            if (N <= 0) throw new ArgumentException("Leaf structure parameter N must be positive");
+            if (N <= 0) throw new ArgumentException("Leaf structure parameter N must be positive.");
             if (CAB < 0 || CAR < 0 || EWT < 0 || LMA < 0 || ANT < 0 || BROWN < 0 || PROT < 0 || CBC < 0)
-                throw new ArgumentException("Leaf constituents must be non-negative");
+                throw new ArgumentException("Leaf constituents must be non-negative.");
             if (Alpha < 0 || Alpha > 90)
                 throw new ArgumentException("Incidence angle must be between 0 and 90 degrees");
 
             // Handle custom wavelengths
-            Vector<double> SpecifiedWavelengths = LeafConstants.Wavelength;
-            if (Wavelengths != null)
+            if (Wavelengths != null && Wavelengths.Length > 0)
             {
-                // Validate that all specified wavelengths are in OpticalConstants.Wavelength using the precomputed dictionary
+                // Validate that all specified wavelengths are in OpticalConstants.Wavelength
                 foreach (double w in Wavelengths)
                 {
                     if (!LeafConstants.WavelengthToIndex.ContainsKey(w))
-                        throw new ArgumentException($"Wavelength {w} is not in OpticalConstants.Wavelength.");
+                    {
+                        throw new ArgumentException($"Wavelength {w} nm is not in OpticalConstants.Wavelength.");
+                    }
                 }
 
-                // Filter spectral data to match the specified wavelengths
-                var indices = new int[Wavelengths.Length];
-                for (int i = 0; i < Wavelengths.Length; i++)
-                {
-                    indices[i] = LeafConstants.WavelengthToIndex[Wavelengths[i]];
-                }
+                // Map wavelengths to their indices in the original array
+                var indices = Wavelengths.Select(w => LeafConstants.WavelengthToIndex[w]).ToArray();
 
-                SpecifiedWavelengths = Vector<double>.Build.DenseOfArray(Wavelengths);
+                // Create a new OpticalConstants with only the specified wavelengths
                 LeafConstants = new OpticalConstants
                 {
-                    Wavelength = SpecifiedWavelengths,
-                    RefractiveIndex = Vector<double>.Build.DenseOfIndexed(Wavelengths.Length, indices.Select(i => (i, LeafConstants.RefractiveIndex[i]))),
-                    SAC_CAB = Vector<double>.Build.DenseOfIndexed(Wavelengths.Length, indices.Select(i => (i, LeafConstants.SAC_CAB[i]))),
-                    SAC_CAR = Vector<double>.Build.DenseOfIndexed(Wavelengths.Length, indices.Select(i => (i, LeafConstants.SAC_CAR[i]))),
-                    SAC_EWT = Vector<double>.Build.DenseOfIndexed(Wavelengths.Length, indices.Select(i => (i, LeafConstants.SAC_EWT[i]))),
-                    SAC_LMA = Vector<double>.Build.DenseOfIndexed(Wavelengths.Length, indices.Select(i => (i, LeafConstants.SAC_LMA[i]))),
-                    Tav40 = Vector<double>.Build.DenseOfIndexed(Wavelengths.Length, indices.Select(i => (i, LeafConstants.Tav40[i]))),
-                    Tav90 = Vector<double>.Build.DenseOfIndexed(Wavelengths.Length, indices.Select(i => (i, LeafConstants.Tav90[i]))),
-                    SAC_ANT = Vector<double>.Build.DenseOfIndexed(Wavelengths.Length, indices.Select(i => (i, LeafConstants.SAC_ANT[i]))),
-                    SAC_BROWN = Vector<double>.Build.DenseOfIndexed(Wavelengths.Length, indices.Select(i => (i, LeafConstants.SAC_BROWN[i]))),
-                    SAC_PROT = Vector<double>.Build.DenseOfIndexed(Wavelengths.Length, indices.Select(i => (i, LeafConstants.SAC_PROT[i]))),
-                    SAC_CBC = Vector<double>.Build.DenseOfIndexed(Wavelengths.Length, indices.Select(i => (i, LeafConstants.SAC_CBC[i]))),
-                    WavelengthToIndex = LeafConstants.WavelengthToIndex // Preserve the mapping
+                    Wavelength = Vector<double>.Build.DenseOfArray(Wavelengths),
+                    RefractiveIndex = Vector<double>.Build.DenseOfEnumerable(indices.Select(i => LeafConstants.RefractiveIndex[i])),
+                    SAC_CAB = Vector<double>.Build.DenseOfEnumerable(indices.Select(i => LeafConstants.SAC_CAB[i])),
+                    SAC_CAR = Vector<double>.Build.DenseOfEnumerable(indices.Select(i => LeafConstants.SAC_CAR[i])),
+                    SAC_EWT = Vector<double>.Build.DenseOfEnumerable(indices.Select(i => LeafConstants.SAC_EWT[i])),
+                    SAC_LMA = Vector<double>.Build.DenseOfEnumerable(indices.Select(i => LeafConstants.SAC_LMA[i])),
+                    Tav40 = Vector<double>.Build.DenseOfEnumerable(indices.Select(i => LeafConstants.Tav40[i])),
+                    Tav90 = Vector<double>.Build.DenseOfEnumerable(indices.Select(i => LeafConstants.Tav90[i])),
+                    SAC_ANT = Vector<double>.Build.DenseOfEnumerable(indices.Select(i => LeafConstants.SAC_ANT[i])),
+                    SAC_BROWN = Vector<double>.Build.DenseOfEnumerable(indices.Select(i => LeafConstants.SAC_BROWN[i])),
+                    SAC_PROT = Vector<double>.Build.DenseOfEnumerable(indices.Select(i => LeafConstants.SAC_PROT[i])),
+                    SAC_CBC = Vector<double>.Build.DenseOfEnumerable(indices.Select(i => LeafConstants.SAC_CBC[i])),
+                    WavelengthToIndex = Wavelengths.Select((w, i) => new { Wavelength = w, Index = i })
+                                                 .ToDictionary(x => x.Wavelength, x => x.Index)
                 };
             }
 
