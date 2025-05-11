@@ -8,57 +8,96 @@ using MathNet.Numerics.LinearAlgebra; // Required for ProspectCore types if pass
 using Newtonsoft.Json; // For JSON input/output with R script
 using Newtonsoft.Json.Linq; // For handling potential JArray from R vectors
 using Models.Sail; // Namespace for SailUtilities and its types
-using Models.Prospect; // Namespace for ProspectCore and its structs
+using Models.Prospect;
+using APSIM.Shared.Utilities; // Namespace for ProspectCore and its structs
 
 namespace UnitTests
 {
     [TestFixture] // NUnit attribute for a test class
     public class SailUtilitiesTests
     {
-        // --- Configuration ---
+        private readonly string RScriptPath = @"C:\Program Files\R\R-4.4.1\bin\Rscript.exe";
+        //private readonly string RSailScriptWrapper = Path.Combine(TestContext.CurrentContext.TestDirectory, "SailUtilitiesWrapper.R");
+        private readonly string RSailScriptWrapper = @"D:\ApsimX\Tests\UnitTests\PROSPECT\SailUtilitiesWrapper.R";
+        
+        // Leaf optical constants data
+        private static readonly string RelativeOpticalDataPath = "..\\..\\..\\Models\\PROSAIL\\PROSPECT\\SpecPROSPECT_FullRange.json";
+        private static string DefaultOpticalDataPath => PathUtilities.GetAbsolutePath(RelativeOpticalDataPath, AppDomain.CurrentDomain.BaseDirectory);
 
-        // IMPORTANT: Update these paths to match your environment
-        // Ensure Rscript.exe is accessible and jsonlite package is installed in R.
-        private readonly string RScriptPath = @"C:\Program Files\R\R-4.4.1\bin\Rscript.exe"; // Example path to Rscript
-        // Assumes SailUtilitiesWrapper.R is copied to the test output directory or provide full path
-        private readonly string RSailScriptWrapper = Path.Combine(TestContext.CurrentContext.TestDirectory, "SailUtilitiesWrapper.R");
+        // Atmospheric data (direct and diffuse radiation for clear conditions)
+        private static readonly string RelativeSpecATMDataPath = "..\\..\\..\\Models\\PROSAIL\\PROSPECT\\SpecATM.json";
+        private static string DefaultSpecATMDataPath => PathUtilities.GetAbsolutePath(RelativeSpecATMDataPath, AppDomain.CurrentDomain.BaseDirectory);
 
-        // Define tolerance for floating-point comparisons
-        private readonly double Tolerance = 1e-6;
+        // Soil reflectance data
+        private static readonly string RelativeSpecSoilDataPath = "..\\..\\..\\Models\\PROSAIL\\PROSPECT\\SpecSoil.json";
+        private static string DefaultSpecSoilDataPath => PathUtilities.GetAbsolutePath(RelativeSpecSoilDataPath, AppDomain.CurrentDomain.BaseDirectory);
 
-        // --- Test Setup ---
+        // Example Prospect simualted data
+        private static readonly string RelativeProspectOutDataPath = "..\\..\\..\\Models\\PROSAIL\\PROSPECT\\SpecSoil.json";
+        private static string DefaultProspectOutDataPath => PathUtilities.GetAbsolutePath(RelativeProspectOutDataPath, AppDomain.CurrentDomain.BaseDirectory);
+
+        private readonly double Tolerance = 1e-3;
+
+        private class SpecATMDataJason
+        {
+            public double[] Wavelength { get; set; }
+            public double[] DirectLight { get; set; }
+            public double[] DiffuseLight { get; set; }
+        }
+
+        private class SpecSoilDataJson
+        {
+            /// <summary>
+            /// Wavelengths (nm). Should match simulation wavelengths.
+            /// </summary>
+            public double[] Wavelength { get; set; }
+
+            /// <summary>
+            /// Soil reflectance spectrum (unitless fraction).
+            /// </summary>
+            public double[] Dry_Soil { get; set; }
+
+            /// <summary>
+            /// Soil reflectance spectrum (unitless fraction).
+            /// </summary>
+            public double[] Wet_Soil { get; set; }
+        }
+
         [OneTimeSetUp]
         public void CheckRSetup()
         {
-            Assert.That(File.Exists(RScriptPath), $"Rscript.exe not found at: {RScriptPath}. Please update the path in SailUtilitiesTests.cs.");
-            Assert.That(File.Exists(RSailScriptWrapper), $"R wrapper script not found at: {RSailScriptWrapper}. Ensure it's copied to the test directory or update the path.");
-            // Optional: Could add a check here to run Rscript --version or check jsonlite installation
-            //           to provide earlier feedback if the environment isn't set up.
+            Assert.That(File.Exists(RScriptPath), $"Rscript.exe not found at: {RScriptPath}.");
+            Assert.That(File.Exists(RSailScriptWrapper), $"R wrapper script not found at: {RSailScriptWrapper}.");
+            Assert.That(File.Exists(DefaultOpticalDataPath), $"R wrapper script not found at: {DefaultOpticalDataPath}.");
+            Assert.That(File.Exists(DefaultSpecATMDataPath), $"R wrapper script not found at: {DefaultSpecATMDataPath}.");
+            Assert.That(File.Exists(DefaultSpecSoilDataPath), $"R wrapper script not found at: {DefaultSpecSoilDataPath}.");
+            Assert.That(File.Exists(DefaultProspectOutDataPath), $"R wrapper script not found at: {DefaultProspectOutDataPath}.");
         }
 
-
-        // --- Test Input Data Generation Helpers ---
-
-        // Helper to create simple atmospheric data
-        private SailUtilities.SpecAtmSensor CreateSampleAtm(double[] wavelengths)
+        // Helper to load atmospheric data
+        private SailUtilities.SpecAtmSensor CreateSampleAtm(string DefaultSpecATMDataPath)
         {
-            int n = wavelengths.Length;
+            string json = File.ReadAllText(DefaultSpecATMDataPath);
+            var ATMData = JsonConvert.DeserializeObject<SpecATMDataJason>(json);
+
             return new SailUtilities.SpecAtmSensor
             {
-                Wavelength = wavelengths,
-                DirectLight = Enumerable.Repeat(1.0, n).ToArray(), // Example: Constant 1.0 W/m2/nm
-                DiffuseLight = Enumerable.Repeat(0.2, n).ToArray() // Example: Constant 0.2 W/m2/nm
+                Wavelength = ATMData.Wavelength,
+                DirectLight = ATMData.DirectLight,
+                DiffuseLight = ATMData.DiffuseLight
             };
         }
 
         // Helper to create simple soil properties
-        private SailUtilities.SoilProperties CreateSampleSoil(double[] wavelengths)
+        private SailUtilities.SoilProperties CreateSampleSoil(string DefaultSpecSoilDataPath)
         {
-            int n = wavelengths.Length;
+            string json = File.ReadAllText(DefaultSpecSoilDataPath);
+            var SoilData = JsonConvert.DeserializeObject<SpecSoilDataJson>(json);
+
             return new SailUtilities.SoilProperties
             {
-                Wavelength = wavelengths,
-                Reflectance = Enumerable.Repeat(0.15, n).ToArray() // Example: Constant 0.15 reflectance
+                Wavelength = SoilData.Wavelength,
+                Reflectance = SoilData.Wet_Soil
             };
         }
 
