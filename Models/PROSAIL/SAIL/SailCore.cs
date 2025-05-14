@@ -10,6 +10,7 @@ using Newtonsoft.Json;
 using Models.Core;
 using APSIM.Shared.Utilities;
 using static Models.Sail.SailUtilities;
+using static Models.Prospect.ProspectCore;
 
 
 namespace Models.Sail
@@ -44,12 +45,23 @@ namespace Models.Sail
                                  double lai, double q, double tts, double tto, double psi,
                                  SoilProperties soilProperties)
         {
-            if (leafOptics == null) throw new ArgumentNullException(nameof(leafOptics));
-            if (soilProperties == null) throw new ArgumentNullException(nameof(soilProperties));
-            if (leafOptics.Reflectance == null || leafOptics.Transmittance == null || soilProperties.Reflectance == null)
+            if (!leafOptics.HasValue)
+            {
+                throw new ArgumentNullException(nameof(leafOptics));
+            }
+            if (soilProperties == null)
+            {
+                throw new ArgumentNullException(nameof(soilProperties));
+            }
+            if (leafOptics.Reflectance == null || leafOptics.Transmittance == null || soilProperties.Reflectance == null) 
+            {
                 throw new ArgumentException("Reflectance/Transmittance arrays in leafOptics and soilProperties cannot be null.");
-            if (leafOptics.Reflectance.Length != leafOptics.Transmittance.Length || leafOptics.Reflectance.Length != soilProperties.Reflectance.Length)
+            }
+
+            if (leafOptics.Reflectance.Length != leafOptics.Transmittance.Length || leafOptics.Reflectance.Length != soilProperties.Reflectance.Length) 
+            {
                 throw new ArgumentException("Input reflectance/transmittance arrays must have the same length.");
+            }                
 
             // ############################ #
             // #	LEAF OPTICAL PROPERTIES	##
@@ -472,27 +484,51 @@ namespace Models.Sail
                                   double fractionBrown, double diss, double cv, double zeta)
         {
             // --- Input Validation ---
-            if (leafGreen == null) throw new ArgumentNullException(nameof(leafGreen));
-            if (leafBrown == null) throw new ArgumentNullException(nameof(leafBrown));
-            if (soilProperties == null) throw new ArgumentNullException(nameof(soilProperties));
+            if (!leafGreen.HasValue) 
+            {
+                throw new ArgumentNullException(nameof(leafGreen));
+            }
+            if (!leafBrown.HasValue)
+            {
+                throw new ArgumentNullException(nameof(leafBrown));
+            }
+            if (soilProperties == null)
+            {
+                throw new ArgumentNullException(nameof(soilProperties));
+            }
             if (leafGreen.Reflectance == null || leafGreen.Transmittance == null ||
                 leafBrown.Reflectance == null || leafBrown.Transmittance == null ||
                 soilProperties.Reflectance == null)
+            {
                 throw new ArgumentException("Reflectance/Transmittance arrays in leafOptics and soilProperties cannot be null.");
+            }                
 
             int nLambda = leafGreen.Reflectance.Length;
             if (leafGreen.Transmittance.Length != nLambda ||
                 leafBrown.Reflectance.Length != nLambda || leafBrown.Transmittance.Length != nLambda ||
                 soilProperties.Reflectance.Length != nLambda)
+            {
                 throw new ArgumentException("Input reflectance/transmittance arrays must have the same length.");
+            }
 
-            if (fractionBrown < 0 || fractionBrown > 1) throw new ArgumentOutOfRangeException(nameof(fractionBrown), "fractionBrown must be between 0 and 1.");
-            if (diss < 0 || diss > 1) throw new ArgumentOutOfRangeException(nameof(diss), "diss must be between 0 and 1.");
-            if (cv < 0 || cv > 1) throw new ArgumentOutOfRangeException(nameof(cv), "Cv (vertical cover) must be between 0 and 1.");
-            if (zeta < 0) throw new ArgumentOutOfRangeException(nameof(zeta), "Zeta (tree shape) cannot be negative.");
+            if (fractionBrown < 0 || fractionBrown > 1)
+            {
+                throw new ArgumentOutOfRangeException(nameof(fractionBrown), "fractionBrown must be between 0 and 1.");
+            }
+            if (diss < 0 || diss > 1)
+            {
+                throw new ArgumentOutOfRangeException(nameof(diss), "diss must be between 0 and 1.");
+            }
+            if (cv < 0 || cv > 1)
+            {
+                throw new ArgumentOutOfRangeException(nameof(cv), "Cv (vertical cover) must be between 0 and 1.");
+            }
+            if (zeta < 0)
+            {
+                throw new ArgumentOutOfRangeException(nameof(zeta), "Zeta (tree shape) cannot be negative.");
+            }
 
-
-            // --- Initialization ---
+            // Initialization
             double[] rsoil = soilProperties.Reflectance; // Soil reflectance (Lambertian assumption)
                                                          // Non-Lambertian soil (placeholders, same as Lambertian in this R code version)
             double[] rddsoil = rsoil;
@@ -525,10 +561,11 @@ namespace Models.Sail
                     rsdstar[i] = rsoil[i]; // Albedo component is just soil
                     rddstar[i] = rsoil[i];
                 }
-                return new SailResult { Rdot = rdot, Rsot = rsot, Rddt = rddt, Rsdt = rsdt, FCover = fCover, Abs_dir = abs_dir, Abs_hem = abs_hem, Rsdstar = rsdstar, Rddstar = rddstar };
+                return new SailResult { Rdot = rdot, Rsot = rsot, Rddt = rddt, Rsdt = rsdt, FCover = fCover, 
+                    Abs_dir = abs_dir, Abs_hem = abs_hem, Rsdstar = rsdstar, Rddstar = rddstar };
             }
 
-            // --- Geometric Quantities ---
+            // Geometric Quantities
             double rd = DEGREES_TO_RADIANS;
             double ttsRad = tts * rd;
             double ttoRad = tto * rd;
@@ -542,7 +579,7 @@ namespace Models.Sail
             double dso = Math.Sqrt(tants * tants + tanto * tanto - 2.0 * tants * tanto * cospsi);
 
 
-            // --- Leaf Angle Distribution ---
+            // Leaf Angle Distribution
             FoliarDistributionResult foliarDistrib;
             if (typeLidf == 1)
             {
@@ -560,7 +597,7 @@ namespace Models.Sail
             double[] lidf = foliarDistrib.Lidf;
             double[] litab = foliarDistrib.Litab;
 
-            // --- Clumping Effects ---
+            // Clumping Effects
             double Cs = 1.0, Co = 1.0; // Clumping factors for sun and observer
             if (cv < 1.0) // If not fully covered vertically
             {
@@ -653,7 +690,7 @@ namespace Models.Sail
             }
 
 
-            // --- Geometric Factors (same as 4SAIL) ---
+            // Geometric Factors (same as 4SAIL)
             double ks = 0, ko = 0, bf = 0, sob = 0, sof = 0;
             int na = litab.Length;
             for (int i = 0; i < na; i++)
@@ -681,13 +718,13 @@ namespace Models.Sail
             double ddb = 0.5 * (1.0 + bf);
             double ddf = 0.5 * (1.0 - bf);
 
-            // --- Layer LAIs ---
+            // Layer LAIs
             // Use the ORIGINAL fractionBrown here, not the adjusted 'fb'
             double lai1 = (1.0 - fractionBrown) * lai; // Top layer LAI (Green)
             double lai2 = fractionBrown * lai;      // Bottom layer LAI (Brown)
 
 
-            // --- Hotspot Calculation (Two Layers) ---
+            // Hotspot Calculation (Two Layers)
             double tss_total = Math.Exp(-ks * lai); // Total direct transmittance (solar)
             double ck = Math.Exp(-ks * lai1);     // Direct transmittance through top layer (solar)
 
@@ -807,7 +844,7 @@ namespace Models.Sail
                 // Let's assume sumint1 and sumint2 are the integrals scaled by dx (path fraction), so multiplication by LAI later is correct.
             }
 
-            // --- Calculate Scattering for Bottom Layer (Layer 2 - Brown) ---
+            // Calculate Scattering for Bottom Layer (Layer 2 - Brown)
             // Using lai2 and rho2/tau2
             double[] tss_L2 = new double[nLambda]; // Solar transmittance Layer 2
             double[] too_L2 = new double[nLambda]; // Observer transmittance Layer 2
@@ -922,7 +959,7 @@ namespace Models.Sail
             double[] toob = too_L2; // Beam Trans. (obs) of background
             double[] tssb = tss_L2; // Beam Trans. (sun) of background
 
-            // --- Calculate Scattering for Top Layer (Layer 1 - Green) ---
+            // Calculate Scattering for Top Layer (Layer 1 - Green)
             // Using lai1 and rho1/tau1
             double[] tss_L1 = new double[nLambda];
             double[] too_L1 = new double[nLambda];
@@ -1009,7 +1046,7 @@ namespace Models.Sail
                 }
             }
 
-            // --- Combine Layers (Adding Method) ---
+            // Combine Layers (Adding Method)
             // Reflectances/Transmittances of the combined two-layer canopy (no soil yet)
             double[] rsdt_comb = new double[nLambda]; // Combined Dir-Hem Refl
             double[] rdot_comb = new double[nLambda]; // Combined Hem-Dir Refl
@@ -1056,7 +1093,7 @@ namespace Models.Sail
                 tddt_comb[i] = tdd_L1[i] * tddb[i] / rn; // Bi-Hem Trans
             }
 
-            // --- Apply Clumping Effects to Combined Vegetation Layer ---
+            // Apply Clumping Effects to Combined Vegetation Layer
             double[] rddcb = new double[nLambda]; // Clumped BiHem Refl (Bottom view)
             double[] rddct = new double[nLambda]; // Clumped BiHem Refl (Top view)
             double[] tddc = new double[nLambda];  // Clumped BiHem Trans
@@ -1097,7 +1134,7 @@ namespace Models.Sail
                 alfad_veg[i] = 1.0 - tddc[i] - rddct[i];         // 1 - Tdd - Rdd (diffuse, top view)
             }
 
-            // --- Add the Soil Background ---
+            // Add the Soil Background
             for (int i = 0; i < nLambda; i++)
             {
                 double rn_soil = 1.0 - rddcb[i] * rddsoil[i]; // Interaction: 1 - Rdd_veg_bottom * Rdd_soil
