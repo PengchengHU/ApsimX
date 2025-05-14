@@ -17,13 +17,61 @@ namespace Models.Prospect
     /// </summary>
     /// <remarks>
     /// Reference: Jacquemoud, S., and Baret, F. (1990). PROSPECT: A model of leaf optical properties spectra.
+    /// Acknowledgement: This C# implementation (script) of PROSPECT is implmented based on the 'prospect' R package (https://github.com/jbferet/prospect) 
+    /// writen by Dr Jean-Baptiste Feret (jean-baptiste.feret@teledetection.fr). Please properly cite the R package and other papers (as listed in the GitHub page):
+    /// Féret, J.-B. and de Boissieu, F. (2024). prospect: an R package to link leaf optical properties with their chemical and
+    /// structural properties with the leaf model PROSPECT. Journal of Open Source Software, 9(94), 6027, https://doi.org/10.21105/joss.06027
     /// </remarks>
     public static class ProspectCore
     {
         /// <summary>
         /// Contains leaf optical constants required for PROSPECT calculations
         /// </summary>
-        public struct OpticalConstants
+        public struct ProspectInputs
+        {
+            /// <summary>Leaf structure parameter N (unitless, avg number of layers).</summary>
+            public double N;
+            /// <summary>Chlorophyll a + b content (μg/cm²).</summary>
+            public double CAB;
+            /// <summary>Total carotenoid content (μg/cm²).</summary>
+            public double CAR;
+            /// <summary>Anthocyanin content (μg/cm²).</summary>
+            public double ANT;
+            /// <summary>Brown pigment content (arbitrary units).</summary>
+            public double BROWN;
+            /// <summary>Equivalent Water Thickness (cm or g/cm²).</summary>
+            public double EWT;
+            /// <summary>Leaf Mass per Area (dry matter content) (g/cm²).</summary>
+            public double LMA;
+            /// <summary>Protein content (g/cm²).</summary>
+            public double PROT;
+            /// <summary>Non-protein Carbon-based constituent content (g/cm²).</summary>
+            public double CBC;
+            /// <summary>Incidence angle for tav calculation (degrees, typically 40 or 59).</summary>
+            public double Alpha; // Default often 40 in PROSPECT contexts
+            /// <summary>Array of specific wavelengths to simulate (subset of LeafOpticalConstants.Wavelength, optional; defaults to all wavelengths).</summary>
+            public double[] Wavelengths;
+
+            /// <summary>
+            /// Constructor to initialize PROSPECT input parameters with default values.
+            /// Defaults match common PROSPECT usage and ProspectCore.
+            /// </summary>
+            public ProspectInputs(double n = 1.5, double cab = 40.0, double car = 8.0, double ant = 0.0,
+                double brown = 0.0, double ewt = 0.01, double lma = 0.008,
+                double prot = 0.0, double cbc = 0.0, double alpha = 40.0, double[] wavelengths = null)
+            {
+                N = n; CAB = cab; CAR = car; ANT = ant; BROWN = brown; EWT = ewt; LMA = lma;
+                PROT = prot; CBC = cbc; Alpha = alpha; 
+                Wavelengths = wavelengths ?? Enumerable.Range(400, 2500 - 400 + 1)
+                                               .Select(x => (double)x)
+                                               .ToArray();
+            }
+        }
+
+        /// <summary>
+        /// Contains leaf optical constants required for PROSPECT calculations
+        /// </summary>
+        public struct LeafOpticalConsts
         {
             /// <summary>Wavelength array in nanometers (nm)</summary>
             public Vector<double> Wavelength;      
@@ -53,6 +101,25 @@ namespace Models.Prospect
             public Dictionary<double, int> WavelengthToIndex;
         }
 
+        /// <summary>
+        /// Holds leaf optical properties (reflectance and transmittance spectra).
+        /// Typically output from the PROSPECT model.
+        /// </summary>
+        public struct LeafOptics
+        {
+            /// <summary>Wavelength array in nanometers (nm)</summary>
+            public double[] Wavelength;
+            /// <summary>Leaf reflectance spectrum (unitless fraction)</summary>
+            public double[] Reflectance;
+            /// <summary>Leaf transmittance spectrum (unitless fraction)</summary>
+            public double[] Transmittance;
+            /// <summary>
+            /// Indicates whether this LeafOptics object holds data.
+            /// Returns false if Wavelength, Reflectance, or Transmittance is null.
+            /// </summary>
+            public readonly bool HasValue => Wavelength != null && Reflectance != null && Transmittance != null;
+        }
+
         // Relative path from APSIM bin directory to Models\PROSAIL\PROSPECT
         private static readonly string RelativeOpticallDataPath = "..\\..\\..\\Models\\PROSAIL\\PROSPECT\\SpecPROSPECT_FullRange.json";
         private static string DefaultOpticalDataPath => PathUtilities.GetAbsolutePath(RelativeOpticallDataPath, AppDomain.CurrentDomain.BaseDirectory);
@@ -60,7 +127,7 @@ namespace Models.Prospect
         /// <summary>
         /// Runs the PROSPECT model to calculate leaf reflectance and transmittance
         /// </summary>
-        /// <param name="LeafOpticalConstants">Leaf optical constants container (optional)</param>
+        /// <param name="LeafOpticalConstants">Leaf optical constants (optional)</param>
         /// <param name="N">Leaf structure parameter (unitless)</param>
         /// <param name="CAB">Chlorophyll a + b content (μg/cm²)</param>
         /// <param name="CAR">Carotenoid content (μg/cm²)</param>
@@ -75,8 +142,9 @@ namespace Models.Prospect
         /// <returns>Tuple containing reflectance and transmittance spectra</returns>
         /// <exception cref="ArgumentException">Thrown if input parameters are invalid or array lengths mismatch.</exception>
         /// <exception cref="FileNotFoundException">Thrown if the file for leaf optical constants is missing.</exception>
-        public static (Vector<double> Reflectance, Vector<double> Transmittance) Prospect(
-            OpticalConstants? LeafOpticalConstants = null, // Optional parameter with null default
+        public static LeafOptics Prospect(
+            //ProspectInputs? ProspectInputs = null,
+            LeafOpticalConsts? LeafOpticalConstants = null, // Optional parameter with null default
             double N = 1.5,
             double CAB = 40.0,
             double CAR = 8.0,
@@ -90,7 +158,7 @@ namespace Models.Prospect
             double[] Wavelengths = null)
         {
             // Load spectral constants if not provided
-            OpticalConstants LeafConstants = LeafOpticalConstants ?? LoadLocalOpticalData();
+            LeafOpticalConsts LeafConstants = LeafOpticalConstants ?? LoadLocalOpticalData();
 
             // Input validation
             if (N <= 0) throw new ArgumentException("Leaf structure parameter N must be positive.");
@@ -115,7 +183,7 @@ namespace Models.Prospect
                 var indices = Wavelengths.Select(w => LeafConstants.WavelengthToIndex[w]).ToArray();
 
                 // Create a new OpticalConstants with only the specified wavelengths
-                LeafConstants = new OpticalConstants
+                LeafConstants = new LeafOpticalConsts
                 {
                     Wavelength = Vector<double>.Build.DenseOfArray(Wavelengths),
                     RefractiveIndex = Vector<double>.Build.DenseOfEnumerable(indices.Select(i => LeafConstants.RefractiveIndex[i])),
@@ -200,7 +268,13 @@ namespace Models.Prospect
             reflectance = reflectance.Map(x => Math.Round(Math.Max(0, Math.Min(1, x)), 4)); // 4 digits
             transmittance = transmittance.Map(x => Math.Round(Math.Max(0, Math.Min(1, x)), 4));
 
-            return (reflectance, transmittance);
+            LeafOptics LeafOpticsResult = new LeafOptics
+            {
+                Wavelength = LeafConstants.Wavelength.ToArray(),
+                Reflectance = reflectance.ToArray(),
+                Transmittance = transmittance.ToArray()
+            };
+            return (LeafOpticsResult);
         }
 
         /// <summary>
@@ -305,7 +379,7 @@ namespace Models.Prospect
         /// <summary>
         /// Load spectral data from a local JSON file
         /// </summary>
-        public static OpticalConstants LoadLocalOpticalData()
+        public static LeafOpticalConsts LoadLocalOpticalData()
         {
             string path = DefaultOpticalDataPath;
             if (!File.Exists(path))
@@ -325,7 +399,7 @@ namespace Models.Prospect
                     wavelengthToIndex[OpticalData.Wavelength[i]] = i;
                 }
 
-                return new OpticalConstants
+                return new LeafOpticalConsts
                 {
                     Wavelength = Vector<double>.Build.DenseOfArray(OpticalData.Wavelength),
                     RefractiveIndex = Vector<double>.Build.DenseOfArray(OpticalData.RefractiveIndex),
