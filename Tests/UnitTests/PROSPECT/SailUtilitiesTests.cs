@@ -4,12 +4,12 @@ using System.IO;
 using System.Diagnostics;
 using System.Collections.Generic;
 using System.Linq;
-using MathNet.Numerics.LinearAlgebra; // Required for ProspectCore types if passed through
-using Newtonsoft.Json; // For JSON input/output with R script
-using Newtonsoft.Json.Linq; // For handling potential JArray from R vectors
-using Models.Sail; // Namespace for SailUtilities and its types
-using Models.Prospect;
-using APSIM.Shared.Utilities; // Namespace for ProspectCore and its structs
+using Newtonsoft.Json;
+using Newtonsoft.Json.Linq;
+using Models.Sail;
+using APSIM.Shared.Utilities;
+using static Models.Prospect.ProspectCore;
+using static Models.Sail.SailUtilities;
 
 namespace UnitTests
 {
@@ -38,6 +38,7 @@ namespace UnitTests
 
         private readonly double Tolerance = 1e-3;
 
+        // Helper class for JSON deserialization
         private class SpecATMDataJason
         {
             public double[] Wavelength { get; set; }
@@ -45,6 +46,7 @@ namespace UnitTests
             public double[] DiffuseLight { get; set; }
         }
 
+        // Helper class for JSON deserialization
         private class SpecSoilDataJson
         {
             /// <summary>
@@ -63,6 +65,18 @@ namespace UnitTests
             public double[] Wet_Soil { get; set; }
         }
 
+        private class LeafOpticsDataJson
+        {
+            /// <summary>Wavelengths (nm). Should match simulation wavelengths.</summary>
+            public double[] Wavelength { get; set; }
+
+            /// <summary>Leaf reflectance spectrum (unitless fraction) (unitless fraction).</summary>
+            public double[] Reflectance { get; set; }
+
+            /// <summary> Leaf transmittance spectrum (unitless fraction).</summary>
+            public double[] Transmittance { get; set; }
+        }
+
         [OneTimeSetUp]
         public void CheckRSetup()
         {
@@ -74,13 +88,14 @@ namespace UnitTests
             Assert.That(File.Exists(DefaultProspectOutDataPath), $"R wrapper script not found at: {DefaultProspectOutDataPath}.");
         }
 
+        #region Read inputs
         // Helper to load atmospheric data
-        private SailUtilities.SpecAtmSensor CreateSampleAtm(string DefaultSpecATMDataPath)
+        private static SpecAtmSensor CreateSampleAtm(string DefaultSpecATMDataPath)
         {
             string json = File.ReadAllText(DefaultSpecATMDataPath);
             var ATMData = JsonConvert.DeserializeObject<SpecATMDataJason>(json);
 
-            return new SailUtilities.SpecAtmSensor
+            return new SpecAtmSensor
             {
                 Wavelength = ATMData.Wavelength,
                 DirectLight = ATMData.DirectLight,
@@ -89,57 +104,42 @@ namespace UnitTests
         }
 
         // Helper to create simple soil properties
-        private SailUtilities.SoilProperties CreateSampleSoil(string DefaultSpecSoilDataPath)
+        private static SoilProperties CreateSampleSoil(string DefaultSpecSoilDataPath)
         {
             string json = File.ReadAllText(DefaultSpecSoilDataPath);
-            var SoilData = JsonConvert.DeserializeObject<SpecSoilDataJson>(json);
+            var soilData = JsonConvert.DeserializeObject<SpecSoilDataJson>(json);
 
-            return new SailUtilities.SoilProperties
+            return new SoilProperties
             {
-                Wavelength = SoilData.Wavelength,
-                Reflectance = SoilData.Wet_Soil
+                Wavelength = soilData.Wavelength,
+                Reflectance = soilData.Wet_Soil
             };
         }
 
-        // Helper to create sample PROSPECT constants (loads real data if possible)
-        private ProspectCore.OpticalConstants CreateSampleProspectConstants(double[] wavelengths)
+        // Helper to create sample PROSPECT leaf optical constants
+        private static LeafOpticalConsts CreateSampleLeafOpticalConstants()
         {
-            try
-            {
-                var constants = ProspectCore.LoadLocalOpticalData();
-                // TODO: Add logic here to interpolate or select wavelengths from loaded 'constants'
-                //       to exactly match the input 'wavelengths' array if needed.
-                //       This example assumes they match or the test handles potential mismatch.
-                if (!constants.Wavelength.ToArray().SequenceEqual(wavelengths))
-                {
-                    TestContext.Progress.WriteLine($"Warning: Loaded Prospect spectral constants wavelengths (Count={constants.Wavelength.Count}) differ from test wavelengths (Count={wavelengths.Length}). Ensure compatibility or add interpolation.");
-                }
-                return constants;
-            }
-            catch (Exception ex)
-            {
-                TestContext.Progress.WriteLine($"WARNING: Failed to load real spectral data for tests: {ex.Message}. Using dummy data.");
-                int n = wavelengths.Length;
-                // Fallback to basic dummy data structure
-                return new ProspectCore.OpticalConstants { /* ... (dummy data as before) ... */ };
-            }
+            var constants = LoadLocalOpticalData();
+            return constants;
         }
 
         // Helper to create a sample LeafOptics object (e.g., for BrownLOP input)
-        private SailUtilities.LeafOptics CreateSampleLeafOptics(double[] wavelengths)
+        private static LeafOptics CreateSampleLeafOptics(string DefaultProspectOutDataPath)
         {
-            int n = wavelengths.Length;
-            return new SailUtilities.LeafOptics
+            string json = File.ReadAllText(DefaultProspectOutDataPath);
+            var leafOpticsData = JsonConvert.DeserializeObject<LeafOpticsDataJson>(json);
+            return new LeafOptics
             {
-                Wavelength = wavelengths,
-                Reflectance = Enumerable.Repeat(0.1, n).ToArray(), // Example brown leaf refl
-                Transmittance = Enumerable.Repeat(0.01, n).ToArray() // Example brown leaf trans
+                Wavelength = leafOpticsData.Wavelength,
+                Reflectance = leafOpticsData.Reflectance,
+                Transmittance = leafOpticsData.Transmittance
             };
         }
+        #endregion
 
+        #region Helpers
 
-        // --- Comparison Helper Methods ---
-
+        // Helpers for comparisons
         private double CompareScalars(double expected, double actual, string context = "")
         {
             double diff = Math.Abs(expected - actual);
@@ -165,7 +165,7 @@ namespace UnitTests
         }
 
         // Helper to extract double array from R result dictionary value (might be JArray)
-        private double[] ExtractDoubleArray(object rResultValue)
+        private static double[] ExtractDoubleArray(object rResultValue)
         {
             if (rResultValue == null) return null;
             if (rResultValue is double[] dArray) return dArray;
@@ -175,14 +175,15 @@ namespace UnitTests
             throw new InvalidCastException($"Cannot convert R result value of type {rResultValue.GetType()} to double[]. Value: {rResultValue}");
         }
 
-        private double CompareFoliarDistribution(SailUtilities.FoliarDistributionResult expected, SailUtilities.FoliarDistributionResult actual, string context = "")
+        // Helpers for comparing methods
+        private double CompareFoliarDistribution(FoliarDistributionResult expected, FoliarDistributionResult actual, string context = "")
         {
             double diffLidf = CompareArrays(expected.Lidf, actual.Lidf, $"Lidf {context}");
             double diffLitab = CompareArrays(expected.Litab, actual.Litab, $"Litab {context}"); // Litab should be exact
             return Math.Max(diffLidf, diffLitab); // Return max difference found
         }
 
-        private double CompareVolscattResult(SailUtilities.VolscattResult expected, SailUtilities.VolscattResult actual, string context = "")
+        private double CompareVolscattResult(VolscattResult expected, VolscattResult actual, string context = "")
         {
             double diffChiS = CompareScalars(expected.Chi_s, actual.Chi_s, $"Chi_s {context}");
             double diffChiO = CompareScalars(expected.Chi_o, actual.Chi_o, $"Chi_o {context}");
@@ -191,7 +192,7 @@ namespace UnitTests
             return new[] { diffChiS, diffChiO, diffFrho, diffFtau }.Max();
         }
 
-        private double CompareScatteringResult(SailUtilities.ScatteringResult expected, SailUtilities.ScatteringResult actual, string context = "")
+        private double CompareScatteringResult(ScatteringResult expected, ScatteringResult actual, string context = "")
         {
             double diffTdd = CompareArrays(expected.Tdd, actual.Tdd, $"Tdd {context}");
             double diffRdd = CompareArrays(expected.Rdd, actual.Rdd, $"Rdd {context}");
@@ -203,7 +204,7 @@ namespace UnitTests
             return new[] { diffTdd, diffRdd, diffTsd, diffRsd, diffTdo, diffRdo, diffRsod }.Max();
         }
 
-        private double CompareAdjustedProspectResult(SailUtilities.AdjustedProspectResult expected, SailUtilities.AdjustedProspectResult actual, string context = "")
+        private double CompareAdjustedProspectResult(AdjustedProspectResult expected, AdjustedProspectResult actual, string context = "")
         {
             Assert.That(actual.GreenLOP, Is.Not.Null, $"Actual GreenLOP is null. {context}");
             Assert.That(expected.GreenLOP, Is.Not.Null, $"Expected GreenLOP is null. {context}");
@@ -212,21 +213,20 @@ namespace UnitTests
             double diffGreenT = CompareArrays(expected.GreenLOP.Transmittance, actual.GreenLOP.Transmittance, $"GreenLOP Trans {context}");
             double diffBrownR = 0, diffBrownT = 0;
 
-            bool expectBrown = expected.BrownLOP != null && expected.BrownLOP.Reflectance != null;
-            bool actualBrown = actual.BrownLOP != null && actual.BrownLOP.Reflectance != null;
+            bool expectBrown = expected.BrownLOP != null && expected.BrownLOP.Value.Reflectance != null;
+            bool actualBrown = actual.BrownLOP != null && actual.BrownLOP.Value.Reflectance != null;
 
             Assert.That(expectBrown, Is.EqualTo(actualBrown), $"Array lengths differ.  Expected: {expectBrown}, Actual: {actualBrown}. {context}");
 
             if (expectBrown && actualBrown)
             {
-                diffBrownR = CompareArrays(expected.BrownLOP.Reflectance, actual.BrownLOP.Reflectance, $"BrownLOP Refl {context}");
-                diffBrownT = CompareArrays(expected.BrownLOP.Transmittance, actual.BrownLOP.Transmittance, $"BrownLOP Trans {context}");
+                diffBrownR = CompareArrays(expected.BrownLOP.Value.Reflectance, actual.BrownLOP.Value.Reflectance, $"BrownLOP Refl {context}");
+                diffBrownT = CompareArrays(expected.BrownLOP.Value.Transmittance, actual.BrownLOP.Value.Transmittance, $"BrownLOP Trans {context}");
             }
             return new[] { diffGreenR, diffGreenT, diffBrownR, diffBrownT }.Max();
         }
 
 
-        // --- R Script Execution Implementation ---
         /// <summary>
         /// Executes a specified function from the R wrapper script with given parameters.
         /// Handles JSON serialization/deserialization and process execution.
@@ -319,19 +319,20 @@ namespace UnitTests
 
             return results ?? new Dictionary<string, object>(); // Return empty dictionary if something went wrong before deserialization
         }
+        #endregion
 
 
-        // --- Test Methods for SailUtilities ---
+        // Test methods in SailUtilities
 
         [Test]
-        public void TestCompute_BRF_R_Comparison()
+        public void TestComputeBRF()
         {
             // Arrange C# Inputs
-            double[] wavelengths = { 400, 500, 600 };
+            //double[] wavelengths = { 400, 500, 600 };
             double[] rdot_in = { 0.1, 0.2, 0.3 };
             double[] rsot_in = { 0.15, 0.25, 0.35 };
             double tts_in = 30.0;
-            var atm_in = CreateSampleAtm(wavelengths);
+            var atm_in = CreateSampleAtm(DefaultSpecATMDataPath);
 
             // Arrange R Inputs Dictionary (Keys match R function parameters)
             var r_params = new Dictionary<string, object> {
@@ -347,7 +348,7 @@ namespace UnitTests
             };
 
             // Act (C#)
-            double[] actual_brf = SailUtilities.Compute_BRF(rdot_in, rsot_in, tts_in, atm_in);
+            double[] actual_brf = ComputeBRF(rdot_in, rsot_in, tts_in, atm_in);
 
             // Act (R)
             var r_results = RunRImplementation("Compute_BRF", r_params);
@@ -358,14 +359,14 @@ namespace UnitTests
         }
 
         [Test]
-        public void TestCompute_fAPAR_R_Comparison()
+        public void TestComputeFAPAR()
         {
             // Arrange C# Inputs
-            double[] wavelengths = { 400, 550, 700, 800 }; // Include points inside and outside PAR range
+            //double[] wavelengths = { 400, 550, 700, 800 }; // Include points inside and outside PAR range
             double[] abs_dir_in = { 0.8, 0.85, 0.75, 0.1 };
             double[] abs_hem_in = { 0.7, 0.75, 0.65, 0.05 };
             double tts_in = 45.0;
-            var atm_in = CreateSampleAtm(wavelengths);
+            var atm_in = CreateSampleAtm(DefaultSpecATMDataPath);
             double parMin = 400, parMax = 700;
 
             // Arrange R Inputs Dictionary
@@ -382,7 +383,7 @@ namespace UnitTests
             };
 
             // Act (C#)
-            double actual_fapar = SailUtilities.Compute_fAPAR(abs_dir_in, abs_hem_in, tts_in, atm_in, parMin, parMax);
+            double actual_fapar = ComputeFAPAR(abs_dir_in, abs_hem_in, tts_in, atm_in, parMin, parMax);
 
             // Act (R)
             var r_results = RunRImplementation("Compute_fAPAR", r_params);
@@ -394,14 +395,14 @@ namespace UnitTests
         }
 
         [Test]
-        public void TestCompute_albedo_R_Comparison()
+        public void TestComputeAlbedo()
         {
             // Arrange C# Inputs
-            double[] wavelengths = { 400, 800, 1200, 1600, 2000, 2400 };
+            //double[] wavelengths = { 400, 800, 1200, 1600, 2000, 2400 };
             double[] rsdstar_in = { 0.1, 0.4, 0.5, 0.4, 0.3, 0.2 };
             double[] rddstar_in = { 0.12, 0.42, 0.52, 0.42, 0.32, 0.22 };
             double tts_in = 20.0;
-            var atm_in = CreateSampleAtm(wavelengths);
+            var atm_in = CreateSampleAtm(DefaultSpecATMDataPath);
             double rangeMin = 400, rangeMax = 2400;
 
             // Arrange R Inputs Dictionary
@@ -418,7 +419,7 @@ namespace UnitTests
              };
 
             // Act (C#)
-            double actual_albedo = SailUtilities.Compute_albedo(rsdstar_in, rddstar_in, tts_in, atm_in, rangeMin, rangeMax);
+            double actual_albedo = ComputeAlbedo(rsdstar_in, rddstar_in, tts_in, atm_in, rangeMin, rangeMax);
 
             // Act (R)
             var r_results = RunRImplementation("Compute_albedo", r_params);
@@ -430,7 +431,7 @@ namespace UnitTests
         }
 
         [Test]
-        public void TestCampbell_R_Comparison()
+        public void TestCampbell()
         {
             // Arrange C# Inputs
             double ala_in = 57.0; // Standard spherical angle approx
@@ -439,12 +440,12 @@ namespace UnitTests
             var r_params = new Dictionary<string, object> { { "ala", ala_in } };
 
             // Act (C#)
-            var actualResult = SailUtilities.Campbell(ala_in);
+            var actualResult = Campbell(ala_in);
 
             // Act (R)
             var r_results = RunRImplementation("campbell", r_params);
             // R wrapper returns list directly, extract components
-            var expectedResult = new SailUtilities.FoliarDistributionResult
+            var expectedResult = new FoliarDistributionResult
             {
                 Lidf = ExtractDoubleArray(r_results["lidf"]),
                 Litab = ExtractDoubleArray(r_results["litab"])
@@ -455,7 +456,7 @@ namespace UnitTests
         }
 
         [Test]
-        public void TestDladgen_R_Comparison()
+        public void TestDladgen()
         {
             // Arrange C# Inputs
             double a_in = -0.35; // Example: Spherical approx
@@ -465,12 +466,12 @@ namespace UnitTests
             var r_params = new Dictionary<string, object> { { "a", a_in }, { "b", b_in } };
 
             // Act (C#)
-            var actualResult = SailUtilities.Dladgen(a_in, b_in);
+            var actualResult = Dladgen(a_in, b_in);
 
             // Act (R)
             var r_results = RunRImplementation("dladgen", r_params);
             // R wrapper returns list directly, extract components
-            var expectedResult = new SailUtilities.FoliarDistributionResult
+            var expectedResult = new FoliarDistributionResult
             {
                 Lidf = ExtractDoubleArray(r_results["lidf"]),
                 Litab = ExtractDoubleArray(r_results["litab"])
@@ -481,7 +482,7 @@ namespace UnitTests
         }
 
         [Test]
-        public void TestDcum_R_Comparison()
+        public void TestDcum()
         {
             // Arrange C# Inputs
             double a_in = 0.0; double b_in = 0.0; double t_in = 45.0; // Uniform case, 45 deg
@@ -490,7 +491,7 @@ namespace UnitTests
             var r_params = new Dictionary<string, object> { { "a", a_in }, { "b", b_in }, { "t", t_in } };
 
             // Act (C#)
-            double actualResult = SailUtilities.Dcum(a_in, b_in, t_in);
+            double actualResult = Dcum(a_in, b_in, t_in);
 
             // Act (R)
             var r_results = RunRImplementation("dcum", r_params);
@@ -507,10 +508,10 @@ namespace UnitTests
         [TestCase(0.5, 0.5, 1.0, TestName = "Jfunc1_Singularity")]
         [TestCase(0.001, 0.0005, 1.0, TestName = "Jfunc1_SmallDiff")]
         [TestCase(0.5, 0.5, 0.0, TestName = "Jfunc1_ZeroT")] // Added test case
-        public void TestJfunc1_R_Comparison(double k, double l, double t)
+        public void TestJfunc1(double k, double l, double t)
         {
             var r_params = new Dictionary<string, object> { { "k", k }, { "l", l }, { "t", t } };
-            double actual = SailUtilities.Jfunc1(k, l, t);
+            double actual = Jfunc1(k, l, t);
             var r_results = RunRImplementation("Jfunc1", r_params);
             double expected = Convert.ToDouble(r_results["Jfunc1"]); // Wrapper names result after function
             CompareScalars(expected, actual, $"Jfunc1(k={k},l={l},t={t})");
@@ -521,10 +522,10 @@ namespace UnitTests
         [TestCase(0.001, -0.001, 0.001, TestName = "Jfunc2_SumZeroSmallT")] // Added test case
         [TestCase(0.0001, 0.0001, 1.0, TestName = "Jfunc2_SmallSum")]
         [TestCase(0.5, 0.5, 0.0, TestName = "Jfunc2_ZeroT")] // Added test case
-        public void TestJfunc2_R_Comparison(double k, double l, double t)
+        public void TestJfunc2(double k, double l, double t)
         {
             var r_params = new Dictionary<string, object> { { "k", k }, { "l", l }, { "t", t } };
-            double actual = SailUtilities.Jfunc2(k, l, t);
+            double actual = Jfunc2(k, l, t);
             var r_results = RunRImplementation("Jfunc2", r_params);
             double expected = Convert.ToDouble(r_results["Jfunc2"]); // Wrapper names result after function
             CompareScalars(expected, actual, $"Jfunc2(k={k},l={l},t={t})");
@@ -536,18 +537,17 @@ namespace UnitTests
         [TestCase(0.0001, 1.0, TestName = "Jfunc4_NearZeroM")]
         [TestCase(0.0, 1.0, TestName = "Jfunc4_ZeroM")]
         [TestCase(0.5, 0.0, TestName = "Jfunc4_ZeroT")] // Added test case
-        public void TestJfunc4_R_Comparison(double m, double t)
+        public void TestJfunc4_R(double m, double t)
         {
             var r_params = new Dictionary<string, object> { { "m", m }, { "t", t } };
-            double actual = SailUtilities.Jfunc4(m, t);
+            double actual = Jfunc4(m, t);
             var r_results = RunRImplementation("Jfunc4", r_params);
             double expected = Convert.ToDouble(r_results["Jfunc4"]); // Wrapper names result after function
             CompareScalars(expected, actual, $"Jfunc4(m={m},t={t})");
         }
 
-        // --- Test for Volscatt ---
         [Test]
-        public void TestVolscatt_R_Comparison()
+        public void TestVolscatt()
         {
             // Arrange C# Inputs
             double tts = 30, tto = 10, psi = 60, ttl = 45;
@@ -556,12 +556,12 @@ namespace UnitTests
             var r_params = new Dictionary<string, object> { { "tts", tts }, { "tto", tto }, { "psi", psi }, { "ttl", ttl } };
 
             // Act (C#)
-            var actual = SailUtilities.Volscatt(tts, tto, psi, ttl);
+            var actual = Volscatt(tts, tto, psi, ttl);
 
             // Act (R)
             var r_results = RunRImplementation("volscatt", r_params);
             // R wrapper returns list directly, extract components
-            var expected = new SailUtilities.VolscattResult
+            var expected = new VolscattResult
             {
                 Chi_s = Convert.ToDouble(r_results["chi_s"]),
                 Chi_o = Convert.ToDouble(r_results["chi_o"]),
@@ -575,71 +575,76 @@ namespace UnitTests
 
         // --- Tests for Check Functions ---
         [Test]
-        public void TestCheckSpectralSampling_Valid() // No R comparison needed
+        public void TestCheckSpectralSamplingValid() // No R comparison needed
+        {
+            //double[] lambda = { 400, 500, 600 };
+            var leafOpticalConstants = CreateSampleLeafOpticalConstants();
+            var soil = CreateSampleSoil(DefaultSpecSoilDataPath);
+            var atm = CreateSampleAtm(DefaultSpecATMDataPath);
+            Assert.DoesNotThrow(() => CheckSpectralSampling(leafOpticalConstants, soil, atm));
+        }
+
+        [Test]
+        public void TestCheckSpectralSamplingLengthMismatch() // No R comparison needed
+        {
+            //double[] lambda1 = { 400, 500, 600 }; 
+            //double[] lambda2 = { 400, 500 };
+            var leafOpticalConstants = CreateSampleLeafOpticalConstants();
+            var soil = CreateSampleSoil(DefaultSpecSoilDataPath); 
+            var atm = CreateSampleAtm(DefaultSpecATMDataPath);
+            Assert.Throws<ArgumentException>(() => CheckSpectralSampling(leafOpticalConstants, soil, atm));
+        }
+
+        [Test]
+        public void TestCheckSpectralSamplingValueMismatch() // No R comparison needed
+        {
+            //double[] lambda1 = { 400, 500, 600 }; 
+            //double[] lambda2 = { 400, 501, 600 };
+            var leafOpticalConstants = CreateSampleLeafOpticalConstants();
+            var soil = CreateSampleSoil(DefaultSpecSoilDataPath); 
+            var atm = CreateSampleAtm(DefaultSpecATMDataPath);
+            Assert.Throws<ArgumentException>(() => CheckSpectralSampling(leafOpticalConstants, soil, atm));
+        }
+
+        [Test]
+        public void TestCheckBrownLopValid() // No R comparison needed
+        {
+            //double[] lambda = { 400, 500, 600 };
+            var brownLop = CreateSampleLeafOptics(DefaultProspectOutDataPath);
+            double[] lambda = brownLop.Wavelength;
+            var inputs = new List<ProspectInputs> { new ProspectInputs() };
+            Assert.DoesNotThrow(() => CheckBrownLOP(brownLop, lambda, inputs));
+        }
+
+        [Test]
+        public void TestCheckBrownLopNullData() // No R comparison needed
         {
             double[] lambda = { 400, 500, 600 };
-            var prospectConst = CreateSampleProspectConstants(lambda);
-            var soil = CreateSampleSoil(lambda);
-            var atm = CreateSampleAtm(lambda);
-            Assert.DoesNotThrow(() => SailUtilities.check_SpectralSampling(prospectConst, soil, atm));
+            var brownLop = CreateSampleLeafOptics(DefaultProspectOutDataPath); 
+            brownLop.Wavelength = null;
+            var inputs = new List<ProspectInputs> { new ProspectInputs() };
+            Assert.Throws<ArgumentException>(() => CheckBrownLOP(brownLop, lambda, inputs));
         }
 
         [Test]
-        public void TestCheckSpectralSampling_LengthMismatch() // No R comparison needed
+        public void TestCheckBrownLopSpectralMismatch() // No R comparison needed
         {
-            double[] lambda1 = { 400, 500, 600 }; double[] lambda2 = { 400, 500 };
-            var prospectConst = CreateSampleProspectConstants(lambda1);
-            var soil = CreateSampleSoil(lambda2); var atm = CreateSampleAtm(lambda1);
-            Assert.Throws<ArgumentException>(() => SailUtilities.check_SpectralSampling(prospectConst, soil, atm));
+            double[] lambdaRef = { 400, 500, 600 }; 
+            //double[] lambdaBrown = { 400, 501, 600 };
+            var brownLop = CreateSampleLeafOptics(DefaultProspectOutDataPath);
+            var inputs = new List<ProspectInputs> { new ProspectInputs() };
+            Assert.Throws<ArgumentException>(() => CheckBrownLOP(brownLop, lambdaRef, inputs));
         }
 
         [Test]
-        public void TestCheckSpectralSampling_ValueMismatch() // No R comparison needed
-        {
-            double[] lambda1 = { 400, 500, 600 }; double[] lambda2 = { 400, 501, 600 };
-            var prospectConst = CreateSampleProspectConstants(lambda1);
-            var soil = CreateSampleSoil(lambda1); var atm = CreateSampleAtm(lambda2);
-            Assert.Throws<ArgumentException>(() => SailUtilities.check_SpectralSampling(prospectConst, soil, atm));
-        }
-
-        [Test]
-        public void TestCheckBrownLOP_Valid() // No R comparison needed
-        {
-            double[] lambda = { 400, 500, 600 };
-            var brownLop = CreateSampleLeafOptics(lambda);
-            var inputs = new List<SailUtilities.ProspectInput> { new SailUtilities.ProspectInput() };
-            Assert.DoesNotThrow(() => SailUtilities.check_BrownLOP(brownLop, lambda, inputs));
-        }
-
-        [Test]
-        public void TestCheckBrownLOP_NullData() // No R comparison needed
-        {
-            double[] lambda = { 400, 500, 600 };
-            var brownLop = CreateSampleLeafOptics(lambda); brownLop.Wavelength = null;
-            var inputs = new List<SailUtilities.ProspectInput> { new SailUtilities.ProspectInput() };
-            Assert.Throws<ArgumentException>(() => SailUtilities.check_BrownLOP(brownLop, lambda, inputs));
-        }
-
-        [Test]
-        public void TestCheckBrownLOP_SpectralMismatch() // No R comparison needed
-        {
-            double[] lambdaRef = { 400, 500, 600 }; double[] lambdaBrown = { 400, 501, 600 };
-            var brownLop = CreateSampleLeafOptics(lambdaBrown);
-            var inputs = new List<SailUtilities.ProspectInput> { new SailUtilities.ProspectInput() };
-            Assert.Throws<ArgumentException>(() => SailUtilities.check_BrownLOP(brownLop, lambdaRef, inputs));
-        }
-
-        // --- Tests for adjust_PROSPECT_2_SAIL ---
-
-        [Test]
-        public void TestAdjustProspect_4SAIL_R_Comparison()
+        public void TestAdjustProspectTo4SAIL()
         {
             // Arrange C# Inputs
             string sailVersion = "4SAIL";
             double[] lambda = { 400, 500, 600 }; // Simple lambda for test structure
-            var prospectConst = CreateSampleProspectConstants(lambda);
-            var inputs = new List<SailUtilities.ProspectInput> {
-                  new SailUtilities.ProspectInput(cab: 50, car: 10) // Green params
+            var prospectConst = CreateSampleLeafOpticalConstants();
+            var inputs = new List<ProspectInputs> {
+                  new ProspectInputs(cab: 50, car: 10) // Green params
              };
             double fractionBrown = 0.0; // Irrelevant for 4SAIL path
 
@@ -653,14 +658,14 @@ namespace UnitTests
              };
 
             // Act (C#)
-            var actual = SailUtilities.adjust_PROSPECT_2_SAIL(sailVersion, prospectConst, inputs, fractionBrown, null);
+            var actual = AdjustProspectToSail(sailVersion, prospectConst, inputs, fractionBrown, null);
 
             // Act (R)
             var r_results = RunRImplementation("adjust_PROSPECT_2_SAIL", r_params);
             // R wrapper formats output nicely
-            var expected = new SailUtilities.AdjustedProspectResult
+            var expected = new AdjustedProspectResult
             {
-                GreenLOP = new SailUtilities.LeafOptics
+                GreenLOP = new LeafOptics
                 {
                     Wavelength = lambda, // Assume R returns data matching lambda
                     Reflectance = ExtractDoubleArray(r_results["GreenLOP_Reflectance"]),
@@ -674,17 +679,17 @@ namespace UnitTests
         }
 
         [Test]
-        public void TestAdjustProspect_4SAIL2_ExternalBrownLOP_R_Comparison()
+        public void TestAdjustProspectToSailExternalBrownLOP()
         {
             // Arrange C# Inputs
             string sailVersion = "4SAIL2";
             double[] lambda = { 400, 500, 600 };
-            var prospectConst = CreateSampleProspectConstants(lambda);
-            var inputs = new List<SailUtilities.ProspectInput> {
-                   new SailUtilities.ProspectInput(cab: 50, car: 10) // Green input
+            var prospectConst = CreateSampleLeafOpticalConstants();
+            var inputs = new List<ProspectInputs> {
+                   new ProspectInputs(cab: 50, car: 10) // Green input
               };
             double fractionBrown = 0.3;
-            var externalBrownLop = CreateSampleLeafOptics(lambda); // Provide external BrownLOP
+            var externalBrownLop = CreateSampleLeafOptics(DefaultProspectOutDataPath); // Provide external BrownLOP
 
             // Arrange R Inputs Dictionary
             var r_params = new Dictionary<string, object> {
@@ -696,20 +701,20 @@ namespace UnitTests
               };
 
             // Act (C#)
-            var actual = SailUtilities.adjust_PROSPECT_2_SAIL(sailVersion, prospectConst, inputs, fractionBrown, externalBrownLop);
+            var actual = AdjustProspectToSail(sailVersion, prospectConst, inputs, fractionBrown, externalBrownLop);
 
             // Act (R)
             var r_results = RunRImplementation("adjust_PROSPECT_2_SAIL", r_params);
             // R wrapper formats output
-            var expected = new SailUtilities.AdjustedProspectResult
+            var expected = new AdjustedProspectResult
             {
-                GreenLOP = new SailUtilities.LeafOptics
+                GreenLOP = new LeafOptics
                 {
                     Wavelength = lambda,
                     Reflectance = ExtractDoubleArray(r_results["GreenLOP_Reflectance"]),
                     Transmittance = ExtractDoubleArray(r_results["GreenLOP_Transmittance"])
                 },
-                BrownLOP = new SailUtilities.LeafOptics
+                BrownLOP = new LeafOptics
                 { // Expect R to return the brown LOP info
                     Wavelength = lambda,
                     Reflectance = ExtractDoubleArray(r_results["BrownLOP_Reflectance"]),
@@ -726,17 +731,17 @@ namespace UnitTests
         }
 
         [Test]
-        public void TestAdjustProspect_4SAIL2_FractionZero_R_Comparison()
+        public void TestAdjustProspectToSAIL2FractionZero()
         {
             // Arrange C# Inputs
             string sailVersion = "4SAIL2";
             double[] lambda = { 400, 500, 600 };
-            var prospectConst = CreateSampleProspectConstants(lambda);
-            var inputs = new List<SailUtilities.ProspectInput> {
-                   new SailUtilities.ProspectInput(cab: 50, car: 10) // Green input
+            var prospectConst = CreateSampleLeafOpticalConstants();
+            var inputs = new List<ProspectInputs> {
+                   new ProspectInputs(cab: 50, car: 10) // Green input
               };
             double fractionBrown = 0.0; // Zero brown fraction
-            SailUtilities.LeafOptics externalBrownLop = null;
+            //LeafOptics externalBrownLop;
 
             // Arrange R Inputs Dictionary
             var r_params = new Dictionary<string, object> {
@@ -746,20 +751,20 @@ namespace UnitTests
                };
 
             // Act (C#)
-            var actual = SailUtilities.adjust_PROSPECT_2_SAIL(sailVersion, prospectConst, inputs, fractionBrown, externalBrownLop);
+            var actual = AdjustProspectToSail(sailVersion, prospectConst, inputs, fractionBrown, null);
 
             // Act (R)
             var r_results = RunRImplementation("adjust_PROSPECT_2_SAIL", r_params);
             // R code sets BrownLOP <- GreenLOP in this case
-            var expected = new SailUtilities.AdjustedProspectResult
+            var expected = new AdjustedProspectResult
             {
-                GreenLOP = new SailUtilities.LeafOptics
+                GreenLOP = new LeafOptics
                 {
                     Wavelength = lambda,
                     Reflectance = ExtractDoubleArray(r_results["GreenLOP_Reflectance"]),
                     Transmittance = ExtractDoubleArray(r_results["GreenLOP_Transmittance"])
                 },
-                BrownLOP = new SailUtilities.LeafOptics
+                BrownLOP = new LeafOptics
                 { // Expect Brown = Green from R
                     Wavelength = lambda,
                     Reflectance = ExtractDoubleArray(r_results["BrownLOP_Reflectance"]), // Should match Green
@@ -770,47 +775,48 @@ namespace UnitTests
             // Assert
             CompareAdjustedProspectResult(expected, actual, "adjust_PROSPECT_2_SAIL (FracZero)");
             // Also explicitly check C# Brown == Green
-            CompareArrays(actual.GreenLOP.Reflectance, actual.BrownLOP.Reflectance, "C# Brown Refl vs Green Refl (FracZero)");
-            CompareArrays(actual.GreenLOP.Transmittance, actual.BrownLOP.Transmittance, "C# Brown Trans vs Green Trans (FracZero)");
+            CompareArrays(actual.GreenLOP.Reflectance, actual.BrownLOP.Value.Reflectance, "C# Brown Refl vs Green Refl (FracZero)");
+            CompareArrays(actual.GreenLOP.Transmittance, actual.BrownLOP.Value.Transmittance, "C# Brown Trans vs Green Trans (FracZero)");
         }
 
         [Test]
-        public void TestAdjustProspect_4SAIL2_TwoInputs_R_Comparison()
+        public void TestAdjustProspectToSail2TwoInputs()
         {
             // Arrange C# Inputs
             string sailVersion = "4SAIL2";
-            double[] lambda = { 400, 500, 600 };
-            var prospectConst = CreateSampleProspectConstants(lambda);
-            var inputs = new List<SailUtilities.ProspectInput> {
-                   new SailUtilities.ProspectInput(cab: 50, car: 10), // Green input
-                   new SailUtilities.ProspectInput(cab: 5, car: 1, brown: 0.5) // Brown input
+            //double[] lambda = { 400, 500, 600 };
+            var leafConst = CreateSampleLeafOpticalConstants();
+            double[] lambda = leafConst.Wavelength.ToArray();
+            var inputs = new List<ProspectInputs> {
+                   new ProspectInputs(cab: 50, car: 10), // Green input
+                   new ProspectInputs(cab: 5, car: 1, brown: 0.5) // Brown input
               };
             double fractionBrown = 0.3; // Non-zero fraction
-            SailUtilities.LeafOptics externalBrownLop = null;
+            //LeafOptics externalBrownLop = null;
 
             // Arrange R Inputs Dictionary
             var r_params = new Dictionary<string, object> {
-                   {"sailVersion", sailVersion}, {"prospectConstants", prospectConst},
+                   {"sailVersion", sailVersion}, {"prospectConstants", leafConst},
                    {"inputProspectList", inputs}, // Pass list of two inputs
                    {"fractionBrown", fractionBrown},
                    {"brownLOP", null}
                };
 
             // Act (C#)
-            var actual = SailUtilities.adjust_PROSPECT_2_SAIL(sailVersion, prospectConst, inputs, fractionBrown, externalBrownLop);
+            var actual = AdjustProspectToSail(sailVersion, leafConst, inputs, fractionBrown, null);
 
             // Act (R)
             var r_results = RunRImplementation("adjust_PROSPECT_2_SAIL", r_params);
             // R code simulates both Green and Brown
-            var expected = new SailUtilities.AdjustedProspectResult
+            var expected = new AdjustedProspectResult
             {
-                GreenLOP = new SailUtilities.LeafOptics
+                GreenLOP = new LeafOptics
                 {
                     Wavelength = lambda,
                     Reflectance = ExtractDoubleArray(r_results["GreenLOP_Reflectance"]),
                     Transmittance = ExtractDoubleArray(r_results["GreenLOP_Transmittance"])
                 },
-                BrownLOP = new SailUtilities.LeafOptics
+                BrownLOP = new LeafOptics
                 { // Expect distinct Brown LOP from R
                     Wavelength = lambda,
                     Reflectance = ExtractDoubleArray(r_results["BrownLOP_Reflectance"]),
@@ -822,22 +828,25 @@ namespace UnitTests
             CompareAdjustedProspectResult(expected, actual, "adjust_PROSPECT_2_SAIL (TwoInput)");
         }
 
-        // --- Tests for Scattering Functions ---
-
         [Test]
-        public void TestNonConservativeScattering_R_Comparison()
+        public void TestNonConservativeScattering()
         {
             // Arrange C# Inputs
-            double[] wavelengths = { 500, 700 }; int n = wavelengths.Length;
+            //double[] wavelengths = { 500, 700 }; 
+            //int n = wavelengths.Length;
             // Example plausible inputs (ensure m > 0.01)
             double[] m_in = { 0.1, 0.15 };
             double lai_in = 2.0;
             double[] att_in = { 0.9, 0.85 };
             double[] sigb_in = { 0.08, 0.07 }; // Ensure att^2 - m^2 = sigb^2 * (something > 0)
-            double ks_in = 0.5; double ko_in = 0.6;
-            double[] sf_in = { 0.2, 0.15 }; double[] sb_in = { 0.3, 0.25 };
-            double[] vf_in = { 0.25, 0.2 }; double[] vb_in = { 0.35, 0.3 };
-            double tss_in = Math.Exp(-ks_in * lai_in); double too_in = Math.Exp(-ko_in * lai_in);
+            double ks_in = 0.5;
+            double ko_in = 0.6;
+            double[] sf_in = { 0.2, 0.15 };
+            double[] sb_in = { 0.3, 0.25 };
+            double[] vf_in = { 0.25, 0.2 }; 
+            double[] vb_in = { 0.35, 0.3 };
+            double tss_in = Math.Exp(-ks_in * lai_in);
+            double too_in = Math.Exp(-ko_in * lai_in);
 
             // Arrange R Inputs Dictionary
             var r_params = new Dictionary<string, object> {
@@ -846,12 +855,12 @@ namespace UnitTests
               };
 
             // Act (C#)
-            var actual = SailUtilities.NonConservativeScattering(m_in, lai_in, att_in, sigb_in, ks_in, ko_in, sf_in, sb_in, vf_in, vb_in, tss_in, too_in);
+            var actual = NonConservativeScattering(m_in, lai_in, att_in, sigb_in, ks_in, ko_in, sf_in, sb_in, vf_in, vb_in, tss_in, too_in);
 
             // Act (R)
             var r_results = RunRImplementation("NonConservativeScattering", r_params);
             // R wrapper returns list directly
-            var expected = new SailUtilities.ScatteringResult
+            var expected = new ScatteringResult
             {
                 Tdd = ExtractDoubleArray(r_results["tdd"]),
                 Rdd = ExtractDoubleArray(r_results["rdd"]),
@@ -867,20 +876,25 @@ namespace UnitTests
         }
 
         [Test]
-        public void TestConservativeScattering_R_Comparison()
+        public void TestConservativeScattering()
         {
             // Arrange C# Inputs
-            double[] wavelengths = { 500, 700 }; int n = wavelengths.Length;
+            //double[] wavelengths = { 500, 700 }; 
+            //int n = wavelengths.Length;
             // Example plausible inputs (ensure m <= 0.01, often near 0)
             double[] m_in = { 0.005, 0.001 };
             double lai_in = 2.0;
             // For near conservative, att ≈ sigb
             double[] att_in = { 0.5, 0.4 };
             double[] sigb_in = { 0.499, 0.399 }; // Close to att
-            double ks_in = 0.5; double ko_in = 0.6;
-            double[] sf_in = { 0.2, 0.15 }; double[] sb_in = { 0.3, 0.25 };
-            double[] vf_in = { 0.25, 0.2 }; double[] vb_in = { 0.35, 0.3 };
-            double tss_in = Math.Exp(-ks_in * lai_in); double too_in = Math.Exp(-ko_in * lai_in);
+            double ks_in = 0.5; 
+            double ko_in = 0.6;
+            double[] sf_in = { 0.2, 0.15 }; 
+            double[] sb_in = { 0.3, 0.25 };
+            double[] vf_in = { 0.25, 0.2 }; 
+            double[] vb_in = { 0.35, 0.3 };
+            double tss_in = Math.Exp(-ks_in * lai_in); 
+            double too_in = Math.Exp(-ko_in * lai_in);
 
             // Arrange R Inputs Dictionary
             var r_params = new Dictionary<string, object> {
@@ -889,12 +903,12 @@ namespace UnitTests
               };
 
             // Act (C#)
-            var actual = SailUtilities.ConservativeScattering(m_in, lai_in, att_in, sigb_in, ks_in, ko_in, sf_in, sb_in, vf_in, vb_in, tss_in, too_in);
+            var actual = ConservativeScattering(m_in, lai_in, att_in, sigb_in, ks_in, ko_in, sf_in, sb_in, vf_in, vb_in, tss_in, too_in);
 
             // Act (R)
             var r_results = RunRImplementation("ConservativeScattering", r_params);
             // R wrapper returns list directly
-            var expected = new SailUtilities.ScatteringResult
+            var expected = new ScatteringResult
             {
                 Tdd = ExtractDoubleArray(r_results["tdd"]),
                 Rdd = ExtractDoubleArray(r_results["rdd"]),
