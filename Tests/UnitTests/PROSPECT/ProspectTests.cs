@@ -7,6 +7,7 @@ using System.Linq;
 using MathNet.Numerics.LinearAlgebra;
 using Newtonsoft.Json;
 using Models.Prospect;
+using static Models.Prospect.ProspectCore;
 
 namespace UnitTests
 {
@@ -52,18 +53,18 @@ namespace UnitTests
             return JsonConvert.DeserializeObject<List<ProspectTestCase>>(File.ReadAllText(TestCasesFile));
         }
 
-        private (Vector<double> Reflectance, Vector<double> Transmittance) RunCSharpImplementation(ProspectTestCase testCase)
+        private LeafOptics RunCSharpImplementation(ProspectTestCase testCase)
         {
             try
             {
-                return ProspectCore.Prospect(N: testCase.N, CAB: testCase.CAB, CAR: testCase.CAR, EWT: testCase.EWT, LMA: testCase.LMA, Alpha: testCase.Alpha);
+                return Prospect(N: testCase.N, CAB: testCase.CAB, CAR: testCase.CAR, EWT: testCase.EWT, LMA: testCase.LMA, Alpha: testCase.Alpha);
             }
             catch (Exception ex)
             {
                 Assert.Fail($"PROSPECT C# implementation failed for {testCase.Name}: {ex.Message}");
-                return (null, null); // Unreachable due to Assert.Fail, but required for return type
+                LeafOptics optics = default;
+                return optics; // Unreachable due to Assert.Fail, but required for return type
             }
-
         }
 
         private Dictionary<string, double[]> RunRImplementation(ProspectTestCase testCase)
@@ -99,9 +100,9 @@ namespace UnitTests
             }
         }
 
-        private double CompareArrays(Vector<double> a, double[] b)
+        private double CompareArrays(double[] a, double[] b)
         {
-            if (a.Count != b.Length) throw new ArgumentException("Array length mismatch");
+            if (a.Length != b.Length) throw new ArgumentException("Array length mismatch");
             return a.Zip(b, (x, y) => Math.Abs(x - y)).Max();
         }
     }
