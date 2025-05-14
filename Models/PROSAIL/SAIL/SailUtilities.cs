@@ -1,28 +1,30 @@
 ﻿using System;
 using System.Collections.Generic;
 using System.Linq;
-//using System.Numerics; // If needed later
-using MathNet.Numerics; // Required for SpecialFunctions (ExponentialIntegral)
-using MathNet.Numerics.LinearAlgebra; // Required for Vector<double>
-using Models.Prospect; // Use namespace from ProspectCore.cs
+using MathNet.Numerics; 
+using MathNet.Numerics.LinearAlgebra;
+using Models.Prospect;
+using static Models.Prospect.ProspectCore;
 
 // Define the namespace for SAIL utilities
 namespace Models.Sail
 {
     /// <summary>
-    /// Provides static utility functions for SAIL model calculations,
-    /// translated from the R script Lib_PROSAIL.R.
+    /// Provides static utility functions for SAIL model calculations.
     /// Includes helpers for LIDF, scattering calculations, spectral checks,
     /// fAPAR/Albedo calculations, and PROSPECT integration.
     /// </summary>
+    /// <remarks>
+    /// Acknowledgement: This C# implementation (script) of PROSAIL is implmented based on the 'prosail' R package (https://github.com/jbferet/prosail) 
+    /// writen by Dr Jean-Baptiste Feret (jean-baptiste.feret@teledetection.fr). 
+    /// Please appropriately cite the R package and other papers (as listed in the GitHub page).
+    /// </remarks>
     public static class SailUtilities
     {
-        // --- Supporting Data Structures ---
-        // These classes/structs define the inputs and outputs for the utility methods.
+        #region Supporting Data Structures/Classes: define the inputs and outputs for the utility methods
 
         /// <summary>
         /// Holds atmospheric sensor spectral data (wavelengths, direct/diffuse irradiance).
-        /// Corresponds to the 'SpecATM_Sensor' list in R.
         /// </summary>
         public class SpecAtmSensor
         {
@@ -43,80 +45,7 @@ namespace Models.Sail
         }
 
         /// <summary>
-        /// Holds leaf optical properties (reflectance and transmittance spectra).
-        /// Corresponds to the 'LeafOptics', 'GreenLOP', 'BrownLOP' lists/dataframes in R.
-        /// Typically output from the PROSPECT model.
-        /// </summary>
-        public class LeafOptics 
-        {
-            /// <summary>
-            /// Wavelengths (nm). Should match the simulation wavelengths.
-            /// </summary>
-            public double[] Wavelength { get; set; } 
-
-            /// <summary>
-            /// Leaf reflectance spectrum (unitless fraction).
-            /// </summary>
-            public double[] Reflectance { get; set; }
-
-            /// <summary>
-            /// Leaf transmittance spectrum (unitless fraction).
-            /// </summary>
-            public double[] Transmittance { get; set; }
-        }
-
-        /// <summary>
-        /// Holds PROSPECT model input parameters.
-        /// Corresponds to the 'Input_PROSPECT' list/dataframe in R.
-        /// </summary>
-        public struct ProspectInput 
-        {
-            /// <summary>Leaf structure parameter N (unitless, avg number of layers).</summary>
-            public double N;
-            /// <summary>Chlorophyll a + b content (μg/cm²).</summary>
-            public double CAB; 
-            /// <summary>Total carotenoid content (μg/cm²).</summary>
-            public double CAR;
-            /// <summary>Anthocyanin content (μg/cm²).</summary>
-            public double ANT;
-            /// <summary>Brown pigment content (arbitrary units).</summary>
-            public double BROWN;
-            /// <summary>Equivalent Water Thickness (cm or g/cm²).</summary>
-            public double EWT;
-            /// <summary>Leaf Mass per Area (dry matter content) (g/cm²).</summary>
-            public double LMA;
-            /// <summary>Protein content (g/cm²).</summary>
-            public double PROT;
-            /// <summary>Non-protein Carbon-based constituent content (g/cm²).</summary>
-            public double CBC;
-            /// <summary>Incidence angle for tav calculation (degrees, typically 40 or 59).</summary>
-            public double Alpha; // Default often 40 in PROSPECT contexts
-
-            /// <summary>
-            /// Constructor to initialize PROSPECT input parameters with default values.
-            /// Defaults match common PROSPECT usage.
-            /// </summary>
-            public ProspectInput(
-                double n = 1.5, double cab = 40.0, double car = 8.0, double ant = 0.0,
-                double brown = 0.0, double ewt = 0.01, double lma = 0.008, // Using ProspectCore default for LMA
-                double prot = 0.0, double cbc = 0.0, double alpha = 40.0)
-            {
-                N = n;
-                CAB = cab; // Use CAB
-                CAR = car;
-                ANT = ant;
-                BROWN = brown;
-                EWT = ewt;
-                LMA = lma;
-                PROT = prot;
-                CBC = cbc;
-                Alpha = alpha;
-            }
-        }
-
-        /// <summary>
         /// Holds soil spectral data (wavelengths and reflectance).
-        /// Corresponds to 'SpecSOIL' in R.
         /// </summary>
         public class SoilProperties 
         {
@@ -203,10 +132,10 @@ namespace Models.Sail
         /// </summary>
         public struct AdjustedProspectResult 
         {
-            /// <summary>Green leaf optical properties.</summary>
+            /// <summary>Green leaf optical properties simulated by PROSPECT.</summary>
             public LeafOptics GreenLOP { get; set; }
             /// <summary>Brown leaf optical properties (may be null or same as GreenLOP).</summary>
-            public LeafOptics BrownLOP { get; set; }
+            public LeafOptics? BrownLOP { get; set; }
         }
 
         /// <summary>
@@ -234,14 +163,13 @@ namespace Models.Sail
             /// <summary>Contribution of hemispherical diffuse incident flux to albedo (Hemispherical reflectance for diffuse incidence, Rdd*).</summary>
             public double[] Rddstar { get; set; }
         }
-
-        // --- End of Supporting Data Structures ---
+        #endregion
 
         // Constants used within the class
         private const double PI = Math.PI;
         private const double DEGREES_TO_RADIANS = PI / 180.0;
 
-        // --- Utility Methods ---
+        #region Utility Methods
 
         /// <summary>
         /// Computes bidirectional reflectance factor (BRF) based on SAIL outputs and solar/diffuse light fractions.
@@ -256,7 +184,7 @@ namespace Models.Sail
         /// <param name="tts">Solar zenith angle (degrees).</param>
         /// <param name="specAtmSensor">Atmospheric data containing DirectLight (Es) and DiffuseLight (Ed) spectra.</param>
         /// <returns>Bidirectional reflectance factor (BRF) spectrum.</returns>
-        public static double[] Compute_BRF(double[] rdot, double[] rsot, double tts, SpecAtmSensor specAtmSensor) // Method made static
+        public static double[] ComputeBRF(double[] rdot, double[] rsot, double tts, SpecAtmSensor specAtmSensor)
         {
             // Section: Direct / Diffuse Light Calculation
             double[] Es = specAtmSensor.DirectLight;    // Direct irradiance component
@@ -277,7 +205,7 @@ namespace Models.Sail
             // Formula from Francois et al. (2002)
             double skyl = 0.847 - 1.61 * sinSolarElevation + 1.04 * sinSolarElevation * sinSolarElevation;
             // Ensure skyl is within physical bounds [0, 1]
-            skyl = Math.Max(0.0, Math.Min(1.0, skyl)); // Clamping added for robustness
+            skyl = Math.Max(0.0, Math.Min(1.0, skyl)); 
 
             int nLambda = rdot.Length; // Number of spectral points
             double[] BRF = new double[nLambda]; // Initialize the result array
@@ -292,7 +220,6 @@ namespace Models.Sail
                 // Total irradiance for weighting
                 double totalIrradiance = effectiveDirectIrradiance + effectiveDiffuseIrradiance;
 
-                // Avoid division by zero if total irradiance is negligible
                 if (Math.Abs(totalIrradiance) < 1e-9)
                 {
                     // If no light, BRF is undefined or zero. Defaulting to zero.
@@ -325,12 +252,12 @@ namespace Models.Sail
         /// <param name="parRangeMin">Minimum wavelength (nm) for PAR integration (default 400).</param>
         /// <param name="parRangeMax">Maximum wavelength (nm) for PAR integration (default 700).</param>
         /// <returns>Fraction of Absorbed Photosynthetically Active Radiation (fAPAR, unitless).</returns>
-        public static double Compute_fAPAR(double[] abs_dir, double[] abs_hem, double tts, SpecAtmSensor specAtmSensor, double parRangeMin = 400, double parRangeMax = 700) // Method made static
+        public static double ComputeFAPAR(double[] abs_dir, double[] abs_hem, double tts, SpecAtmSensor specAtmSensor, double parRangeMin = 400, double parRangeMax = 700)
         {
-            // Section: Direct / Diffuse Light Calculation
+            // Direct / Diffuse Light Calculation
             double[] Es = specAtmSensor.DirectLight;
             double[] Ed = specAtmSensor.DiffuseLight;
-            double[] lambda = specAtmSensor.Wavelength; // Use Wavelength field
+            double[] lambda = specAtmSensor.Wavelength;
 
             // Input validation
             if (abs_dir.Length != abs_hem.Length || abs_dir.Length != Es.Length || abs_dir.Length != Ed.Length || abs_dir.Length != lambda.Length)
@@ -343,7 +270,7 @@ namespace Models.Sail
             double solarElevationRad = (90.0 - tts) * rd;
             double sinSolarElevation = Math.Sin(solarElevationRad);
             double skyl = 0.847 - 1.61 * sinSolarElevation + 1.04 * sinSolarElevation * sinSolarElevation;
-            skyl = Math.Max(0.0, Math.Min(1.0, skyl)); // Clamp
+            skyl = Math.Max(0.0, Math.Min(1.0, skyl));
 
             double totalAbsorbedPAR = 0;    // Accumulator for absorbed PAR energy
             double totalIncidentPAR = 0;    // Accumulator for incident PAR energy
@@ -356,7 +283,8 @@ namespace Models.Sail
                 {
                     // Calculate effective irradiance components
                     double directIrradiance = (1.0 - skyl) * Es[i];
-                    double diffuseIrradiance = skyl * Ed[i]; // See note in Compute_BRF
+                    // Note: R code uses Ed here. Francois paper might imply skyl relates Es and Ed? Check original paper if critical.
+                    double diffuseIrradiance = skyl * Ed[i];
                     double incident = directIrradiance + diffuseIrradiance;
 
                     // Calculate absorbed energy: AbsDirect * DirectIrrad + AbsHemispheric * DiffuseIrrad
@@ -364,7 +292,7 @@ namespace Models.Sail
 
                     // Accumulate total incident and absorbed PAR energy
                     // NOTE: This performs simple summation, assuming equal spectral bandwidths.
-                    // For higher accuracy with non-uniform sampling, use numerical integration (e.g., trapezoidal rule).
+                    // For higher accuracy with non-uniform sampling, use numerical integration.
                     totalAbsorbedPAR += absorbed;
                     totalIncidentPAR += incident;
                 }
@@ -373,10 +301,10 @@ namespace Models.Sail
             // Calculate fAPAR ratio
             if (Math.Abs(totalIncidentPAR) < 1e-9)
             {
-                return 0; // Avoid division by zero if no incident PAR
+                return 0;
             }
 
-            double fAPAR = totalAbsorbedPAR / totalIncidentPAR; //
+            double fAPAR = totalAbsorbedPAR / totalIncidentPAR;
 
             // Ensure fAPAR is within physical bounds [0, 1]
             return Math.Max(0.0, Math.Min(1.0, fAPAR));
@@ -398,12 +326,12 @@ namespace Models.Sail
         /// <param name="albedoRangeMin">Minimum wavelength (nm) for albedo integration (default 400).</param>
         /// <param name="albedoRangeMax">Maximum wavelength (nm) for albedo integration (default 2400).</param>
         /// <returns>Broadband albedo value (unitless fraction) over the specified range.</returns>
-        public static double Compute_albedo(double[] rsdstar, double[] rddstar, double tts, SpecAtmSensor specAtmSensor, double albedoRangeMin = 400, double albedoRangeMax = 2400) // Method made static
+        public static double ComputeAlbedo(double[] rsdstar, double[] rddstar, double tts, SpecAtmSensor specAtmSensor, double albedoRangeMin = 400, double albedoRangeMax = 2400)
         {
-            // Section: Direct / Diffuse Light Calculation
+            // Direct / Diffuse Light Calculation
             double[] Es = specAtmSensor.DirectLight;
             double[] Ed = specAtmSensor.DiffuseLight;
-            double[] lambda = specAtmSensor.Wavelength; // Use Wavelength field
+            double[] lambda = specAtmSensor.Wavelength;
 
             // Input validation
             if (rsdstar.Length != rddstar.Length || rsdstar.Length != Es.Length || rsdstar.Length != Ed.Length || rsdstar.Length != lambda.Length)
@@ -416,7 +344,7 @@ namespace Models.Sail
             double solarElevationRad = (90.0 - tts) * rd;
             double sinSolarElevation = Math.Sin(solarElevationRad);
             double skyl = 0.847 - 1.61 * sinSolarElevation + 1.04 * sinSolarElevation * sinSolarElevation;
-            skyl = Math.Max(0.0, Math.Min(1.0, skyl)); // Clamp
+            skyl = Math.Max(0.0, Math.Min(1.0, skyl));
 
             double totalReflectedEnergy = 0; // Accumulator for reflected energy
             double totalIncidentEnergy = 0;  // Accumulator for incident energy
@@ -429,7 +357,8 @@ namespace Models.Sail
                 {
                     // Calculate effective irradiance components
                     double directIrradiance = (1.0 - skyl) * Es[i];
-                    double diffuseIrradiance = skyl * Ed[i]; // See note in Compute_BRF
+                    // Note: R code uses Ed here. Francois paper might imply skyl relates Es and Ed? Check original paper if critical.
+                    double diffuseIrradiance = skyl * Ed[i];
                     double incident = directIrradiance + diffuseIrradiance;
 
                     // Calculate reflected energy: Rsd* * DirectIrrad + Rdd* * DiffuseIrrad
@@ -445,10 +374,10 @@ namespace Models.Sail
             // Calculate albedo ratio
             if (Math.Abs(totalIncidentEnergy) < 1e-9)
             {
-                return 0; // Avoid division by zero if no incident energy
+                return 0;
             }
 
-            double albedo = totalReflectedEnergy / totalIncidentEnergy; //
+            double albedo = totalReflectedEnergy / totalIncidentEnergy;
 
             // Ensure albedo is within physical bounds [0, 1]
             return Math.Max(0.0, Math.Min(1.0, albedo));
@@ -472,7 +401,7 @@ namespace Models.Sail
         /// <param name="tss">Directional transmittance (solar) for the layer (scalar).</param>
         /// <param name="too">Directional transmittance (observer) for the layer (scalar).</param>
         /// <returns>A ScatteringResult struct containing Tdd, Rdd, Tsd, Rsd, Tdo, Rdo, Rsod arrays.</returns>
-        public static ScatteringResult NonConservativeScattering( // Method made static
+        public static ScatteringResult NonConservativeScattering(
             double[] m, double lai, double[] att, double[] sigb, double ks, double ko,
             double[] sf, double[] sb, double[] vf, double[] vb, double tss, double too)
         {
@@ -527,14 +456,16 @@ namespace Models.Sail
 
                 // Denominator term used in several calculations
                 double denom = 1.0 - rinf2 * e2; // 1 - rinf^2 * exp(-2*m*LAI)
-                                                 // Avoid division by zero, maintain sign
-                if (Math.Abs(denom) < 1e-12) denom = (denom >= 0 ? 1e-12 : -1e-12);
+                if (Math.Abs(denom) < 1e-12)
+                {
+                    denom = (denom >= 0 ? 1e-12 : -1e-12);
+                }
 
                 // Calculate J functions using helper methods
-                double J1ks_val = Jfunc1(ks, mi, lai); // J1(ks, m, lai)
-                double J2ks_val = Jfunc2(ks, mi, lai); // J2(ks, m, lai)
-                double J1ko_val = Jfunc1(ko, mi, lai); // J1(ko, m, lai)
-                double J2ko_val = Jfunc2(ko, mi, lai); // J2(ko, m, lai)
+                double J1ks_val = Jfunc1(ks, mi, lai); 
+                double J2ks_val = Jfunc2(ks, mi, lai); 
+                double J1ko_val = Jfunc1(ko, mi, lai); 
+                double J2ko_val = Jfunc2(ko, mi, lai);
 
                 // Calculate intermediate P, Q terms for solar and view directions
                 double Ps = (sfi + sbi * rinf) * J1ks_val;
@@ -551,12 +482,20 @@ namespace Models.Sail
                 rdo[i] = (Qv - re * Pv) / denom;       // Hemispherical-directional Reflectance (view, Rdo)
 
                 // Calculation for multiple scattering contribution (Rsod)
-                double z = Jfunc2(ks, ko, lai); // R uses Jfunc2, equivalent to Jfunc3
+                double z = Jfunc2(ks, ko, lai);
                 double g1_denom = ko + mi;
                 double g2_denom = ks + mi;
+                
                 // Avoid division by zero
-                if (Math.Abs(g1_denom) < 1e-12) g1_denom = (g1_denom >= 0 ? 1e-12 : -1e-12);
-                if (Math.Abs(g2_denom) < 1e-12) g2_denom = (g2_denom >= 0 ? 1e-12 : -1e-12);
+                if (Math.Abs(g1_denom) < 1e-12)
+                {
+                    g1_denom = (g1_denom >= 0 ? 1e-12 : -1e-12);
+                }
+
+                if (Math.Abs(g2_denom) < 1e-12)
+                {
+                    g2_denom = (g2_denom >= 0 ? 1e-12 : -1e-12);
+                }
 
                 // Intermediate g1, g2 terms
                 double g1 = (z - J1ks_val * too) / g1_denom; // Note: uses layer transmittance 'too'
@@ -589,10 +528,11 @@ namespace Models.Sail
 
         /// <summary>
         /// Computes scattering components for conservative or near-conservative scattering conditions (m no larger than 0.01).
-        /// Internal helper function for SAIL models (specifically 4SAIL2). Uses different formulae than NonConservativeScattering.
+        /// Internal helper function for SAIL models (specifically 4SAIL2). 
+        /// Uses different formulae than NonConservativeScattering.
         /// </summary>
         // (Parameters and return description identical to NonConservativeScattering)
-        public static ScatteringResult ConservativeScattering( // Method made static
+        public static ScatteringResult ConservativeScattering(
            double[] m, double lai, double[] att, double[] sigb, double ks, double ko,
            double[] sf, double[] sb, double[] vf, double[] vb, double tss, double too)
         {
@@ -638,7 +578,7 @@ namespace Models.Sail
 
                 // Intermediate rtp, rtm terms
                 double rtp = (1.0 - amsig * J4_val) / denom_rtp;
-                double rtm = (-1.0 + apsig * J4_val) / denom_rtm; // R uses (-1 + ...)
+                double rtm = (-1.0 + apsig * J4_val) / denom_rtm;
 
                 // Calculate Rdd and Tdd for conservative case
                 // Note: For perfect conservative scattering (m=0, amsig=0), rtp=1. Rdd+Tdd should equal 1.
@@ -648,7 +588,6 @@ namespace Models.Sail
                 // Denominators involving extinction coefficients and m
                 double dns = ks * ks - mi * mi; // k_sun^2 - m^2
                 double dno = ko * ko - mi * mi; // k_obs^2 - m^2
-                                                // Avoid division by zero
                 if (Math.Abs(dns) < 1e-12) dns = (dns >= 0 ? 1e-12 : -1e-12);
                 if (Math.Abs(dno) < 1e-12) dno = (dno >= 0 ? 1e-12 : -1e-12);
 
@@ -670,7 +609,7 @@ namespace Models.Sail
                 tsd[i] = dks * (tss - tdd[i]) - cks * tss * rdd[i];
                 tdo[i] = dko * (too - tdd[i]) - cko * too * rdd[i];
                 // Multiple scattering contribution to bidirectional reflectance
-                rsod[i] = ho * (1.0 - tss * too) - cko * tsd[i] * too - dko * rsd[i]; // R uses rsd[i] here
+                rsod[i] = ho * (1.0 - tss * too) - cko * tsd[i] * too - dko * rsd[i];
             }
 
             // Return the struct containing results
@@ -687,7 +626,7 @@ namespace Models.Sail
         /// </remarks>
         /// <param name="ala">Average leaf inclination angle (degrees).</param>
         /// <returns>A FoliarDistributionResult struct containing LIDF values (lidf) and representative angles (litab).</returns>
-        public static FoliarDistributionResult Campbell(double ala) // Method made static
+        public static FoliarDistributionResult Campbell(double ala)
         {
             // Predefined angle bins (midpoints 'litab' and boundaries 'tx1', 'tx2') from R code
             double[] tx1 = { 10.0, 20.0, 30.0, 40.0, 50.0, 60.0, 70.0, 80.0, 82.0, 84.0, 86.0, 88.0, 90.0 }; // Upper bounds
@@ -707,7 +646,6 @@ namespace Models.Sail
             }
 
             // Calculate eccentricity factor based on average leaf angle (ala)
-            // Formula from R code, likely derived from Campbell's work.
             double excent = Math.Exp(-1.6184e-5 * Math.Pow(ala, 3) + 2.1145e-3 * Math.Pow(ala, 2) - 1.2390e-1 * ala + 3.2491);
             double totalFreqSum = 0; // Accumulator for normalization
 
@@ -809,13 +747,13 @@ namespace Models.Sail
             {
                 for (int i = 0; i < nBins; i++)
                 {
-                    normalizedFreq[i] = freq[i] / totalFreqSum; //
+                    normalizedFreq[i] = freq[i] / totalFreqSum;
                 }
             }
             // If sum is zero, result remains array of zeros.
 
             // Return the LIDF values and corresponding angles
-            return new FoliarDistributionResult { Lidf = normalizedFreq, Litab = litab }; //
+            return new FoliarDistributionResult { Lidf = normalizedFreq, Litab = litab };
         }
 
         /// <summary>
@@ -829,7 +767,7 @@ namespace Models.Sail
         /// <param name="a">LIDF parameter 'a'.</param>
         /// <param name="b">LIDF parameter 'b'.</param>
         /// <returns>A FoliarDistributionResult struct containing LIDF values and representative angles.</returns>
-        public static FoliarDistributionResult Dladgen(double a, double b) // Method made static
+        public static FoliarDistributionResult Dladgen(double a, double b)
         {
             // Representative angles (degrees) for LIDF bins, from R code
             double[] litab = { 5.0, 15.0, 25.0, 35.0, 45.0, 55.0, 65.0, 75.0, 81.0, 83.0, 85.0, 87.0, 89.0 };
@@ -865,7 +803,7 @@ namespace Models.Sail
             }
 
             // Return the calculated LIDF frequencies and representative angles
-            return new FoliarDistributionResult { Lidf = freq, Litab = litab }; //
+            return new FoliarDistributionResult { Lidf = freq, Litab = litab }; 
         }
 
         /// <summary>
@@ -876,7 +814,7 @@ namespace Models.Sail
         /// <param name="b">LIDF parameter 'b'.</param>
         /// <param name="t">Angle (degrees) up to which cumulative frequency is calculated.</param>
         /// <returns>Cumulative frequency f (fraction of leaves with inclination is no larger than t).</returns>
-        public static double Dcum(double a, double b, double t) // Method made static
+        public static double Dcum(double a, double b, double t)
         {
             double rd = DEGREES_TO_RADIANS; // Convert degrees to radians
             double f; // Resulting cumulative frequency
@@ -906,7 +844,7 @@ namespace Models.Sail
                     // Calculate the correction step 'dx'
                     double dx = 0.5 * (y - x + p);
                     // Update the transformed angle 'x'
-                    x = x + dx;
+                    x += dx;
                     // Update the change for convergence check
                     delx = Math.Abs(dx);
                     iter++; // Increment iteration counter
@@ -917,7 +855,6 @@ namespace Models.Sail
                 {
                     // Log a warning if convergence wasn't reached
                     Console.WriteLine($"Warning: Dcum iteration did not converge within {maxIter} iterations for t={t}, a={a}, b={b}");
-                    // R code uses the last calculated 'y'. We will do the same.
                 }
 
                 // Calculate final cumulative frequency 'f' using the last 'y' and target 'p'
@@ -982,7 +919,7 @@ namespace Models.Sail
         /// <param name="l">Parameter l.</param>
         /// <param name="t">Parameter t.</param>
         /// <returns>Result of the J2 function.</returns>
-        public static double Jfunc2(double k, double l, double t) // Method made static
+        public static double Jfunc2(double k, double l, double t)
         {
             // Calculate the sum k+l
             double sum_kl = k + l;
@@ -1009,16 +946,16 @@ namespace Models.Sail
 
 
         /// <summary>
-        /// J3 function for SAIL calculations. Identical to Jfunc2 in the provided R code.
+        /// J3 function for SAIL calculations.
         /// Calculates (1 - exp(-(k+l)*t)) / (k + l).
         /// </summary>
         /// <param name="k">Parameter k.</param>
         /// <param name="l">Parameter l.</param>
         /// <param name="t">Parameter t.</param>
         /// <returns>Result of the J3 function.</returns>
-        public static double Jfunc3(double k, double l, double t) // Method made static
+        public static double Jfunc3(double k, double l, double t)
         {
-            // Functionally identical to Jfunc2 based on the R code provided
+            // Functionally identical to Jfunc2 based on the R code
             return Jfunc2(k, l, t);
         }
 
@@ -1031,7 +968,7 @@ namespace Models.Sail
         /// <param name="m">SAIL exponent m (should be near 0 for conservative scattering).</param>
         /// <param name="t">Parameter t (e.g., LAI).</param>
         /// <returns>Result of the J4 function.</returns>
-        public static double Jfunc4(double m, double t) // Method made static
+        public static double Jfunc4(double m, double t)
         {
             // Calculate the product m*t
             double del = m * t;
@@ -1075,14 +1012,14 @@ namespace Models.Sail
         /// <summary>
         /// Compute volume scattering functions (Chi_s, Chi_o) and phase function components (Frho, Ftau).
         /// Internal helper function for SAIL, calculates angle-dependent geometric factors.
-        /// Based on Wout Verhoef, april 2001, for CROMA (as cited in R code).
+        /// Based on Wout Verhoef, april 2001, for CROMA.
         /// </summary>
         /// <param name="tts">Solar zenith angle (degrees).</param>
         /// <param name="tto">Viewing zenith angle (degrees).</param>
         /// <param name="psi">Relative azimuth angle (degrees).</param>
         /// <param name="ttl">Leaf inclination angle (degrees).</param>
         /// <returns>A VolscattResult struct containing chi_s, chi_o, frho, ftau.</returns>
-        public static VolscattResult Volscatt(double tts, double tto, double psi, double ttl) // Method made static
+        public static VolscattResult Volscatt(double tts, double tto, double psi, double ttl)
         {
             // Convert input angles from degrees to radians
             double rd = DEGREES_TO_RADIANS;
@@ -1149,13 +1086,13 @@ namespace Models.Sail
             chi_o = Math.Max(0.0, chi_o);
 
             // Calculate auxiliary azimuth angles for bidirectional scattering phase function
-            double btran1 = Math.Abs(bts - bto); //
-            double btran2 = PI - Math.Abs(bts + bto - PI); //
+            double btran1 = Math.Abs(bts - bto);
+            double btran2 = PI - Math.Abs(bts + bto - PI); 
 
             // Determine integration limits bt1, bt2, bt3 based on relative azimuth psi
             double bt1, bt2, bt3;
-            if (psir <= btran1) { bt1 = psir; bt2 = btran1; bt3 = btran2; } //
-            else { bt1 = btran1; if (psir <= btran2) { bt2 = psir; bt3 = btran2; } else { bt2 = btran2; bt3 = psir; } } //
+            if (psir <= btran1) { bt1 = psir; bt2 = btran1; bt3 = btran2; }
+            else { bt1 = btran1; if (psir <= btran2) { bt2 = psir; bt3 = btran2; } else { bt2 = btran2; bt3 = psir; } }
 
             // Calculate intermediate terms t1 and t2 for phase function
             double t1 = 2.0 * cs * co + ss * so * cospsi; //
@@ -1163,7 +1100,7 @@ namespace Models.Sail
             if (bt2 > 1e-9) // Avoid calculation if bt2 is zero
             {
                 // Formula using intermediate factors ds, doo from R code
-                t2 = Math.Sin(bt2) * (2.0 * ds * doo + ss * so * Math.Cos(bt1) * Math.Cos(bt3)); //
+                t2 = Math.Sin(bt2) * (2.0 * ds * doo + ss * so * Math.Cos(bt1) * Math.Cos(bt3));
             }
 
             // Calculate final phase function components Frho and Ftau
@@ -1181,28 +1118,27 @@ namespace Models.Sail
 
 
         /// <summary>
-        /// Checks if spectral sampling (wavelengths) is identical between PROSPECT constants, SOIL properties, and ATM data.
+        /// Checks if spectral sampling (wavelengths) is identical between PROSPECT leaf optical constants, SOIL properties, and ATM data.
         /// Throws an ArgumentException if sampling does not match in length or values.
         /// </summary>
-        /// <param name="prospectConstants">PROSPECT spectral constants object (must contain Wavelength vector).</param>
+        /// <param name="leafConstants">PROSPECT leaf optical constants object (must contain Wavelength vector).</param>
         /// <param name="soilProperties">Soil spectral properties object (must contain Wavelength array).</param>
         /// <param name="specAtm">Atmosphere spectral properties object (must contain Wavelength array).</param>
-        public static void check_SpectralSampling(ProspectCore.OpticalConstants prospectConstants, SoilProperties soilProperties, SpecAtmSensor specAtm) // Method made static
+        public static void CheckSpectralSampling(LeafOpticalConsts leafConstants, SoilProperties soilProperties, SpecAtmSensor specAtm)
         {
             // Extract wavelength arrays
-            // Note: ProspectCore uses Vector<double>, others use double[]
-            double[] lambdaProspect = prospectConstants.Wavelength?.ToArray(); // Convert Vector to array for comparison
+            double[] lambdaLeafConstants = leafConstants.Wavelength?.ToArray();
             double[] lambdaSoil = soilProperties?.Wavelength;
             double[] lambdaAtm = specAtm?.Wavelength;
 
             // Check if any wavelength array is null
-            if (lambdaProspect == null || lambdaSoil == null || lambdaAtm == null)
+            if (lambdaLeafConstants == null || lambdaSoil == null || lambdaAtm == null)
             {
                 throw new ArgumentNullException("check_SpectralSampling: One or more spectral wavelength arrays are null.");
             }
 
             // Get lengths
-            int lenProspect = lambdaProspect.Length;
+            int lenProspect = lambdaLeafConstants.Length;
             int lenSoil = lambdaSoil.Length;
             int lenAtm = lambdaAtm.Length;
 
@@ -1216,26 +1152,32 @@ namespace Models.Sail
                 throw new ArgumentException(errorMessage);
             }
 
+            if (lambdaLeafConstants == null || lambdaSoil == null || lambdaAtm == null)
+            {
+                throw new ArgumentNullException("check_SpectralSampling: One or more spectral wavelength arrays are null.");
+            }
+                
+            if (lambdaLeafConstants.Length != lambdaSoil.Length || lambdaLeafConstants.Length != lambdaAtm.Length)
+            {
+                throw new ArgumentException("Please ensure matching spectral sampling (lengths) between ProspectConstants, Soil, and Atm data.");
+            }
+
             // Check if wavelength values match exactly using SequenceEqual
             // Assumes wavelengths are in the same order.
-            bool soilMatchesProspect = lambdaProspect.SequenceEqual(lambdaSoil);
-            bool atmMatchesProspect = lambdaProspect.SequenceEqual(lambdaAtm);
-
-            if (!soilMatchesProspect || !atmMatchesProspect) //
+            // May need to sort before checking?
+            if (!lambdaLeafConstants.SequenceEqual(lambdaSoil) || !lambdaLeafConstants.SequenceEqual(lambdaAtm)) 
             {
-                // Optionally log the first mismatch point for debugging
-                /*
-                for(int i=0; i<lenProspect; i++) {
-                    if (Math.Abs(lambdaProspect[i] - lambdaSoil[i]) > 1e-6 || Math.Abs(lambdaProspect[i] - lambdaAtm[i]) > 1e-6) {
-                       Console.WriteLine($"Spectral mismatch at index {i}: Prospect={lambdaProspect[i]}, Soil={lambdaSoil[i]}, Atm={lambdaAtm[i]}");
-                       break;
+                // Log the first mismatch point for debugging
+                for (int i = 0; i < lenProspect; i++)
+                {
+                    if (Math.Abs(lambdaLeafConstants[i] - lambdaSoil[i]) > 1e-6 || Math.Abs(lambdaLeafConstants[i] - lambdaAtm[i]) > 1e-6)
+                    {
+                        Console.WriteLine($"Spectral mismatch at index {i}: Prospect={lambdaLeafConstants[i]}, Soil={lambdaSoil[i]}, Atm={lambdaAtm[i]}");
+                        break;
                     }
                 }
-                */
-                Console.WriteLine(errorMessage); // Log error
-                throw new ArgumentException(errorMessage); // Throw exception
+                throw new ArgumentException("Please ensure matching spectral sampling (wavelength values) between ProspectConstants, Soil, and Atm data.");
             }
-            // If all checks pass, the method completes successfully.
         }
 
 
@@ -1244,22 +1186,14 @@ namespace Models.Sail
         /// Throws exceptions for critical errors (missing data, spectral mismatch).
         /// Writes console warnings for non-critical issues (multiple PROSPECT inputs provided).
         /// </summary>
-        /// <param name="brownLOP">LeafOptics object representing brown leaf properties. Can be null if not provided externally.</param>
-        /// <param name="referenceLambda">The reference wavelength array (e.g., from ProspectConstants) that BrownLOP's wavelengths should match.</param>
+        /// <param name="brownLOP">LeafOptics object for brown leaf properties. Can be null.</param>
+        /// <param name="referenceLambda">The reference wavelength array (e.g., from ProspectConstants.Wavelength) that BrownLOP's wavelengths should match.</param>
         /// <param name="inputProspectList">A list of ProspectInput parameters (used only to check count for warning message).</param>
-        public static void check_BrownLOP(LeafOptics brownLOP, double[] referenceLambda, List<ProspectInput> inputProspectList) // Method made static
+        public static void CheckBrownLOP(LeafOptics? brownLOP, double[] referenceLambda, List<ProspectInputs> inputProspectList)
         {
-            // Only perform checks if a BrownLOP object was actually passed in
-            if (brownLOP != null)
+            // Only perform checks if a BrownLOP object was actually passed in and has value
+            if (brownLOP.HasValue && brownLOP.Value.HasValue)
             {
-                // Check required fields (Wavelength, Reflectance, Transmittance) are present and not null
-                if (brownLOP.Wavelength == null || brownLOP.Reflectance == null || brownLOP.Transmittance == null)
-                {
-                    string msg = "Provided BrownLOP must include non-null 'Wavelength', 'Reflectance' and 'Transmittance' arrays."; //
-                    Console.WriteLine(msg); // Log error
-                    throw new ArgumentException(msg); // Throw exception
-                }
-
                 // Check spectral domain matching against the reference simulation wavelengths
                 if (referenceLambda == null)
                 {
@@ -1267,23 +1201,20 @@ namespace Models.Sail
                 }
 
                 // Compare lengths and values of wavelength arrays
-                if (brownLOP.Wavelength.Length != referenceLambda.Length || !brownLOP.Wavelength.SequenceEqual(referenceLambda)) //
+                if (brownLOP.Value.Wavelength.Length != referenceLambda.Length || !brownLOP.Value.Wavelength.SequenceEqual(referenceLambda))
                 {
-                    string msg = "Spectral domain mismatch: BrownLOP wavelengths do not match the reference simulation wavelengths."; //
-                    Console.WriteLine(msg); // Log error
-                    throw new ArgumentException(msg); // Throw exception
+                    string msg = "Spectral domain mismatch: BrownLOP wavelengths do not match the reference simulation wavelengths.";
+                    Console.WriteLine(msg);
+                    throw new ArgumentException(msg);
                 }
 
                 // Issue a warning if BrownLOP is provided AND multiple PROSPECT input sets exist
-                // This indicates the second PROSPECT input set might be redundant.
-                if (inputProspectList != null && inputProspectList.Count > 1) //
+                if (inputProspectList != null && inputProspectList.Count > 1)
                 {
-                    // R code just prints messages, so we do the same
-                    Console.WriteLine("Warning: External BrownLOP provided along with multiple PROSPECT input parameter sets."); //
-                    Console.WriteLine("         Only the first PROSPECT input set will be used for green vegetation simulation."); //
+                    Console.WriteLine("Warning: External BrownLOP provided along with multiple PROSPECT input parameter sets.");
+                    Console.WriteLine("         Only the first PROSPECT input set will be used for green vegetation simulation.");
                 }
             }
-            // If brownLOP is null, no checks are needed here; adjust_PROSPECT_2_SAIL will handle it.
         }
 
 
@@ -1293,51 +1224,50 @@ namespace Models.Sail
         /// based on input parameters and optionally provided external BrownLOP data.
         /// </summary>
         /// <param name="sailVersion">String identifying the SAIL model version: "4SAIL" or "4SAIL2".</param>
-        /// <param name="prospectConstants">Spectral constants required by the PROSPECT model (e.g., refractive index, SACs).</param>
+        /// <param name="leafOpticalConstants">Leaf optical constants constants required by the PROSPECT model.</param>
         /// <param name="inputProspectList">
-        /// A list containing PROSPECT input parameters (N, CAB, CAR, etc.).
-        /// Expects 1 set for 4SAIL (or 4SAIL2 with BrownLOP/fraction_brown=0).
-        /// Expects 2 sets (first for green, second for brown) for 4SAIL2 if BrownLOP is null and fraction_brown > 0.
+        /// A list containing PROSPECT input parameters (SailUtilities.ProspectInput).
+        /// Expects 1 set for 4SAIL (or 4SAIL2 with BrownLOP/fractionBrown=0).
+        /// Expects 2 sets (first for green, second for brown) for 4SAIL2 if BrownLOP is null and fractionBrown > 0.
         /// </param>
-        /// <param name="fraction_brown">Fraction of brown vegetation (0-1). Used only by 4SAIL2 logic when BrownLOP is not provided.</param>
+        /// <param name="fractionBrown">Fraction of brown vegetation (0-1). Used only by 4SAIL2 logic when BrownLOP is not provided.</param>
         /// <param name="brownLOP">Optional pre-calculated brown leaf optical properties. If provided, simulation for brown leaves is skipped.</param>
         /// <returns>An AdjustedProspectResult struct containing the calculated GreenLOP and potentially BrownLOP.</returns>
         /// <exception cref="ArgumentException">Thrown if inputs are inconsistent (e.g., null lists, bad SAIL version) or Prospect simulation fails.</exception>
-        /// <exception cref="InvalidOperationException">Thrown if ProspectCore.Run fails internally.</exception>
-        public static AdjustedProspectResult adjust_PROSPECT_2_SAIL( // Method made static
+        /// <exception cref="InvalidOperationException">Thrown if ProspectCore.Prospect fails internally.</exception>
+        public static AdjustedProspectResult AdjustProspectToSail(
             string sailVersion,
-            ProspectCore.OpticalConstants prospectConstants, // Use ProspectCore's struct type
-            List<ProspectInput> inputProspectList,            // Use SailUtilities' struct type
-            double fraction_brown,
-            LeafOptics brownLOP = null)                       // Use SailUtilities' class type
+            LeafOpticalConsts leafOpticalConstants,   
+            List<ProspectInputs> inputProspectList, 
+            double fractionBrown,
+            LeafOptics? brownLOP = null)
         {
-            // --- Input Validation ---
+            // Input Validation
             if (inputProspectList == null || inputProspectList.Count == 0)
             {
-                throw new ArgumentException("adjust_PROSPECT_2_SAIL: Input_PROSPECT list cannot be null or empty.");
+                throw new ArgumentException("AdjustProspectToSail: inputProspectList cannot be null or empty.");
             }
-            // prospectConstants is a struct, so it cannot be null itself, but its contents might be invalid
-            if (prospectConstants.Wavelength == null || prospectConstants.Wavelength.Count == 0)
+            
+            if (leafOpticalConstants.Wavelength == null || leafOpticalConstants.Wavelength.Count == 0)
             {
-                throw new ArgumentException("adjust_PROSPECT_2_SAIL: ProspectConstants must contain valid wavelength data.");
+                throw new ArgumentException("AdjustProspectToSail: leafOpticalConstants must contain valid Wavelength data.");
             }
-            if (fraction_brown < 0 || fraction_brown > 1)
+            if (fractionBrown < 0 || fractionBrown > 1)
             {
-                throw new ArgumentOutOfRangeException(nameof(fraction_brown), "fraction_brown must be between 0 and 1.");
+                throw new ArgumentOutOfRangeException(nameof(fractionBrown), "fractionBrown must be between 0 and 1.");
             }
 
-            // --- Simulate Green Leaf Optical Properties (Always needed) ---
-            ProspectInput greenIn = inputProspectList[0]; // Get parameters for green leaf
-            LeafOptics greenLOP; // Result will be stored here
+            // Simulate Green Leaf Optical Properties (greenLOP): always needed
+            ProspectInputs greenIn = inputProspectList[0]; // Get parameters for green leaf
+            LeafOptics greenLOP;
 
             try
             {
-                // Call the static Run method from ProspectCore
-                // Use named arguments for clarity and robustness against parameter order changes.
-                (Vector<double> refl_g, Vector<double> trans_g) = ProspectCore.Prospect(
-                    LeafOpticalConstants: prospectConstants, // Pass the full constants struct
-                    N: greenIn.N,           // Pass individual parameters from the input struct
-                    CAB: greenIn.CAB,       // Use CAB (consistent with ProspectCore)
+                // Call the Prospect method from ProspectCore
+                greenLOP = ProspectCore.Prospect(
+                    LeafOpticalConstants: leafOpticalConstants,
+                    N: greenIn.N,
+                    CAB: greenIn.CAB,
                     CAR: greenIn.CAR,
                     ANT: greenIn.ANT,
                     BROWN: greenIn.BROWN,
@@ -1346,85 +1276,72 @@ namespace Models.Sail
                     PROT: greenIn.PROT,
                     CBC: greenIn.CBC,
                     Alpha: greenIn.Alpha);
-
-                // Convert the Vector<double> results from ProspectCore back to double[] for LeafOptics
-                greenLOP = new LeafOptics
-                {
-                    Wavelength = prospectConstants.Wavelength.ToArray(), // Copy wavelengths from input constants
-                    Reflectance = refl_g.ToArray(),                      // Convert Vector to array
-                    Transmittance = trans_g.ToArray()                      // Convert Vector to array
-                };
             }
             catch (Exception ex) // Catch potential errors during PROSPECT run
             {
-                // Wrap the original exception for better diagnostics
                 throw new InvalidOperationException($"PROSPECT simulation failed for Green LOP: {ex.Message}", ex);
             }
 
 
-            // --- Determine Brown Leaf Optical Properties (based on SAIL version and inputs) ---
-            LeafOptics finalBrownLOP = null; // Initialize Brown LOP result
+            // Determine Brown Leaf Optical Properties based on SAIL version and inputs
+            LeafOptics? finalBrownLOP = null; // Initialize Brown LOP result
 
-            // Logic specific to SAIL version
-            if (sailVersion == "4SAIL") //
+            if (sailVersion == "4SAIL")
             {
-                // 4SAIL only uses GreenLOP. BrownLOP is not needed and remains null.
+                // 4SAIL only uses GreenLOP. BrownLOP is not needed.
                 finalBrownLOP = null;
             }
-            else if (sailVersion == "4SAIL2") //
+            else if (sailVersion == "4SAIL2")
             {
-                // 4SAIL2 requires both Green and Brown LOP. Determine the source for Brown LOP.
+                // 4SAIL2 requires both Green and Brown LOP.
 
-                // Case 1: External BrownLOP object is provided directly
-                if (brownLOP != null)
+                // Case 1: External BrownLOP is provided directly
+                if (brownLOP.HasValue && brownLOP.Value.HasValue)
                 {
-                    // Check if the provided BrownLOP is spectrally valid
-                    check_BrownLOP(brownLOP, prospectConstants.Wavelength.ToArray(), inputProspectList);
-                    // Use the provided external BrownLOP
-                    finalBrownLOP = brownLOP;
+                    // Check if the provided BrownLOP is spectrally valid against prospectConstants wavelengths
+                    CheckBrownLOP(brownLOP, leafOpticalConstants.Wavelength.ToArray(), inputProspectList);
+                    finalBrownLOP = brownLOP; // Use the externally provided one
                 }
-                // Case 2: External BrownLOP is *not* provided. Need to simulate or use GreenLOP.
+                // Case 2: External BrownLOP is NOT provided. Need to simulate or use Green LOP.
                 else
                 {
-                    // Subcase 2a: If fraction_brown is effectively zero, brown leaves don't contribute.
-                    if (Math.Abs(fraction_brown) < 1e-9)
+                    // Subcase 2a: If fractionBrown is effectively zero, brown leaves don't contribute significantly or are same as green.
+                    if (Math.Abs(fractionBrown) < 1e-9)
                     {
-                        // Assign Green LOP to Brown LOP as they are optically identical in this case
+                        // Assign Green LOP to Brown LOP (optically identical in this scenario)
                         finalBrownLOP = greenLOP;
                     }
-                    // Subcase 2b: fraction_brown > 0, and no external BrownLOP. Need to simulate using second input set.
+                    // Subcase 2b: fractionBrown > 0, and NO external BrownLOP. Need to simulate using second input set.
                     else
                     {
                         // Check if a second input set for brown leaves exists in the list
                         if (inputProspectList.Count < 2)
                         {
                             // R code prints a warning and implicitly runs as 4SAIL. Mimic warning.
-                            Console.WriteLine("Warning: 4SAIL2 requires two sets of PROSPECT inputs (or external BrownLOP/zero fraction_brown)."); //
-                            Console.WriteLine("         Only one input set found. Brown LOP cannot be generated via PROSPECT."); //
-                            Console.WriteLine("         Proceeding as if 4SAIL was selected (BrownLOP will be effectively null)."); //
-                            // Set BrownLOP to null, so downstream 4SAIL2 logic might handle it or fail if it strictly requires it.
-                            finalBrownLOP = null;
+                            Console.WriteLine("Warning: 4SAIL2 needs two sets of PROSPECT inputs (or external BrownLOP/zero fractionBrown).");
+                            Console.WriteLine("         Only one input set found. Brown LOP cannot be generated via PROSPECT.");
+                            Console.WriteLine("         Proceeding as if 4SAIL was selected (BrownLOP will be effectively null for SAIL core).");
+                            finalBrownLOP = null; // No distinct brown LOP simulated
                         }
                         else // Second input set is available
                         {
                             // Get parameters for brown leaf from the second element of the list
-                            ProspectInput brownIn = inputProspectList[1];
+                            ProspectInputs brownIn = inputProspectList[1];
                             try
                             {
-                                // Call ProspectCore.Run for the brown leaf parameters
-                                (Vector<double> refl_b, Vector<double> trans_b) = ProspectCore.Prospect(
-                                     LeafOpticalConstants: prospectConstants, // Use same spectral constants
-                                     N: brownIn.N, CAB: brownIn.CAB, CAR: brownIn.CAR, ANT: brownIn.ANT,
-                                     BROWN: brownIn.BROWN, EWT: brownIn.EWT, LMA: brownIn.LMA,
-                                     PROT: brownIn.PROT, CBC: brownIn.CBC, Alpha: brownIn.Alpha);
-
-                                // Convert result to LeafOptics structure
-                                finalBrownLOP = new LeafOptics
-                                {
-                                    Wavelength = prospectConstants.Wavelength.ToArray(),
-                                    Reflectance = refl_b.ToArray(),
-                                    Transmittance = trans_b.ToArray()
-                                };
+                                // Call ProspectCore.Prospect for the brown leaf parameters
+                                finalBrownLOP = ProspectCore.Prospect(
+                                     LeafOpticalConstants: leafOpticalConstants, // Use same spectral constants
+                                     N: brownIn.N, 
+                                     CAB: brownIn.CAB, 
+                                     CAR: brownIn.CAR, 
+                                     ANT: brownIn.ANT,
+                                     BROWN: brownIn.BROWN, 
+                                     EWT: brownIn.EWT, 
+                                     LMA: brownIn.LMA,
+                                     PROT: brownIn.PROT, 
+                                     CBC: brownIn.CBC, 
+                                     Alpha: brownIn.Alpha);
                             }
                             catch (Exception ex) // Catch potential errors during PROSPECT run
                             {
@@ -1439,9 +1356,9 @@ namespace Models.Sail
                 throw new ArgumentException($"Unsupported SAIL version specified: '{sailVersion}'. Use '4SAIL' or '4SAIL2'.");
             }
 
-            // Return the struct containing the final GreenLOP and BrownLOP (which might be null or same as green)
-            return new AdjustedProspectResult { GreenLOP = greenLOP, BrownLOP = finalBrownLOP };
+            // Return the struct containing the final GreenLOP and BrownLOP
+            return new AdjustedProspectResult {GreenLOP = greenLOP, BrownLOP = finalBrownLOP};
         }
-
-    } // End of static class SailUtilities
-} // End of namespace Models.Sail
+        #endregion
+    }
+}
