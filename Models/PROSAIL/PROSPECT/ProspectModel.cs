@@ -9,7 +9,9 @@ using Models.Core;
 using Models.Functions;
 using APSIM.Shared.Utilities;
 using Models.PMF;
+using Models.Prospect;
 using System.Threading;
+using static Models.Prospect.ProspectCore;
 
 namespace Models.Prospect
 {
@@ -135,12 +137,12 @@ namespace Models.Prospect
         /// <summary>
         /// The cached spectral constants loaded at simulation start
         /// </summary>
-        private ProspectCore.OpticalConstants? cachedOpticalConstants = null;
+        private ProspectCore.LeafOpticalConsts? cachedOpticalConstants = null;
 
         /// <summary>
         /// Cached PROSPECT results for the current day
         /// </summary>
-        private (Vector<double> Reflectance, Vector<double> Transmittance, double[] UsedWavelengths)? cachedResults = null;
+        private LeafOptics? cachedResults = null;
 
         /// <summary>
         /// The date of the last cached results
@@ -293,12 +295,12 @@ namespace Models.Prospect
                 cachedResults = results; // Cache results
                 lastCalculationDate = Clock.Today;
 
-                WriteMessage(LogLevel.Info, $"ProspectModel: PROSPECT calculation completed, Reflectance[{results.Reflectance.Count}], Transmittance[{results.Transmittance.Count}]");
+                WriteMessage(LogLevel.Info, message: $"ProspectModel: PROSPECT calculation completed, Reflectance[{results.Reflectance.Length}], Transmittance[{results.Transmittance.Length}]");
 
                 // Save to database only if enabled
                 if (EnableSQLiteOutput)
                 {
-                    WriteToDatabase(Clock.Today, results.Reflectance.ToArray(), results.Transmittance.ToArray(), results.UsedWavelengths);
+                    WriteToDatabase(Clock.Today, results);
                     WriteMessage(LogLevel.Info, $"ProspectModel: Wrote results to database for {Clock.Today:yyyy-MM-dd}.");
                 }
                 else
@@ -516,18 +518,23 @@ namespace Models.Prospect
         /// <summary>
         /// Write PROSPECT results to the database
         /// </summary>
-        private void WriteToDatabase(DateTime date, double[] reflectance, double[] transmittance, double[] usedWavelengths)
+        private void WriteToDatabase(DateTime date, LeafOptics leafOptics)
         {
-            if (dbConnection == null || reflectance == null || transmittance == null || usedWavelengths == null)
+            double[] reflectance = leafOptics.Reflectance;
+            double[] transmittance = leafOptics.Transmittance;
+            double[] usedWavelength = leafOptics.Wavelength;
+
+            if (dbConnection == null || reflectance == null || transmittance == null || usedWavelength == null)
             {
-                WriteMessage(LogLevel.Warning, "ProspectModel: WriteToDatabase skipped due to null dbConnection, reflectance, transmittance, or usedWavelengths.");
+                WriteMessage(LogLevel.Warning, "ProspectModel: WriteToDatabase skipped due to null dbConnection, reflectance, transmittance, or wavelength.");
                 return;
             }
 
             // Validate array lengths
-            if (reflectance.Length != usedWavelengths.Length || transmittance.Length != usedWavelengths.Length)
+            if (reflectance.Length != usedWavelength.Length ||
+                transmittance.Length != usedWavelength.Length)
             {
-                WriteMessage(LogLevel.Error, $"ProspectModel: Array length mismatch in WriteToDatabase: Reflectance[{reflectance.Length}], Transmittance[{transmittance.Length}], UsedWavelengths[{usedWavelengths.Length}].");
+                WriteMessage(LogLevel.Error, $"ProspectModel: Array length mismatch in WriteToDatabase: reflectance[{reflectance.Length}], transmittance[{transmittance.Length}], wavelengths[{usedWavelength.Length}].");
                 throw new InvalidOperationException("Array length mismatch in WriteToDatabase.");
             }
 
@@ -560,9 +567,9 @@ namespace Models.Prospect
                 bool firstSpectra = true;
 
                 // Process all wavelengths
-                for (int i = 0; i < usedWavelengths.Length; i++)
+                for (int i = 0; i < usedWavelength.Length; i++)
                 {
-                    double wavelength = usedWavelengths[i];
+                    double wavelength = usedWavelength[i];
                     if (outputWavelengthSet.Contains(wavelength))
                     {
                         if (!firstSpectra)
@@ -653,7 +660,7 @@ namespace Models.Prospect
         /// A Review Study. Remote Sensing 10, 85. https://doi.org/10.3390/rs10010085
         /// </remarks>
         /// <returns>A tuple containing reflectance and transmittance vectors</returns>
-        public (Vector<double> Reflectance, Vector<double> Transmittance, double[] UsedWavelengths) CalculateProspect()
+        public LeafOptics CalculateProspect()
         {
             if (cachedOpticalConstants == null)
             {
@@ -770,22 +777,21 @@ namespace Models.Prospect
             double[] inputWavelengths = wavelengths.Length > 0 ? wavelengths : cachedOpticalConstants.Value.Wavelength.ToArray();
 
             // Run the PROSPECT model with the selected wavelengths
-            var results = ProspectCore.Prospect(
+            LeafOptics results = ProspectCore.Prospect(
                 LeafOpticalConstants: cachedOpticalConstants,
                 N: nValue, CAB: cabValue, CAR: carValue, EWT: ewtValue, LMA: lmaValue,
                 ANT: antValue, BROWN: brownValue, PROT: protValue, CBC: cbcValue, Alpha: alphaValue,
                 Wavelengths: inputWavelengths);
 
-            WriteMessage(LogLevel.Info, $"ProspectModel: CalculateProspect completed, Reflectance[{results.Reflectance.Count}], Transmittance[{results.Transmittance.Count}], Wavelengths[{inputWavelengths.Length}]");
+            WriteMessage(LogLevel.Info, $"ProspectModel: CalculateProspect completed, Reflectance[{results.Reflectance.Length}], Transmittance[{results.Transmittance.Length}], Wavelengths[{inputWavelengths.Length}]");
 
             // Validate that the results match the input wavelengths
-            if (results.Reflectance.Count != inputWavelengths.Length || results.Transmittance.Count != inputWavelengths.Length)
+            if (results.Reflectance.Length != inputWavelengths.Length || results.Transmittance.Length != inputWavelengths.Length)
             {
-                WriteMessage(LogLevel.Error, $"ProspectModel: Mismatch between PROSPECT output and input wavelengths: Reflectance[{results.Reflectance.Count}], Transmittance[{results.Transmittance.Count}], InputWavelengths[{inputWavelengths.Length}].");
+                WriteMessage(LogLevel.Error, $"ProspectModel: Mismatch between PROSPECT output and input wavelengths: Reflectance[{results.Reflectance.Length}], Transmittance[{results.Transmittance.Length}], InputWavelengths[{inputWavelengths.Length}].");
                 throw new InvalidOperationException("Mismatch between PROSPECT output and input wavelengths.");
             }
-
-            return (results.Reflectance, results.Transmittance, inputWavelengths);
+            return (results);
         }
 
         /// <summary>
