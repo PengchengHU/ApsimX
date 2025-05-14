@@ -127,6 +127,7 @@ namespace Models.Prospect
         /// <summary>
         /// Runs the PROSPECT model to calculate leaf reflectance and transmittance
         /// </summary>
+        /// <param name="ProspectInputs">Prospect inputs that will be used if provided, otherwise use the following individual parameters</param>
         /// <param name="LeafOpticalConstants">Leaf optical constants (optional)</param>
         /// <param name="N">Leaf structure parameter (unitless)</param>
         /// <param name="CAB">Chlorophyll a + b content (μg/cm²)</param>
@@ -143,7 +144,7 @@ namespace Models.Prospect
         /// <exception cref="ArgumentException">Thrown if input parameters are invalid or array lengths mismatch.</exception>
         /// <exception cref="FileNotFoundException">Thrown if the file for leaf optical constants is missing.</exception>
         public static LeafOptics Prospect(
-            //ProspectInputs? ProspectInputs = null,
+            ProspectInputs? ProspectInputs = null,
             LeafOpticalConsts? LeafOpticalConstants = null, // Optional parameter with null default
             double N = 1.5,
             double CAB = 40.0,
@@ -157,6 +158,23 @@ namespace Models.Prospect
             double Alpha = 40.0,
             double[] Wavelengths = null)
         {
+
+            // Use inputs struct values if provided, otherwise use individual parameters
+            if (ProspectInputs.HasValue)
+            {
+                N = ProspectInputs.Value.N;
+                CAB = ProspectInputs.Value.CAB;
+                CAR = ProspectInputs.Value.CAR;
+                ANT = ProspectInputs.Value.ANT;
+                BROWN = ProspectInputs.Value.BROWN;
+                EWT = ProspectInputs.Value.EWT;
+                LMA = ProspectInputs.Value.LMA;
+                PROT = ProspectInputs.Value.PROT;
+                CBC = ProspectInputs.Value.CBC;
+                Alpha = ProspectInputs.Value.Alpha;
+                Wavelengths = ProspectInputs.Value.Wavelengths;
+            }
+
             // Load spectral constants if not provided
             LeafOpticalConsts LeafConstants = LeafOpticalConstants ?? LoadLocalOpticalData();
 
