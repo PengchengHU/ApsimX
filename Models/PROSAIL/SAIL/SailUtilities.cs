@@ -47,18 +47,38 @@ namespace Models.Sail
         /// <summary>
         /// Holds soil spectral data (wavelengths and reflectance).
         /// </summary>
-        public class SoilProperties 
+        public struct SoilOptics 
         {
             /// <summary>
             /// Wavelengths (nm). Should match simulation wavelengths.
             /// </summary>
-            public double[] Wavelength { get; set; } 
+            public Vector<double> Wavelength;
 
             /// <summary>
             /// Soil reflectance spectrum (unitless fraction).
             /// </summary>
-            public double[] Reflectance { get; set; }
+            public Vector<double> Reflectance;
+
+            /// <summary>Dictionary mapping wavelengths to their indices in the Wavelength array (for optimized filtering).</summary>
+            public Dictionary<double, int> WavelengthToIndex;
+
+            /// <summary>
+            /// Initializes a new instance of SoilOptics with default values.
+            /// </summary>
+            public SoilOptics(Vector<double> wavelength, Vector<double> reflectance, Dictionary<double, int> wavelengthToIndex)
+            {
+                Wavelength = wavelength;
+                Reflectance = reflectance;
+                WavelengthToIndex = wavelengthToIndex ?? new Dictionary<double, int>();
+            }
+
+            /// <summary>
+            /// Indicates whether this LeafOptics object holds data.
+            /// Returns false if Wavelength or Reflectance is null.
+            /// </summary>
+            public readonly bool HasValue => Wavelength != null && Reflectance != null && WavelengthToIndex != null;
         }
+
 
         /// <summary>
         /// Represents the result of the Campbell or Dladgen function for Leaf Inclination Distribution (LIDF).
@@ -326,7 +346,8 @@ namespace Models.Sail
         /// <param name="albedoRangeMin">Minimum wavelength (nm) for albedo integration (default 400).</param>
         /// <param name="albedoRangeMax">Maximum wavelength (nm) for albedo integration (default 2400).</param>
         /// <returns>Broadband albedo value (unitless fraction) over the specified range.</returns>
-        public static double ComputeAlbedo(double[] rsdstar, double[] rddstar, double tts, SpecAtmSensor specAtmSensor, double albedoRangeMin = 400, double albedoRangeMax = 2400)
+        public static double ComputeAlbedo(double[] rsdstar, double[] rddstar, double tts, 
+            SpecAtmSensor specAtmSensor, double albedoRangeMin = 400, double albedoRangeMax = 2400)
         {
             // Direct / Diffuse Light Calculation
             double[] Es = specAtmSensor.DirectLight;
@@ -1124,11 +1145,11 @@ namespace Models.Sail
         /// <param name="leafConstants">PROSPECT leaf optical constants object (must contain Wavelength vector).</param>
         /// <param name="soilProperties">Soil spectral properties object (must contain Wavelength array).</param>
         /// <param name="specAtm">Atmosphere spectral properties object (must contain Wavelength array).</param>
-        public static void CheckSpectralSampling(LeafOpticalConsts leafConstants, SoilProperties soilProperties, SpecAtmSensor specAtm)
+        public static void CheckSpectralSampling(LeafOpticalConsts leafConstants, SoilOptics soilProperties, SpecAtmSensor specAtm)
         {
             // Extract wavelength arrays
             double[] lambdaLeafConstants = leafConstants.Wavelength?.ToArray();
-            double[] lambdaSoil = soilProperties?.Wavelength;
+            double[] lambdaSoil = soilProperties.Wavelength.ToArray();
             double[] lambdaAtm = specAtm?.Wavelength;
 
             // Check if any wavelength array is null
@@ -1264,18 +1285,8 @@ namespace Models.Sail
             try
             {
                 // Call the Prospect method from ProspectCore
-                greenLOP = ProspectCore.Prospect(
-                    LeafOpticalConstants: leafOpticalConstants,
-                    N: greenIn.N,
-                    CAB: greenIn.CAB,
-                    CAR: greenIn.CAR,
-                    ANT: greenIn.ANT,
-                    BROWN: greenIn.BROWN,
-                    EWT: greenIn.EWT,
-                    LMA: greenIn.LMA,
-                    PROT: greenIn.PROT,
-                    CBC: greenIn.CBC,
-                    Alpha: greenIn.Alpha);
+                greenLOP = ProspectCore.Prospect(ProspectInputs: greenIn,
+                    LeafOpticalConstants: leafOpticalConstants);
             }
             catch (Exception ex) // Catch potential errors during PROSPECT run
             {
@@ -1330,18 +1341,9 @@ namespace Models.Sail
                             try
                             {
                                 // Call ProspectCore.Prospect for the brown leaf parameters
-                                finalBrownLOP = ProspectCore.Prospect(
-                                     LeafOpticalConstants: leafOpticalConstants, // Use same spectral constants
-                                     N: brownIn.N, 
-                                     CAB: brownIn.CAB, 
-                                     CAR: brownIn.CAR, 
-                                     ANT: brownIn.ANT,
-                                     BROWN: brownIn.BROWN, 
-                                     EWT: brownIn.EWT, 
-                                     LMA: brownIn.LMA,
-                                     PROT: brownIn.PROT, 
-                                     CBC: brownIn.CBC, 
-                                     Alpha: brownIn.Alpha);
+                                finalBrownLOP = ProspectCore.Prospect(ProspectInputs: brownIn,
+                                     LeafOpticalConstants: leafOpticalConstants // Use same spectral constants
+                                );
                             }
                             catch (Exception ex) // Catch potential errors during PROSPECT run
                             {
