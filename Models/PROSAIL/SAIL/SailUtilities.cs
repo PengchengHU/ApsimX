@@ -196,7 +196,8 @@ namespace Models.Sail
         /// </summary>
         /// <remarks>
         /// The direct and diffuse light components are combined using the approach from:
-        /// Francois et al. (2002) Conversion of 400-1100 nm vegetation albedo measurements into total shortwave broadband albedo using a canopy radiative transfer model, Agronomie.
+        /// Francois et al. (2002) Conversion of 400-1100 nm vegetation albedo measurements into total shortwave broadband albedo
+        ///     using a canopy radiative transfer model, Agronomie.
         /// Es = direct irradiance, Ed = diffuse irradiance.
         /// </remarks>
         /// <param name="rdot">Hemispherical-directional reflectance factor (R_o) spectrum from SAIL.</param>
@@ -272,7 +273,8 @@ namespace Models.Sail
         /// <param name="parRangeMin">Minimum wavelength (nm) for PAR integration (default 400).</param>
         /// <param name="parRangeMax">Maximum wavelength (nm) for PAR integration (default 700).</param>
         /// <returns>Fraction of Absorbed Photosynthetically Active Radiation (fAPAR, unitless).</returns>
-        public static double ComputeFAPAR(double[] abs_dir, double[] abs_hem, double tts, SpecAtmSensor specAtmSensor, double parRangeMin = 400, double parRangeMax = 700)
+        public static double ComputeFAPAR(double[] abs_dir, double[] abs_hem, double tts, 
+            SpecAtmSensor specAtmSensor, double parRangeMin = 400, double parRangeMax = 700)
         {
             // Direct / Diffuse Light Calculation
             double[] Es = specAtmSensor.DirectLight;

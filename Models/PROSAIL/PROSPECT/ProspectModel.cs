@@ -245,7 +245,7 @@ namespace Models.Prospect
             WriteMessage(LogLevel.Info, "ProspectModel: Simulation commencing.");
             try
             {
-                cachedOpticalConstants = ProspectCore.LoadLocalOpticalData();
+                cachedOpticalConstants = LoadLocalLeafOpticalData();
                 WriteMessage(LogLevel.Info, $"ProspectModel: Leaf optical constants loaded, Wavelengths count: {cachedOpticalConstants.Value.Wavelength.Count}.");
             }
             catch (Exception ex)

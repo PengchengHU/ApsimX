@@ -10,6 +10,10 @@ using Models.Sail;
 using APSIM.Shared.Utilities;
 using static Models.Prospect.ProspectCore;
 using static Models.Sail.SailUtilities;
+using static Models.Prospect.ProsailCore;
+using APSIM.Shared.APSoil;
+using MathNet.Numerics;
+using MathNet.Numerics.LinearAlgebra;
 
 namespace UnitTests
 {
@@ -47,7 +51,7 @@ namespace UnitTests
         }
 
         // Helper class for JSON deserialization
-        private class SpecSoilDataJson
+        private class WetDrySoilOpticalDataJason
         {
             /// <summary>
             /// Wavelengths (nm). Should match simulation wavelengths.
@@ -104,22 +108,35 @@ namespace UnitTests
         }
 
         // Helper to create simple soil properties
-        private static SoilProperties CreateSampleSoil(string DefaultSpecSoilDataPath)
+        private static SoilOptics CreateSampleSoil(double psoil = 0.5)
         {
-            string json = File.ReadAllText(DefaultSpecSoilDataPath);
-            var soilData = JsonConvert.DeserializeObject<SpecSoilDataJson>(json);
-
-            return new SoilProperties
+            WetDrySoilReflectance wetDrySoilReflectance = LoadLocalWetDrySoilOpticalData();
+            // Create the wavelength-to-index mapping for speeding up the subset of the specified wavelengths
+            var wavelengthToIndex = new Dictionary<double, int>();
+            for (int i = 0; i < wetDrySoilReflectance.Wavelength.Count; i++)
             {
-                Wavelength = soilData.Wavelength,
-                Reflectance = soilData.Wet_Soil
+                wavelengthToIndex[wetDrySoilReflectance.Wavelength[i]] = i;
+            }
+
+            // Calculate the weighted reflectance vector
+            Vector<double> weightedReflectance = psoil * wetDrySoilReflectance.ReflectanceDry +
+                                                 (1 - psoil) * wetDrySoilReflectance.ReflectanceWet;
+
+            SoilOptics soilOpticalData;
+            soilOpticalData = new SoilOptics
+            {
+                Wavelength = wetDrySoilReflectance.Wavelength,
+                Reflectance = weightedReflectance,
+                WavelengthToIndex = wavelengthToIndex
             };
+
+            return soilOpticalData;
         }
 
         // Helper to create sample PROSPECT leaf optical constants
         private static LeafOpticalConsts CreateSampleLeafOpticalConstants()
         {
-            var constants = LoadLocalOpticalData();
+            var constants = LoadLocalLeafOpticalData();
             return constants;
         }
 
@@ -579,7 +596,7 @@ namespace UnitTests
         {
             //double[] lambda = { 400, 500, 600 };
             var leafOpticalConstants = CreateSampleLeafOpticalConstants();
-            var soil = CreateSampleSoil(DefaultSpecSoilDataPath);
+            var soil = CreateSampleSoil();
             var atm = CreateSampleAtm(DefaultSpecATMDataPath);
             Assert.DoesNotThrow(() => CheckSpectralSampling(leafOpticalConstants, soil, atm));
         }
@@ -590,7 +607,7 @@ namespace UnitTests
             //double[] lambda1 = { 400, 500, 600 }; 
             //double[] lambda2 = { 400, 500 };
             var leafOpticalConstants = CreateSampleLeafOpticalConstants();
-            var soil = CreateSampleSoil(DefaultSpecSoilDataPath); 
+            var soil = CreateSampleSoil(); 
             var atm = CreateSampleAtm(DefaultSpecATMDataPath);
             Assert.Throws<ArgumentException>(() => CheckSpectralSampling(leafOpticalConstants, soil, atm));
         }
@@ -601,7 +618,7 @@ namespace UnitTests
             //double[] lambda1 = { 400, 500, 600 }; 
             //double[] lambda2 = { 400, 501, 600 };
             var leafOpticalConstants = CreateSampleLeafOpticalConstants();
-            var soil = CreateSampleSoil(DefaultSpecSoilDataPath); 
+            var soil = CreateSampleSoil(); 
             var atm = CreateSampleAtm(DefaultSpecATMDataPath);
             Assert.Throws<ArgumentException>(() => CheckSpectralSampling(leafOpticalConstants, soil, atm));
         }

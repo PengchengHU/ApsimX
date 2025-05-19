@@ -37,38 +37,38 @@ namespace Models.Sail
         /// <param name="tts">Sun zenith angle (degrees).</param>
         /// <param name="tto">Observer zenith angle (degrees).</param>
         /// <param name="psi">Relative azimuth angle between sun and observer (degrees).</param>
-        /// <param name="soilProperties">Soil reflectance properties.</param>
+        /// <param name="soilOptics">Soil reflectance properties.</param>
         /// <returns>A SailResult object containing calculated reflectance factors, fCover, and absorptance.</returns>
         /// <exception cref="ArgumentNullException">Thrown if leafOptics or soilProperties are null.</exception>
         /// <exception cref="ArgumentException">Thrown if input array lengths mismatch.</exception>
         public static SailResult FourSAIL(LeafOptics leafOptics, int typeLidf, double lidfA, double? lidfB,
                                  double lai, double q, double tts, double tto, double psi,
-                                 SoilProperties soilProperties)
+                                 SoilOptics soilOptics)
         {
             if (!leafOptics.HasValue)
             {
                 throw new ArgumentNullException(nameof(leafOptics));
             }
-            if (soilProperties == null)
+            if (!soilOptics.HasValue)
             {
-                throw new ArgumentNullException(nameof(soilProperties));
+                throw new ArgumentNullException(nameof(soilOptics));
             }
-            if (leafOptics.Reflectance == null || leafOptics.Transmittance == null || soilProperties.Reflectance == null) 
+            if (leafOptics.Reflectance == null || leafOptics.Transmittance == null || soilOptics.Reflectance == null) 
             {
                 throw new ArgumentException("Reflectance/Transmittance arrays in leafOptics and soilProperties cannot be null.");
             }
 
-            if (leafOptics.Reflectance.Length != leafOptics.Transmittance.Length || leafOptics.Reflectance.Length != soilProperties.Reflectance.Length) 
+            if (leafOptics.Reflectance.Length != leafOptics.Transmittance.Length || leafOptics.Reflectance.Length != soilOptics.Reflectance.Count) 
             {
                 throw new ArgumentException("Input reflectance/transmittance arrays must have the same length.");
             }                
 
-            // ############################ #
-            // #	LEAF OPTICAL PROPERTIES	##
-            // ############################ #
+            // ########################################################################### #
+            // #	                 LEAF OPTICAL PROPERTIES	                           #
+            // ########################################################################### #
             double[] rho = leafOptics.Reflectance; // leaf reflectance
             double[] tau = leafOptics.Transmittance; // leaf transmittance
-            double[] rsoil = soilProperties.Reflectance; // soil reflectance
+            double[] rsoil = soilOptics.Reflectance.ToArray(); // soil reflectance
             int nLambda = rho.Length; // Number of spectral bands
 
             // Pre-allocate result arrays
@@ -470,7 +470,7 @@ namespace Models.Sail
         /// <param name="tts">Sun zenith angle (degrees).</param>
         /// <param name="tto">Observer zenith angle (degrees).</param>
         /// <param name="psi">Relative azimuth angle between sun and observer (degrees).</param>
-        /// <param name="soilProperties">Soil reflectance properties (assumed Lambertian).</param>
+        /// <param name="soilOptics">Soil reflectance properties (assumed Lambertian).</param>
         /// <param name="fractionBrown">Fraction of brown leaf area (0-1).</param>
         /// <param name="diss">Layer dissociation factor (0-1).</param>
         /// <param name="cv">Vertical crown cover percentage (0-1).</param>
@@ -480,7 +480,7 @@ namespace Models.Sail
         /// <exception cref="ArgumentException">Thrown if input array lengths mismatch or parameters are invalid.</exception>
         public static SailResult FourSAIL2(LeafOptics leafGreen, LeafOptics leafBrown,
                                   int typeLidf, double lidfA, double? lidfB, double lai,
-                                  double q, double tts, double tto, double psi, SoilProperties soilProperties,
+                                  double q, double tts, double tto, double psi, SoilOptics soilOptics,
                                   double fractionBrown, double diss, double cv, double zeta)
         {
             // --- Input Validation ---
@@ -492,13 +492,13 @@ namespace Models.Sail
             {
                 throw new ArgumentNullException(nameof(leafBrown));
             }
-            if (soilProperties == null)
+            if (!soilOptics.HasValue)
             {
-                throw new ArgumentNullException(nameof(soilProperties));
+                throw new ArgumentNullException(nameof(soilOptics));
             }
             if (leafGreen.Reflectance == null || leafGreen.Transmittance == null ||
                 leafBrown.Reflectance == null || leafBrown.Transmittance == null ||
-                soilProperties.Reflectance == null)
+                soilOptics.Reflectance == null)
             {
                 throw new ArgumentException("Reflectance/Transmittance arrays in leafOptics and soilProperties cannot be null.");
             }                
@@ -506,7 +506,7 @@ namespace Models.Sail
             int nLambda = leafGreen.Reflectance.Length;
             if (leafGreen.Transmittance.Length != nLambda ||
                 leafBrown.Reflectance.Length != nLambda || leafBrown.Transmittance.Length != nLambda ||
-                soilProperties.Reflectance.Length != nLambda)
+                soilOptics.Reflectance.Count != nLambda)
             {
                 throw new ArgumentException("Input reflectance/transmittance arrays must have the same length.");
             }
@@ -529,7 +529,7 @@ namespace Models.Sail
             }
 
             // Initialization
-            double[] rsoil = soilProperties.Reflectance; // Soil reflectance (Lambertian assumption)
+            double[] rsoil = soilOptics.Reflectance.ToArray(); // Soil reflectance (Lambertian assumption)
                                                          // Non-Lambertian soil (placeholders, same as Lambertian in this R code version)
             double[] rddsoil = rsoil;
             double[] rdosoil = rsoil;

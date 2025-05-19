@@ -21,7 +21,7 @@ namespace Models.Functions
     /// thresholds of the most sensitive period around flowering when sensitivity equals 1. The same function of sensitivity applies to both frost and heat stress but with different 
     /// parameterizations.</para><br/>
     /// <para>The values of the parameters of the damage function are estimated by linking the frost- and heat-limited yield (i.e., obtained by applying the damage function to 
-    /// APSIM-simulated yields) and the corresponding field yields.Currently, the damage function was parameterized for canola and wheat, and it will be available for barley soon.</para><br/>
+    /// APSIM-simulated yields) and the corresponding field yields. Currently, the damage function was parameterized for canola and wheat, and it will be available for barley soon.</para><br/>
     /// <strong>Model usage</strong>: <para>Add the <em>FrostHeatDamgeFunctions</em> model under the specific Plant model (i.e., Canola or Wheat model) via the interface</para><br/>
     /// <strong>Model output</strong>: <para>The output variables include 
     /// <list type="bullet"> 
