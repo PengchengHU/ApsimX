@@ -167,6 +167,13 @@ namespace Models.Functions
         [Description("End of sensitive period")]
         public double HeatEndSensitiveGS { get; set; }
 
+        /// <summary>Effect of rainfall</summary>
+        [Separator("Effect of rainfall")]
+
+        // <summary>Increased percentage of frost damage</summary>
+        [Description("Factor of rainfall effect, 1 means no effect, <1 means decreased effect and >1 mean increased effect")]
+        public double RainfallEffect { get; set; }
+
 
         // Internal variables
         /// <summary>Overall remainng ratio after frost events.</summary>
@@ -503,6 +510,14 @@ namespace Models.Functions
             
             // Daily actual yield reduction by a frost event
             FrostReductionRatio = FrostPotentialReductionRatio * FrostSensitivity;
+
+            // Effect of rainfall on frost damage
+            double YesterdayRainfall = (Weather.YesterdaysMetData == null) ? Weather.Rain : Weather.YesterdaysMetData.Rain;
+            if (YesterdayRainfall < 10)
+            {
+                FrostReductionRatio *= RainfallEffect;
+            }
+
             // Count frost events
             if (FrostReductionRatio > 0)
             {
