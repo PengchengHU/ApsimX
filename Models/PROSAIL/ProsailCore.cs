@@ -9,11 +9,9 @@ using static Models.Sail.SailUtilities;
 using static Models.Prospect.ProspectCore;
 using MathNet.Numerics;
 using MathNet.Numerics.LinearAlgebra;
-using static Models.Prospect.ProsailCore;
 
 
-
-namespace Models.Prospect
+namespace Models.Prosail
 {
     /// <summary>
     /// Implements the PRO4SAIL model combining PROSPECT and SAIL for canopy reflectance simulation.
@@ -140,7 +138,7 @@ namespace Models.Prospect
             }
             else if (psoil.HasValue && psoil.Value > 0 && psoil.Value < 1) // if no soil optical data provided, use psoil to calculate 
             {
-                WetDrySoilReflectance wetDrySoilReflectance = LoadLocalWetDrySoilOpticalData();
+                WetDrySoilReflectance wetDrySoilReflectance = LoadLocalWetDrySoilOpticalData(DefaultSoilOpticalDataPath);
                 // Create the wavelength-to-index mapping for speeding up the subset of the specified wavelengths
                 var wavelengthToIndex = new Dictionary<double, int>();
                 for (int i = 0; i < wetDrySoilReflectance.Wavelength.Count; i++)
@@ -171,7 +169,7 @@ namespace Models.Prospect
                 {
                     if (!soilOpticalData.WavelengthToIndex.ContainsKey(w))
                     {
-                        throw new ArgumentException($"Wavelength {w} nm is not in the soil optical data wavelengths.");
+                        throw new ArgumentException($"Wavelength {w} nm is not in the wavelengths of soil optical data.");
                     }
                 }
 
@@ -249,17 +247,16 @@ namespace Models.Prospect
         /// <summary>
         /// Load spectral data of wet and dry soil from a local JSON file
         /// </summary>
-        public static WetDrySoilReflectance LoadLocalWetDrySoilOpticalData()
+        public static WetDrySoilReflectance LoadLocalWetDrySoilOpticalData(string SoilOpticalDataPath)
         {
-            string path = DefaultSoilOpticalDataPath;
-            if (!File.Exists(path))
+            if (!File.Exists(SoilOpticalDataPath))
             {
-                throw new FileNotFoundException($"Soil optical data file not found at {path}. Please provide a valid SoilOptics or ensure the file exists.");
+                throw new FileNotFoundException($"Soil optical data file not found at {SoilOpticalDataPath}. Please provide a valid SoilOptics or ensure the file exists.");
             }
 
             try
             {
-                string json = File.ReadAllText(path);
+                string json = File.ReadAllText(SoilOpticalDataPath);
                 var OpticalData = JsonConvert.DeserializeObject<WetDrySoilOpticalDataJason>(json);
 
                 return new WetDrySoilReflectance
@@ -271,7 +268,7 @@ namespace Models.Prospect
             }
             catch (Exception ex)
             {
-                throw new Exception($"Failed to load soil optical data from {DefaultSoilOpticalDataPath}: {ex.Message}", ex);
+                throw new Exception($"Failed to load soil optical data from {SoilOpticalDataPath}: {ex.Message}", ex);
             }
         }
 
