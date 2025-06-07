@@ -1,4 +1,3 @@
-
 #--------------------------------------------------------------------------------------------------#
 # Author: Pengcheng Hu (hupc23@gmail.com)
 # Date: Tue Apr 29 15:39:25 2025
@@ -37,7 +36,10 @@ outputJsonPath <- args[3]
 # Define the path to the core SAIL functions script
 # Assumes Lib_PROSAIL.R is in the same directory as this wrapper script.
 # Adjust the path if necessary.
-libProsailPath <- file.path(dirname(sys.frame(1)$ofile), "Lib_PROSAIL.R") # Get dir of *this* script
+# libProsailPath <- file.path(dirname(sys.frame(1)$ofile), "Lib_PROSAIL.R") # Get dir of *this* script
+
+scriptDir <- dirname(normalizePath(sub("^--file=", "", grep("^--file=", commandArgs(), value = TRUE)[1])))
+libProsailPath <- file.path(scriptDir, "Lib_PROSAIL.R")
 
 # Check if Lib_PROSAIL.R exists
 if (!file.exists(libProsailPath)) {
@@ -47,13 +49,16 @@ if (!file.exists(libProsailPath)) {
 # Source the core SAIL functions script
 # Sourcing within tryCatch to handle potential errors during sourcing
 sourceSuccessful <- FALSE
-tryCatch({
-  source(libProsailPath)
-  sourceSuccessful <- TRUE
-  cat("Successfully sourced:", libProsailPath, "\n") # Log success
-}, error = function(e) {
-  stop(paste("Error sourcing Lib_PROSAIL.R:", e$message), call. = FALSE)
-})
+tryCatch(
+  {
+    source(libProsailPath)
+    sourceSuccessful <- TRUE
+    cat("Successfully sourced:", libProsailPath, "\n") # Log success
+  },
+  error = function(e) {
+    stop(paste("Error sourcing Lib_PROSAIL.R:", e$message), call. = FALSE)
+  }
+)
 if (!sourceSuccessful) {
   stop("Failed to source Lib_PROSAIL.R. Check script integrity and path.", call. = FALSE)
 }
@@ -69,14 +74,17 @@ if (!file.exists(inputJsonPath)) {
 # Read and parse parameters from the input JSON file
 # simplifyVector = FALSE to preserve list structure for single elements if needed
 # simplifyDataFrame = FALSE might be needed if data frames are passed specifically
-params <- tryCatch({
-  fromJSON(inputJsonPath, simplifyVector = TRUE, simplifyDataFrame = FALSE)
-}, error = function(e) {
-  stop(paste("Error parsing input JSON file:", inputJsonPath, "-", e$message), call. = FALSE)
-})
+params <- tryCatch(
+  {
+    fromJSON(inputJsonPath, simplifyVector = TRUE, simplifyDataFrame = FALSE)
+  },
+  error = function(e) {
+    stop(paste("Error parsing input JSON file:", inputJsonPath, "-", e$message), call. = FALSE)
+  }
+)
 
 cat("Input parameters read for function:", functionName, "\n")
-# print(params) # Optional: Print parameters for debugging
+# print(params)
 
 # --- Special Parameter Handling (if necessary) ---
 # Some R functions might expect specific data types (e.g., data.frame, matrices)
@@ -88,7 +96,7 @@ if (functionName %in% c("Compute_BRF", "Compute_fAPAR", "Compute_albedo") && !is
   # Ensure the structure matches R's expectation (likely list(Direct_Light=..., Diffuse_Light=...))
   # fromJSON usually handles this if C# sends correct structure. Check names:
   expected_names <- c("Direct_Light", "Diffuse_Light", "Wavelength") # Wavelength needed for fAPAR/Albedo range checks
-  if(!all(expected_names %in% names(params$SpecATM_Sensor))) {
+  if (!all(expected_names %in% names(params$SpecATM_Sensor))) {
     warning("SpecATM_Sensor structure in JSON might not match R expectation (Direct_Light, Diffuse_Light, Wavelength).")
   }
   # Ensure vectors are numeric
@@ -114,29 +122,73 @@ if (functionName %in% c("check_SpectralSampling", "adjust_PROSPECT_2_SAIL") && !
 
 # Special handling for adjust_PROSPECT_2_SAIL
 if (functionName == "adjust_PROSPECT_2_SAIL") {
+  
+  # Correct parameter names
+  params$SAILversion <- params$SAILversion
+  #params$SAILversion <- NULL
+  
+  # Ensure proper NULL handling
+  if (is.null(params$brownLOP)) {
+    params$BrownLOP <- NULL
+  } else {
+    params$BrownLOP <- params$brownLOP
+    params$brownLOP <- NULL
+  }
+  
   # ProspectConstants / Spec_Sensor: C# sends SpectralConstants, R expects list with named vectors
   # Rename 'Wavelength' from C# SpectralConstants to 'lambda' for R
   if (!is.null(params$prospectConstants$Wavelength)) {
     params$prospectConstants$lambda <- as.numeric(params$prospectConstants$Wavelength)
     params$prospectConstants$Wavelength <- NULL # Remove original
   }
+  # Rename 'RefractiveIndex' from C# SpectralConstants to 'nrefrac' for R
+  if (!is.null(params$prospectConstants$RefractiveIndex)) {
+    params$prospectConstants$nrefrac <- as.numeric(params$prospectConstants$RefractiveIndex)
+    params$prospectConstants$RefractiveIndex <- NULL # Remove original
+  }
+  # Rename 'Tav90' from C# SpectralConstants to 'calctav_90' for R
+  if (!is.null(params$prospectConstants$Tav90)) {
+    params$prospectConstants$calctav_90 <- as.numeric(params$prospectConstants$Tav90)
+    params$prospectConstants$Tav90 <- NULL # Remove original
+  }
+  # Rename 'Tav40' from C# SpectralConstants to 'calctav_40' for R
+  if (!is.null(params$prospectConstants$Tav40)) {
+    params$prospectConstants$calctav_40 <- as.numeric(params$prospectConstants$Tav40)
+    params$prospectConstants$Tav40 <- NULL # Remove original
+  }
+  # Rename 'SAC_CAB' from C# SpectralConstants to 'SAC_CHL' for R
+  if (!is.null(params$prospectConstants$SAC_CAB)) {
+    params$prospectConstants$SAC_CHL <- as.numeric(params$prospectConstants$SAC_CAB)
+    params$prospectConstants$SAC_CAB <- NULL # Remove original
+  }
+
   # Ensure other fields are numeric vectors (jsonlite usually handles this)
   # Rename parameter itself
   params$Spec_Sensor <- params$prospectConstants
   params$prospectConstants <- NULL
-  
+
   # Input_PROSPECT: C# sends List<ProspectInput>, R expects list or dataframe
   # fromJSON should parse List<Dictionary<string,object>> into R list of lists.
   # Need to ensure names match R expectations (e.g., CHL vs CAB)
   if (!is.null(params$inputProspectList)) {
     params$Input_PROSPECT <- lapply(params$inputProspectList, function(item) {
       # Rename CAB back to CHL if Lib_PROSAIL.R expects CHL
-      if(!is.null(item$CAB)) { item$CHL <- item$CAB; item$CAB <- NULL }
+      if (!is.null(item$CAB)) {
+        item$CHL <- item$CAB
+        item$CAB <- NULL
+      }
       # Ensure N, CAR, EWT etc are numeric
-      item$N <- as.numeric(item$N); item$CHL <- as.numeric(item$CHL); item$CAR <- as.numeric(item$CAR);
-      item$ANT <- as.numeric(item$ANT); item$BROWN <- as.numeric(item$BROWN); item$EWT <- as.numeric(item$EWT);
-      item$LMA <- as.numeric(item$LMA); item$PROT <- as.numeric(item$PROT); item$CBC <- as.numeric(item$CBC);
-      item$alpha <- as.numeric(item$Alpha); item$Alpha <- NULL; # Rename alpha
+      item$N <- as.numeric(item$N)
+      item$CHL <- as.numeric(item$CHL)
+      item$CAR <- as.numeric(item$CAR)
+      item$ANT <- as.numeric(item$ANT)
+      item$BROWN <- as.numeric(item$BROWN)
+      item$EWT <- as.numeric(item$EWT)
+      item$LMA <- as.numeric(item$LMA)
+      item$PROT <- as.numeric(item$PROT)
+      item$CBC <- as.numeric(item$CBC)
+      item$alpha <- as.numeric(item$Alpha)
+      item$Alpha <- NULL # Rename alpha
       return(as.data.frame(item)) # Try converting each item to a 1-row dataframe? Or keep as list?
       # adjust_PROSPECT_2_SAIL uses index [1,], [2,], suggesting dataframe needed.
       # Let's bind rows into a dataframe
@@ -151,25 +203,24 @@ if (functionName == "adjust_PROSPECT_2_SAIL") {
   } else {
     params$Input_PROSPECT <- NULL # Ensure it's NULL if not provided
   }
-  
-  
+
   # BrownLOP: C# sends LeafOptics object or null
-  if (!is.null(params$brownLOP)) {
+  if (!is.null(params$BrownLOP)) {
     # Rename Wavelength to lambda if needed
-    if (!is.null(params$brownLOP$Wavelength)) {
-      params$brownLOP$lambda <- as.numeric(params$brownLOP$Wavelength)
-      params$brownLOP$Wavelength <- NULL
+    if (!is.null(params$BrownLOP$Wavelength)) {
+      params$BrownLOP$lambda <- as.numeric(params$BrownLOP$Wavelength)
+      params$BrownLOP$Wavelength <- NULL
     }
     # Ensure Reflectance/Transmittance are numeric
-    params$brownLOP$Reflectance <- as.numeric(params$brownLOP$Reflectance)
-    params$brownLOP$Transmittance <- as.numeric(params$brownLOP$Transmittance)
+    params$BrownLOP$Reflectance <- as.numeric(params$BrownLOP$Reflectance)
+    params$BrownLOP$Transmittance <- as.numeric(params$BrownLOP$Transmittance)
     # Convert to dataframe? adjust_PROSPECT_2_SAIL seems to expect dataframe via check_BrownLOP
-    params$BrownLOP <- as.data.frame(params$brownLOP)
-    params$brownLOP <- NULL # Remove original
+    params$BrownLOP <- as.data.frame(params$BrownLOP)
+    params$BrownLOP <- NULL # Remove original
   } else {
     params$BrownLOP <- NULL # Ensure NULL is passed if C# sends null
   }
-  
+
   # Rename fraction_brown from C#
   params$fraction_brown <- params$fractionBrown
   params$fractionBrown <- NULL
@@ -186,11 +237,14 @@ if (!exists(functionName, mode = "function")) {
 # Call the specified function with the parsed parameters using do.call
 # Wrap in tryCatch to capture errors during function execution
 cat("Calling R function:", functionName, "\n")
-result <- tryCatch({
-  do.call(functionName, params)
-}, error = function(e) {
-  stop(paste("Error executing R function '", functionName, "': ", e$message), call. = FALSE)
-})
+result <- tryCatch(
+  {
+    do.call(functionName, params)
+  },
+  error = function(e) {
+    stop(paste("Error executing R function '", functionName, "': ", e$message), call. = FALSE)
+  }
+)
 
 cat("R function execution completed.\n")
 
@@ -211,7 +265,7 @@ if (is.data.frame(result)) {
     outputList$GreenLOP_Reflectance <- result$GreenLOP$Reflectance
     outputList$GreenLOP_Transmittance <- result$GreenLOP$Transmittance
     # Handle potentially NULL BrownLOP
-    if(!is.null(result$BrownLOP)) {
+    if (!is.null(result$BrownLOP)) {
       outputList$BrownLOP_Reflectance <- result$BrownLOP$Reflectance
       outputList$BrownLOP_Transmittance <- result$BrownLOP$Transmittance
     } else {
@@ -240,18 +294,21 @@ if (is.data.frame(result)) {
 # Convert the output list to JSON format
 # auto_unbox = TRUE converts single-element vectors to scalars in JSON
 # pretty = TRUE makes the output file more readable (optional)
-outputJson <- toJSON(outputList, auto_unbox = TRUE, pretty = TRUE, digits=10) # Increase digits for precision
+outputJson <- toJSON(outputList, auto_unbox = TRUE, pretty = TRUE, digits = 10) # Increase digits for precision
 
 # Write the JSON result to the specified output file
 # Wrap in tryCatch for file writing errors
 writeSuccessful <- FALSE
-tryCatch({
-  write(outputJson, file = outputJsonPath)
-  writeSuccessful <- TRUE
-  cat("Results successfully written to:", outputJsonPath, "\n")
-}, error = function(e) {
-  stop(paste("Error writing output JSON file:", outputJsonPath, "-", e$message), call. = FALSE)
-})
+tryCatch(
+  {
+    write(outputJson, file = outputJsonPath)
+    writeSuccessful <- TRUE
+    cat("Results successfully written to:", outputJsonPath, "\n")
+  },
+  error = function(e) {
+    stop(paste("Error writing output JSON file:", outputJsonPath, "-", e$message), call. = FALSE)
+  }
+)
 
 if (!writeSuccessful) {
   stop("Failed to write output JSON file.", call. = FALSE)
