@@ -416,6 +416,10 @@ namespace Models.Prospect
             {
                 string json = File.ReadAllText(path);
                 var OpticalData = JsonConvert.DeserializeObject<LeafOpticalDataJason>(json);
+                if(OpticalData == null || OpticalData.Wavelength == null)
+                {
+                    throw new InvalidDataException($"Deserialized OpticalData or its Wavelength array is null from file: {path}");
+                }
 
                 // Create the wavelength-to-index mapping for speeding up the subset of the specified wavelengths
                 var wavelengthToIndex = new Dictionary<double, int>();
