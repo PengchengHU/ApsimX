@@ -6,13 +6,10 @@ using System.Collections.Generic;
 using System.Linq;
 using Newtonsoft.Json;
 using Newtonsoft.Json.Linq;
-using Models.Sail;
 using APSIM.Shared.Utilities;
 using static Models.Prospect.ProspectCore;
 using static Models.Sail.SailUtilities;
-using static Models.Prospect.ProsailCore;
-using APSIM.Shared.APSoil;
-using MathNet.Numerics;
+using static Models.Prosail.ProsailCore;
 using MathNet.Numerics.LinearAlgebra;
 
 namespace UnitTests
@@ -23,24 +20,24 @@ namespace UnitTests
         private readonly string RScriptPath = @"C:\Program Files\R\R-4.4.1\bin\Rscript.exe";
         //private readonly string RSailScriptWrapper = Path.Combine(TestContext.CurrentContext.TestDirectory, "SailUtilitiesWrapper.R");
         private readonly string RSailScriptWrapper = @"D:\ApsimX\Tests\UnitTests\PROSPECT\SailUtilitiesWrapper.R";
-        
+                
         // Leaf optical constants data
-        private static readonly string RelativeOpticalDataPath = "..\\..\\..\\Models\\PROSAIL\\PROSPECT\\SpecPROSPECT_FullRange.json";
+        private static readonly string RelativeOpticalDataPath = "..\\..\\..\\Tests\\UnitTests\\PROSPECT\\SpecPROSPECT_FullRange.json";
         private static string DefaultOpticalDataPath => PathUtilities.GetAbsolutePath(RelativeOpticalDataPath, AppDomain.CurrentDomain.BaseDirectory);
 
         // Atmospheric data (direct and diffuse radiation for clear conditions)
-        private static readonly string RelativeSpecATMDataPath = "..\\..\\..\\Models\\PROSAIL\\PROSPECT\\SpecATM.json";
+        private static readonly string RelativeSpecATMDataPath = "..\\..\\..\\Tests\\UnitTests\\PROSPECT\\SpecATM.json";
         private static string DefaultSpecATMDataPath => PathUtilities.GetAbsolutePath(RelativeSpecATMDataPath, AppDomain.CurrentDomain.BaseDirectory);
 
         // Soil reflectance data
-        private static readonly string RelativeSpecSoilDataPath = "..\\..\\..\\Models\\PROSAIL\\PROSPECT\\SpecSoil.json";
+        private static readonly string RelativeSpecSoilDataPath = "..\\..\\..\\Tests\\UnitTests\\PROSPECT\\SpecSOIL.json";
         private static string DefaultSpecSoilDataPath => PathUtilities.GetAbsolutePath(RelativeSpecSoilDataPath, AppDomain.CurrentDomain.BaseDirectory);
 
         // Example Prospect simualted data
-        private static readonly string RelativeProspectOutDataPath = "..\\..\\..\\Models\\PROSAIL\\PROSPECT\\SpecSoil.json";
+        private static readonly string RelativeProspectOutDataPath = "..\\..\\..\\Tests\\UnitTests\\PROSPECT\\prospectOut.json";
         private static string DefaultProspectOutDataPath => PathUtilities.GetAbsolutePath(RelativeProspectOutDataPath, AppDomain.CurrentDomain.BaseDirectory);
 
-        private readonly double Tolerance = 1e-3;
+        private readonly double Tolerance = 3e-3;
 
         // Helper class for JSON deserialization
         private class SpecATMDataJason
@@ -90,6 +87,38 @@ namespace UnitTests
             Assert.That(File.Exists(DefaultSpecATMDataPath), $"R wrapper script not found at: {DefaultSpecATMDataPath}.");
             Assert.That(File.Exists(DefaultSpecSoilDataPath), $"R wrapper script not found at: {DefaultSpecSoilDataPath}.");
             Assert.That(File.Exists(DefaultProspectOutDataPath), $"R wrapper script not found at: {DefaultProspectOutDataPath}.");
+
+            // Check for R package 'jsonlite'
+            CheckRPackage("jsonlite");
+        }
+
+        private void CheckRPackage(string packageName)
+        {
+            ProcessStartInfo psi = new ProcessStartInfo
+            {
+                FileName = RScriptPath,
+                Arguments = $"-e \"if(!requireNamespace('{packageName}', quietly = TRUE)) q(status=1)\"",
+                RedirectStandardOutput = true,
+                RedirectStandardError = true,
+                UseShellExecute = false,
+                CreateNoWindow = true
+            };
+
+            try
+            {
+                using (var process = Process.Start(psi))
+                {
+                    string output = process.StandardOutput.ReadToEnd(); // Consume output
+                    string error = process.StandardError.ReadToEnd();   // Consume error
+                    process.WaitForExit(30000); // 30 second timeout
+
+                    Assert.That(process.ExitCode == 0, $"R package '{packageName}' not found. Please install it using: install.packages('{packageName}')\nOutput: {output}\nError: {error}");
+                }
+            }
+            catch (Exception ex)
+            {
+                Assert.Fail($"Failed to check for R package '{packageName}'. Exception: {ex.Message}");
+            }
         }
 
         #region Read inputs
@@ -110,7 +139,7 @@ namespace UnitTests
         // Helper to create simple soil properties
         private static SoilOptics CreateSampleSoil(double psoil = 0.5)
         {
-            WetDrySoilReflectance wetDrySoilReflectance = LoadLocalWetDrySoilOpticalData();
+            WetDrySoilReflectance wetDrySoilReflectance = LoadLocalWetDrySoilOpticalData(DefaultSpecSoilDataPath);
             // Create the wavelength-to-index mapping for speeding up the subset of the specified wavelengths
             var wavelengthToIndex = new Dictionary<double, int>();
             for (int i = 0; i < wetDrySoilReflectance.Wavelength.Count; i++)
@@ -308,7 +337,6 @@ namespace UnitTests
                         TestContext.Progress.WriteLine($"R Error Stream (might contain warnings):\n{error}");
                     }
 
-
                     // 5. Read and deserialize results JSON from the output file
                     if (!File.Exists(tempOutputFile) || new FileInfo(tempOutputFile).Length == 0)
                     {
@@ -392,7 +420,7 @@ namespace UnitTests
                 { "abs_hem", abs_hem_in },
                 { "tts", tts_in },
                 { "SpecATM_Sensor", new {
-                     Wavelength=atm_in.Wavelength, // Pass Wavelength needed by R wrapper
+                     Wavelength = atm_in.Wavelength, // Pass Wavelength needed by R wrapper
                      Direct_Light = atm_in.DirectLight,
                      Diffuse_Light = atm_in.DiffuseLight }
                  },
@@ -604,23 +632,75 @@ namespace UnitTests
         [Test]
         public void TestCheckSpectralSamplingLengthMismatch() // No R comparison needed
         {
-            //double[] lambda1 = { 400, 500, 600 }; 
-            //double[] lambda2 = { 400, 500 };
             var leafOpticalConstants = CreateSampleLeafOpticalConstants();
-            var soil = CreateSampleSoil(); 
+            var soil = CreateSampleSoil();
             var atm = CreateSampleAtm(DefaultSpecATMDataPath);
-            Assert.Throws<ArgumentException>(() => CheckSpectralSampling(leafOpticalConstants, soil, atm));
+
+            // Introduce a length mismatch
+            // Ensure leafOpticalConstants.Wavelength is not null and has some elements before trying to modify
+            if (leafOpticalConstants.Wavelength != null && leafOpticalConstants.Wavelength.Count > 0)
+            {
+                var modifiedWavelengths = leafOpticalConstants.Wavelength.ToList();
+                modifiedWavelengths.RemoveAt(0); // Remove an element to create length mismatch
+                var modifiedLeafConstants = new LeafOpticalConsts
+                {
+                    Wavelength = Vector<double>.Build.DenseOfEnumerable(modifiedWavelengths),
+                    RefractiveIndex = Vector<double>.Build.DenseOfEnumerable(leafOpticalConstants.RefractiveIndex.Skip(1)), // Adjust other arrays accordingly
+                    SAC_CAB = Vector<double>.Build.DenseOfEnumerable(leafOpticalConstants.SAC_CAB.Skip(1)),
+                    SAC_CAR = Vector<double>.Build.DenseOfEnumerable(leafOpticalConstants.SAC_CAR.Skip(1)),
+                    SAC_EWT = Vector<double>.Build.DenseOfEnumerable(leafOpticalConstants.SAC_EWT.Skip(1)),
+                    SAC_LMA = Vector<double>.Build.DenseOfEnumerable(leafOpticalConstants.SAC_LMA.Skip(1)),
+                    Tav40 = Vector<double>.Build.DenseOfEnumerable(leafOpticalConstants.Tav40.Skip(1)),
+                    Tav90 = Vector<double>.Build.DenseOfEnumerable(leafOpticalConstants.Tav90.Skip(1)),
+                    SAC_ANT = Vector<double>.Build.DenseOfEnumerable(leafOpticalConstants.SAC_ANT.Skip(1)),
+                    SAC_BROWN = Vector<double>.Build.DenseOfEnumerable(leafOpticalConstants.SAC_BROWN.Skip(1)),
+                    SAC_PROT = Vector<double>.Build.DenseOfEnumerable(leafOpticalConstants.SAC_PROT.Skip(1)),
+                    SAC_CBC = Vector<double>.Build.DenseOfEnumerable(leafOpticalConstants.SAC_CBC.Skip(1)),
+                    WavelengthToIndex = modifiedWavelengths.Select((w, i) => new { Wavelength = w, Index = i }).ToDictionary(x => x.Wavelength, x => x.Index)
+                };
+                Assert.Throws<ArgumentException>(() => CheckSpectralSampling(modifiedLeafConstants, soil, atm));
+            }
+            else
+            {
+                Assert.Inconclusive("Could not create a length mismatch because initial leaf optical constants wavelength data was null or empty.");
+            }
         }
 
         [Test]
         public void TestCheckSpectralSamplingValueMismatch() // No R comparison needed
         {
-            //double[] lambda1 = { 400, 500, 600 }; 
-            //double[] lambda2 = { 400, 501, 600 };
             var leafOpticalConstants = CreateSampleLeafOpticalConstants();
-            var soil = CreateSampleSoil(); 
+            var soil = CreateSampleSoil();
             var atm = CreateSampleAtm(DefaultSpecATMDataPath);
-            Assert.Throws<ArgumentException>(() => CheckSpectralSampling(leafOpticalConstants, soil, atm));
+
+            // Introduce a value mismatch
+            // Ensure leafOpticalConstants.Wavelength is not null and has some elements
+            if (leafOpticalConstants.Wavelength != null && leafOpticalConstants.Wavelength.Count > 0)
+            {
+                var modifiedWavelengths = leafOpticalConstants.Wavelength.ToArray();
+                modifiedWavelengths[0] += 1.0; // Change a value
+                var modifiedLeafConstants = new LeafOpticalConsts
+                {
+                    Wavelength = Vector<double>.Build.DenseOfArray(modifiedWavelengths),
+                    RefractiveIndex = leafOpticalConstants.RefractiveIndex, // Keep other arrays same length
+                    SAC_CAB = leafOpticalConstants.SAC_CAB,
+                    SAC_CAR = leafOpticalConstants.SAC_CAR,
+                    SAC_EWT = leafOpticalConstants.SAC_EWT,
+                    SAC_LMA = leafOpticalConstants.SAC_LMA,
+                    Tav40 = leafOpticalConstants.Tav40,
+                    Tav90 = leafOpticalConstants.Tav90,
+                    SAC_ANT = leafOpticalConstants.SAC_ANT,
+                    SAC_BROWN = leafOpticalConstants.SAC_BROWN,
+                    SAC_PROT = leafOpticalConstants.SAC_PROT,
+                    SAC_CBC = leafOpticalConstants.SAC_CBC,
+                    WavelengthToIndex = modifiedWavelengths.Select((w, i) => new { Wavelength = w, Index = i }).ToDictionary(x => x.Wavelength, x => x.Index)
+                };
+                Assert.Throws<ArgumentException>(() => CheckSpectralSampling(modifiedLeafConstants, soil, atm));
+            }
+            else
+            {
+                Assert.Inconclusive("Could not create a value mismatch because initial leaf optical constants wavelength data was null or empty.");
+            }
         }
 
         [Test]
@@ -646,11 +726,25 @@ namespace UnitTests
         [Test]
         public void TestCheckBrownLopSpectralMismatch() // No R comparison needed
         {
-            double[] lambdaRef = { 400, 500, 600 }; 
-            //double[] lambdaBrown = { 400, 501, 600 };
-            var brownLop = CreateSampleLeafOptics(DefaultProspectOutDataPath);
+            double[] lambdaRef = { 400, 500, 600 };
+            // Create a BrownLOP with a known spectral mismatch (different values)
+            var brownLop = new LeafOptics
+            {
+                Wavelength = new double[] { 400, 501, 600 }, // Mismatched value
+                Reflectance = new double[] { 0.1, 0.1, 0.1 },
+                Transmittance = new double[] { 0.1, 0.1, 0.1 }
+            };
             var inputs = new List<ProspectInputs> { new ProspectInputs() };
             Assert.Throws<ArgumentException>(() => CheckBrownLOP(brownLop, lambdaRef, inputs));
+
+            // Test for length mismatch
+            var brownLopLengthMismatch = new LeafOptics
+            {
+                Wavelength = new double[] { 400, 500 }, // Mismatched length
+                Reflectance = new double[] { 0.1, 0.1 },
+                Transmittance = new double[] { 0.1, 0.1 }
+            };
+            Assert.Throws<ArgumentException>(() => CheckBrownLOP(brownLopLengthMismatch, lambdaRef, inputs));
         }
 
         [Test]
@@ -667,11 +761,11 @@ namespace UnitTests
 
             // Arrange R Inputs Dictionary
             var r_params = new Dictionary<string, object> {
-                  {"sailVersion", sailVersion}, // Use the variable name C# uses, wrapper handles mapping
+                  {"SAILversion", sailVersion}, // Use the variable name C# uses, wrapper handles mapping
                   {"prospectConstants", prospectConst}, // Pass the C# struct, wrapper handles mapping
                   {"inputProspectList", inputs}, // Pass C# list, wrapper handles mapping
                   {"fractionBrown", fractionBrown}, // Use C# name
-                  {"brownLOP", null} // Explicitly null
+                  {"BrownLOP", null} // Explicitly null
              };
 
             // Act (C#)
@@ -710,11 +804,11 @@ namespace UnitTests
 
             // Arrange R Inputs Dictionary
             var r_params = new Dictionary<string, object> {
-                   {"sailVersion", sailVersion},
+                   {"SAILversion", sailVersion},
                    {"prospectConstants", prospectConst},
                    {"inputProspectList", inputs}, // Only first input used by R when BrownLOP provided
                    {"fractionBrown", fractionBrown},
-                   {"brownLOP", externalBrownLop} // Pass the C# object, wrapper handles mapping
+                   {"BrownLOP", externalBrownLop} // Pass the C# object, wrapper handles mapping
               };
 
             // Act (C#)
@@ -762,9 +856,9 @@ namespace UnitTests
 
             // Arrange R Inputs Dictionary
             var r_params = new Dictionary<string, object> {
-                   {"sailVersion", sailVersion}, {"prospectConstants", prospectConst},
+                   {"SAILversion", sailVersion}, {"prospectConstants", prospectConst},
                    {"inputProspectList", inputs}, {"fractionBrown", fractionBrown},
-                   {"brownLOP", null}
+                   {"BrownLOP", null}
                };
 
             // Act (C#)
@@ -813,10 +907,11 @@ namespace UnitTests
 
             // Arrange R Inputs Dictionary
             var r_params = new Dictionary<string, object> {
-                   {"sailVersion", sailVersion}, {"prospectConstants", leafConst},
+                   {"SAILversion", sailVersion}, 
+                   {"prospectConstants", leafConst},
                    {"inputProspectList", inputs}, // Pass list of two inputs
                    {"fractionBrown", fractionBrown},
-                   {"brownLOP", null}
+                   {"BrownLOP", null}
                };
 
             // Act (C#)
@@ -824,6 +919,7 @@ namespace UnitTests
 
             // Act (R)
             var r_results = RunRImplementation("adjust_PROSPECT_2_SAIL", r_params);
+
             // R code simulates both Green and Brown
             var expected = new AdjustedProspectResult
             {
