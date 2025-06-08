@@ -189,11 +189,10 @@ if (functionName == "adjust_PROSPECT_2_SAIL") {
       item$CBC <- as.numeric(item$CBC)
       item$alpha <- as.numeric(item$Alpha)
       item$Alpha <- NULL # Rename alpha
-      return(as.data.frame(item)) # Try converting each item to a 1-row dataframe? Or keep as list?
-      # adjust_PROSPECT_2_SAIL uses index [1,], [2,], suggesting dataframe needed.
-      # Let's bind rows into a dataframe
+      return(as.data.frame(item))
     })
-    # Bind the list of dataframes into a single dataframe
+    
+    # Bind the list of dataframes into a single dataframe as adjust_PROSPECT_2_SAIL uses index [1,], [2,], suggesting dataframe needed.
     if (length(params$Input_PROSPECT) > 0) {
       params$Input_PROSPECT <- do.call(rbind, params$Input_PROSPECT)
     } else {

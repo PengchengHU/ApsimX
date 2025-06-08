@@ -456,7 +456,7 @@ namespace UnitTests
                  { "rddstar", rddstar_in },
                  { "tts", tts_in },
                  { "SpecATM_Sensor", new {
-                      Wavelength=atm_in.Wavelength, // Pass Wavelength needed by R wrapper
+                      Wavelength = atm_in.Wavelength, // Pass Wavelength needed by R wrapper
                       Direct_Light = atm_in.DirectLight,
                       Diffuse_Light = atm_in.DiffuseLight }
                   },
@@ -895,7 +895,6 @@ namespace UnitTests
         {
             // Arrange C# Inputs
             string sailVersion = "4SAIL2";
-            //double[] lambda = { 400, 500, 600 };
             var leafConst = CreateSampleLeafOpticalConstants();
             double[] lambda = leafConst.Wavelength.ToArray();
             var inputs = new List<ProspectInputs> {
@@ -903,7 +902,6 @@ namespace UnitTests
                    new ProspectInputs(cab: 5, car: 1, brown: 0.5) // Brown input
               };
             double fractionBrown = 0.3; // Non-zero fraction
-            //LeafOptics externalBrownLop = null;
 
             // Arrange R Inputs Dictionary
             var r_params = new Dictionary<string, object> {
