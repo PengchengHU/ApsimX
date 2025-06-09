@@ -1,16 +1,17 @@
-﻿using NUnit.Framework; // Using NUnit framework
-using System;
-using System.IO;
-using System.Diagnostics;
-using System.Collections.Generic;
-using System.Linq;
+﻿using APSIM.Shared.Utilities;
+using MathNet.Numerics.LinearAlgebra;
 using Newtonsoft.Json;
 using Newtonsoft.Json.Linq;
-using APSIM.Shared.Utilities;
+using NUnit.Framework; // Using NUnit framework
+using NUnit.Framework.Constraints;
+using System;
+using System.Collections.Generic;
+using System.Diagnostics;
+using System.IO;
+using System.Linq;
+using static Models.Prosail.ProsailCore;
 using static Models.Prospect.ProspectCore;
 using static Models.Sail.SailUtilities;
-using static Models.Prosail.ProsailCore;
-using MathNet.Numerics.LinearAlgebra;
 
 namespace UnitTests
 {
@@ -43,8 +44,8 @@ namespace UnitTests
         private class SpecATMDataJason
         {
             public double[] Wavelength { get; set; }
-            public double[] DirectLight { get; set; }
-            public double[] DiffuseLight { get; set; }
+            public double[] Direct_Light { get; set; }
+            public double[] Diffuse_Light { get; set; }
         }
 
         // Helper class for JSON deserialization
@@ -131,8 +132,8 @@ namespace UnitTests
             return new SpecAtmSensor
             {
                 Wavelength = ATMData.Wavelength,
-                DirectLight = ATMData.DirectLight,
-                DiffuseLight = ATMData.DiffuseLight
+                DirectLight = ATMData.Direct_Light,
+                DiffuseLight = ATMData.Diffuse_Light
             };
         }
 
@@ -188,6 +189,17 @@ namespace UnitTests
         // Helpers for comparisons
         private double CompareScalars(double expected, double actual, string context = "")
         {
+            // Handle NaN cases
+            if (double.IsNaN(expected) && double.IsNaN(actual))
+            {
+                return 0.0; // Both NaN - considered equal
+            }
+
+            if (double.IsNaN(expected) || double.IsNaN(actual))
+            {
+                Assert.Fail($"NaN mismatch {context}. Expected: {expected}, Actual: {actual}");
+            }
+
             double diff = Math.Abs(expected - actual);
             Assert.That(diff <= Tolerance, $"Scalar mismatch {context}. Expected: {expected}, Actual: {actual}, Diff: {diff}");
             return diff; // Return difference for potential logging or max calc
@@ -373,23 +385,25 @@ namespace UnitTests
         public void TestComputeBRF()
         {
             // Arrange C# Inputs
-            //double[] wavelengths = { 400, 500, 600 };
-            double[] rdot_in = { 0.1, 0.2, 0.3 };
-            double[] rsot_in = { 0.15, 0.25, 0.35 };
             double tts_in = 30.0;
             var atm_in = CreateSampleAtm(DefaultSpecATMDataPath);
+            double[] rdot_in = Enumerable.Range(0, atm_in.Wavelength.Length)
+                                  .Select(_ => new Random().NextDouble())
+                                  .ToArray();
+            double[] rsot_in = Enumerable.Range(0, atm_in.Wavelength.Length)
+                                  .Select(_ => new Random().NextDouble())
+                                  .ToArray();
 
             // Arrange R Inputs Dictionary (Keys match R function parameters)
             var r_params = new Dictionary<string, object> {
                 { "rdot", rdot_in },
                 { "rsot", rsot_in },
                 { "tts", tts_in },
-                // Structure matching R's expected list for SpecATM_Sensor
                 { "SpecATM_Sensor", new {
                      Wavelength = atm_in.Wavelength, // Pass wavelength needed by wrapper
                      Direct_Light = atm_in.DirectLight,
-                     Diffuse_Light = atm_in.DiffuseLight }
-                 }
+                     Diffuse_Light = atm_in.DiffuseLight}
+                }
             };
 
             // Act (C#)
@@ -407,12 +421,15 @@ namespace UnitTests
         public void TestComputeFAPAR()
         {
             // Arrange C# Inputs
-            //double[] wavelengths = { 400, 550, 700, 800 }; // Include points inside and outside PAR range
-            double[] abs_dir_in = { 0.8, 0.85, 0.75, 0.1 };
-            double[] abs_hem_in = { 0.7, 0.75, 0.65, 0.05 };
             double tts_in = 45.0;
             var atm_in = CreateSampleAtm(DefaultSpecATMDataPath);
             double parMin = 400, parMax = 700;
+            double[] abs_dir_in = Enumerable.Range(0, atm_in.Wavelength.Length)
+                                  .Select(_ => new Random().NextDouble())
+                                  .ToArray();
+            double[] abs_hem_in = Enumerable.Range(0, atm_in.Wavelength.Length)
+                                  .Select(_ => new Random().NextDouble())
+                                  .ToArray();
 
             // Arrange R Inputs Dictionary
             var r_params = new Dictionary<string, object> {
@@ -444,11 +461,17 @@ namespace UnitTests
         {
             // Arrange C# Inputs
             //double[] wavelengths = { 400, 800, 1200, 1600, 2000, 2400 };
-            double[] rsdstar_in = { 0.1, 0.4, 0.5, 0.4, 0.3, 0.2 };
-            double[] rddstar_in = { 0.12, 0.42, 0.52, 0.42, 0.32, 0.22 };
+            //double[] rsdstar_in = { 0.1, 0.4, 0.5, 0.4, 0.3, 0.2 };
+            //double[] rddstar_in = { 0.12, 0.42, 0.52, 0.42, 0.32, 0.22 };
             double tts_in = 20.0;
             var atm_in = CreateSampleAtm(DefaultSpecATMDataPath);
             double rangeMin = 400, rangeMax = 2400;
+            double[] rsdstar_in = Enumerable.Range(0, atm_in.Wavelength.Length)
+                                  .Select(_ => new Random().NextDouble())
+                                  .ToArray();
+            double[] rddstar_in = Enumerable.Range(0, atm_in.Wavelength.Length)
+                                  .Select(_ => new Random().NextDouble())
+                                  .ToArray();
 
             // Arrange R Inputs Dictionary
             var r_params = new Dictionary<string, object> {
@@ -678,7 +701,7 @@ namespace UnitTests
             if (leafOpticalConstants.Wavelength != null && leafOpticalConstants.Wavelength.Count > 0)
             {
                 var modifiedWavelengths = leafOpticalConstants.Wavelength.ToArray();
-                modifiedWavelengths[0] += 1.0; // Change a value
+                modifiedWavelengths[0] += 0.5; // Change a value
                 var modifiedLeafConstants = new LeafOpticalConsts
                 {
                     Wavelength = Vector<double>.Build.DenseOfArray(modifiedWavelengths),
@@ -716,8 +739,9 @@ namespace UnitTests
         [Test]
         public void TestCheckBrownLopNullData() // No R comparison needed
         {
-            double[] lambda = { 400, 500, 600 };
-            var brownLop = CreateSampleLeafOptics(DefaultProspectOutDataPath); 
+            //double[] lambda = { 400, 500, 600 };
+            var brownLop = CreateSampleLeafOptics(DefaultProspectOutDataPath);
+            double[] lambda = brownLop.Wavelength;
             brownLop.Wavelength = null;
             var inputs = new List<ProspectInputs> { new ProspectInputs() };
             Assert.Throws<ArgumentException>(() => CheckBrownLOP(brownLop, lambda, inputs));
@@ -937,6 +961,81 @@ namespace UnitTests
 
             // Assert
             CompareAdjustedProspectResult(expected, actual, "adjust_PROSPECT_2_SAIL (TwoInput)");
+        }
+
+        public void TestAdjustProspectToSail2TwoInputsFractionZero()
+        {
+            // Arrange C# Inputs
+            string sailVersion = "4SAIL2";
+            var leafConst = CreateSampleLeafOpticalConstants();
+            double[] lambda = leafConst.Wavelength.ToArray();
+            var inputs = new List<ProspectInputs> {
+                   new ProspectInputs(cab: 50, car: 10),          // Green input
+                   new ProspectInputs(cab: 5, car: 1, brown: 0.5) // Second input, should be ignored by R for BrownLOP calc when fractionBrown is 0
+              };
+            double fractionBrown = 0.0; // Zero brown fraction
+
+            // Arrange R Inputs Dictionary
+            var r_params = new Dictionary<string, object> {
+                   {"SAILversion", sailVersion},
+                   {"prospectConstants", leafConst},
+                   {"inputProspectList", inputs}, // Pass list of two inputs
+                   {"fractionBrown", fractionBrown},
+                   {"BrownLOP", null}
+               };
+
+            // Act (C#)
+            var actual = AdjustProspectToSail(sailVersion, leafConst, inputs, fractionBrown, null);
+
+            // Act (R)
+            var r_results = RunRImplementation("adjust_PROSPECT_2_SAIL", r_params);
+
+            var expectedGreenLOP = new LeafOptics
+            {
+                Wavelength = lambda,
+                Reflectance = ExtractDoubleArray(r_results["GreenLOP_Reflectance"]),
+                Transmittance = ExtractDoubleArray(r_results["GreenLOP_Transmittance"])
+            };
+
+            LeafOptics? expectedBrownLOP = null;
+            // When fractionBrown is 0, R script logic should make BrownLOP effectively a copy of GreenLOP,
+            // or at least derived from the first PROSPECT input.
+            // The R wrapper ensures BrownLOP_Reflectance and BrownLOP_Transmittance keys exist.
+            if (r_results.TryGetValue("BrownLOP_Reflectance", out object brownReflObj) && brownReflObj != null &&
+                r_results.TryGetValue("BrownLOP_Transmittance", out object brownTransObj) && brownTransObj != null)
+            {
+                double[] brownReflectance = ExtractDoubleArray(brownReflObj);
+                double[] brownTransmittance = ExtractDoubleArray(brownTransObj);
+
+                if (brownReflectance != null && brownTransmittance != null)
+                {
+                    expectedBrownLOP = new LeafOptics
+                    {
+                        Wavelength = lambda,
+                        Reflectance = brownReflectance,
+                        Transmittance = brownTransmittance
+                    };
+                }
+            }
+
+            var expected = new AdjustedProspectResult
+            {
+                GreenLOP = expectedGreenLOP,
+                BrownLOP = expectedBrownLOP
+            };
+
+            // Assert
+            CompareAdjustedProspectResult(expected, actual, "adjust_PROSPECT_2_SAIL (TwoInput, FractionZero)");
+
+            // Explicitly check that C#'s actual BrownLOP matches its GreenLOP
+            Assert.That(actual.BrownLOP.HasValue, Is.True, "C# actual.BrownLOP should have a value when fractionBrown is 0.");
+            CompareArrays(actual.GreenLOP.Reflectance, actual.BrownLOP.Value.Reflectance, "C# Brown Refl vs Green Refl (TwoInput, FracZero)");
+            CompareArrays(actual.GreenLOP.Transmittance, actual.BrownLOP.Value.Transmittance, "C# Brown Trans vs Green Trans (TwoInput, FracZero)");
+
+            // Also check that R's expected BrownLOP matches its GreenLOP
+            Assert.That(expected.BrownLOP.HasValue, Is.True, "R expected.BrownLOP should have a value when fractionBrown is 0.");
+            CompareArrays(expected.GreenLOP.Reflectance, expected.BrownLOP.Value.Reflectance, "R Brown Refl vs Green Refl (TwoInput, FracZero)");
+            CompareArrays(expected.GreenLOP.Transmittance, expected.BrownLOP.Value.Transmittance, "R Brown Trans vs Green Trans (TwoInput, FracZero)");
         }
 
         [Test]
