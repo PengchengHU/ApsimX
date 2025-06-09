@@ -269,8 +269,8 @@ namespace UnitTests
 
             double diffGreenR = CompareArrays(expected.GreenLOP.Reflectance, actual.GreenLOP.Reflectance, $"GreenLOP Refl {context}");
             double diffGreenT = CompareArrays(expected.GreenLOP.Transmittance, actual.GreenLOP.Transmittance, $"GreenLOP Trans {context}");
+            
             double diffBrownR = 0, diffBrownT = 0;
-
             bool expectBrown = expected.BrownLOP != null && expected.BrownLOP.Value.Reflectance != null;
             bool actualBrown = actual.BrownLOP != null && actual.BrownLOP.Value.Reflectance != null;
 
@@ -943,7 +943,7 @@ namespace UnitTests
             var r_results = RunRImplementation("adjust_PROSPECT_2_SAIL", r_params);
 
             // R code simulates both Green and Brown
-            var expected = new AdjustedProspectResult
+            /*var expected = new AdjustedProspectResult
             {
                 GreenLOP = new LeafOptics
                 {
@@ -957,7 +957,27 @@ namespace UnitTests
                     Reflectance = ExtractDoubleArray(r_results["BrownLOP_Reflectance"]),
                     Transmittance = ExtractDoubleArray(r_results["BrownLOP_Transmittance"])
                 }
+            };*/
+
+            var expected = new AdjustedProspectResult
+            {
+                GreenLOP = new LeafOptics
+                {
+                    Wavelength = lambda,
+                    Reflectance = ExtractDoubleArray(r_results["GreenLOP_Reflectance"]),
+                    Transmittance = ExtractDoubleArray(r_results["GreenLOP_Transmittance"])
+                }
             };
+            // Only include BrownLOP if it exists in results
+            if (r_results.ContainsKey("BrownLOP_Reflectance") && r_results.ContainsKey("BrownLOP_Transmittance"))
+            {
+                expected.BrownLOP = new LeafOptics
+                {
+                    Wavelength = lambda,
+                    Reflectance = ExtractDoubleArray(r_results["BrownLOP_Reflectance"]),
+                    Transmittance = ExtractDoubleArray(r_results["BrownLOP_Transmittance"])
+                };
+            }
 
             // Assert
             CompareAdjustedProspectResult(expected, actual, "adjust_PROSPECT_2_SAIL (TwoInput)");

@@ -16,7 +16,7 @@
 #   A JSON object containing the named results returned by the R function.
 #--------------------------------------------------------------------------------------------------#
 
-# --- Initialization ---
+# Preparation ####
 
 library(jsonlite)
 
@@ -35,9 +35,6 @@ outputJsonPath <- args[3]
 
 # Define the path to the core SAIL functions script
 # Assumes Lib_PROSAIL.R is in the same directory as this wrapper script.
-# Adjust the path if necessary.
-# libProsailPath <- file.path(dirname(sys.frame(1)$ofile), "Lib_PROSAIL.R") # Get dir of *this* script
-
 scriptDir <- dirname(normalizePath(sub("^--file=", "", grep("^--file=", commandArgs(), value = TRUE)[1])))
 libProsailPath <- file.path(scriptDir, "Lib_PROSAIL.R")
 
@@ -63,9 +60,7 @@ if (!sourceSuccessful) {
   stop("Failed to source Lib_PROSAIL.R. Check script integrity and path.", call. = FALSE)
 }
 
-
-# --- Input Processing ---
-
+# Input Processing ####
 # Check if the input JSON file exists
 if (!file.exists(inputJsonPath)) {
   stop(paste("Error: Input JSON file not found at:", inputJsonPath), call. = FALSE)
@@ -84,13 +79,12 @@ params <- tryCatch(
 )
 
 cat("Input parameters read for function:", functionName, "\n")
-# print(params)
 
-# --- Special Parameter Handling (if necessary) ---
+## Special Parameter Handling (if necessary) ####
 # Some R functions might expect specific data types (e.g., data.frame, matrices)
 # Convert parameters if the default JSON parsing isn't sufficient.
 
-# Example: Convert nested lists for spectral data into the expected list structure
+### Convert nested lists for spectral data into the expected list structure ####
 # R list elements often need names (e.g., SpecATM_Sensor$Direct_Light)
 if (functionName %in% c("Compute_BRF", "Compute_fAPAR", "Compute_albedo") && !is.null(params$SpecATM_Sensor)) {
   # Ensure the structure matches R's expectation (likely list(Direct_Light=..., Diffuse_Light=...))
@@ -120,21 +114,10 @@ if (functionName %in% c("check_SpectralSampling", "adjust_PROSPECT_2_SAIL") && !
   }
 }
 
-# Special handling for adjust_PROSPECT_2_SAIL
+### Special handling for adjust_PROSPECT_2_SAIL ####
 if (functionName == "adjust_PROSPECT_2_SAIL") {
   
   # Correct parameter names
-  params$SAILversion <- params$SAILversion
-  #params$SAILversion <- NULL
-  
-  # Ensure proper NULL handling
-  if (is.null(params$brownLOP)) {
-    params$BrownLOP <- NULL
-  } else {
-    params$BrownLOP <- params$brownLOP
-    params$brownLOP <- NULL
-  }
-  
   # ProspectConstants / Spec_Sensor: C# sends SpectralConstants, R expects list with named vectors
   # Rename 'Wavelength' from C# SpectralConstants to 'lambda' for R
   if (!is.null(params$prospectConstants$Wavelength)) {
@@ -162,7 +145,8 @@ if (functionName == "adjust_PROSPECT_2_SAIL") {
     params$prospectConstants$SAC_CAB <- NULL # Remove original
   }
 
-  # Ensure other fields are numeric vectors (jsonlite usually handles this)
+  # WavelengthToIndex is not required in R
+  params$prospectConstants$WavelengthToIndex <- NULL 
   # Rename parameter itself
   params$Spec_Sensor <- params$prospectConstants
   params$prospectConstants <- NULL
@@ -171,6 +155,7 @@ if (functionName == "adjust_PROSPECT_2_SAIL") {
   # fromJSON should parse List<Dictionary<string,object>> into R list of lists.
   # Need to ensure names match R expectations (e.g., CHL vs CAB)
   if (!is.null(params$inputProspectList)) {
+    # Try converting each item to a 1-row dataframe
     params$Input_PROSPECT <- lapply(params$inputProspectList, function(item) {
       # Rename CAB back to CHL if Lib_PROSAIL.R expects CHL
       if (!is.null(item$CAB)) {
@@ -188,10 +173,11 @@ if (functionName == "adjust_PROSPECT_2_SAIL") {
       item$PROT <- as.numeric(item$PROT)
       item$CBC <- as.numeric(item$CBC)
       item$alpha <- as.numeric(item$Alpha)
-      item$Alpha <- NULL # Rename alpha
-      return(as.data.frame(item)) # Try converting each item to a 1-row dataframe? Or keep as list?
-      # adjust_PROSPECT_2_SAIL uses index [1,], [2,], suggesting dataframe needed.
+      item$Alpha <- NULL # Remove original
+      item$Wavelengths <- NULL # Wavelengths is not required by R
+      return(as.data.frame(item)) 
     })
+    # adjust_PROSPECT_2_SAIL uses index [1,], [2,], suggesting dataframe needed
     # Bind the list of dataframes into a single dataframe 
     if (length(params$Input_PROSPECT) > 0) {
       params$Input_PROSPECT <- do.call(rbind, params$Input_PROSPECT)
@@ -205,29 +191,30 @@ if (functionName == "adjust_PROSPECT_2_SAIL") {
 
   # BrownLOP: C# sends LeafOptics object or null
   if (!is.null(params$BrownLOP)) {
-    # Rename Wavelength to lambda if needed
+    # Rename Wavelength to wvl
     if (!is.null(params$BrownLOP$Wavelength)) {
-      params$BrownLOP$lambda <- as.numeric(params$BrownLOP$Wavelength)
-      params$BrownLOP$Wavelength <- NULL
+      params$BrownLOP$wvl <- as.numeric(params$BrownLOP$Wavelength)
+      params$BrownLOP$Wavelength <- NULL # Remove original C# param name
     }
     # Ensure Reflectance/Transmittance are numeric
     params$BrownLOP$Reflectance <- as.numeric(params$BrownLOP$Reflectance)
     params$BrownLOP$Transmittance <- as.numeric(params$BrownLOP$Transmittance)
     # Convert to dataframe? adjust_PROSPECT_2_SAIL seems to expect dataframe via check_BrownLOP
     params$BrownLOP <- as.data.frame(params$BrownLOP)
-    params$BrownLOP <- NULL # Remove original
   } else {
     params$BrownLOP <- NULL # Ensure NULL is passed if C# sends null
   }
 
+  # HasValue is not required by R
+  params$BrownLOP$HasValue <- NULL
+  
   # Rename fraction_brown from C#
   params$fraction_brown <- params$fractionBrown
-  params$fractionBrown <- NULL
+  params$fractionBrown <- NULL # Remove original
 }
 
 
-# --- Function Execution ---
-
+# Function Execution ####
 # Check if the target function exists in the sourced environment
 if (!exists(functionName, mode = "function")) {
   stop(paste("Error: Function '", functionName, "' not found in Lib_PROSAIL.R."), call. = FALSE)
@@ -244,10 +231,9 @@ result <- tryCatch(
     stop(paste("Error executing R function '", functionName, "': ", e$message), call. = FALSE)
   }
 )
-
 cat("R function execution completed.\n")
 
-# --- Result Formatting ---
+# Result Formatting ####
 
 # Format the result into a named list suitable for JSON output
 outputList <- list()
@@ -288,7 +274,7 @@ if (is.data.frame(result)) {
   outputList$result <- result # Store raw result
 }
 
-# --- Output Generation ---
+# Output Generation ####
 
 # Convert the output list to JSON format
 # auto_unbox = TRUE converts single-element vectors to scalars in JSON
