@@ -200,9 +200,9 @@ namespace Models.Sail
         ///     using a canopy radiative transfer model, Agronomie.
         /// Es = direct irradiance, Ed = diffuse irradiance.
         /// </remarks>
-        /// <param name="rdot">Hemispherical-directional reflectance factor (R_o) spectrum from SAIL.</param>
-        /// <param name="rsot">Bi-directional reflectance factor (R_so) spectrum from SAIL.</param>
-        /// <param name="tts">Solar zenith angle (degrees).</param>
+        /// <param name="rdot">Hemispherical-directional reflectance factor (R_o) spectrum from SAIL. Array with one value per wavelength.</param>
+        /// <param name="rsot">Bi-directional reflectance factor (R_so) spectrum from SAIL. Array with value per wavelength.</param>
+        /// <param name="tts">Solar zenith angle (degrees). Single value used for all wavelengths.</param>
         /// <param name="specAtmSensor">Atmospheric data containing DirectLight (Es) and DiffuseLight (Ed) spectra.</param>
         /// <returns>Bidirectional reflectance factor (BRF) spectrum.</returns>
         public static double[] ComputeBRF(double[] rdot, double[] rsot, double tts, SpecAtmSensor specAtmSensor)
@@ -214,7 +214,7 @@ namespace Models.Sail
             // Input validation: Ensure all spectral arrays have the same length
             if (rdot.Length != rsot.Length || rdot.Length != Es.Length || rdot.Length != Ed.Length)
             {
-                throw new ArgumentException("Compute_BRF: Input arrays (rdot, rsot, Es, Ed) must have the same length.");
+                throw new ArgumentException("ComputeBRF: Input arrays (rdot, rsot, Es, Ed) must have the same length.");
             }
 
             // Convert angles to radians
@@ -284,7 +284,7 @@ namespace Models.Sail
             // Input validation
             if (abs_dir.Length != abs_hem.Length || abs_dir.Length != Es.Length || abs_dir.Length != Ed.Length || abs_dir.Length != lambda.Length)
             {
-                throw new ArgumentException("Compute_fAPAR: Input arrays must have the same length.");
+                throw new ArgumentException("ComputeFAPAR: Input arrays must have the same length.");
             }
 
             // Calculate skyl factor as in Compute_BRF
@@ -359,7 +359,7 @@ namespace Models.Sail
             // Input validation
             if (rsdstar.Length != rddstar.Length || rsdstar.Length != Es.Length || rsdstar.Length != Ed.Length || rsdstar.Length != lambda.Length)
             {
-                throw new ArgumentException("Compute_albedo: Input arrays must have the same length.");
+                throw new ArgumentException("ComputeAlbedo: Input arrays must have the same length.");
             }
 
             // Calculate skyl factor
@@ -944,6 +944,12 @@ namespace Models.Sail
         /// <returns>Result of the J2 function.</returns>
         public static double Jfunc2(double k, double l, double t)
         {
+            // Early return for t = 0 case
+            if (Math.Abs(t) < 1e-15)  // Using machine epsilon tolerance
+            {
+                return 0.0;
+            }
+
             // Calculate the sum k+l
             double sum_kl = k + l;
             double Jout; // Result
@@ -952,13 +958,17 @@ namespace Models.Sail
             if (Math.Abs(sum_kl) < 1e-9)
             {
                 // Use L'Hopital's rule limit: t*exp(-(sum_kl)*t) -> t
-                Jout = t;
+                //Jout = t;
+                Console.WriteLine($"Warning: k + l ≈ 0 ({sum_kl:E3}). Return NaN");
+                return double.NaN;
             }
             // Handle small exponent case using Taylor expansion exp(-x) ≈ 1 - x
             else if (Math.Abs(sum_kl * t) < 1e-6)
             {
                 // (1 - (1 - sum_kl*t)) / sum_kl = sum_kl*t / sum_kl = t
-                Jout = t;
+                //Jout = t;
+                Console.WriteLine($"Warning: sum_kl * tl ≈ 0 ({sum_kl * t:E3}). Return NaN");
+                return double.NaN;
             }
             else // Standard calculation
             {
@@ -1157,7 +1167,7 @@ namespace Models.Sail
             // Check if any wavelength array is null
             if (lambdaLeafConstants == null || lambdaSoil == null || lambdaAtm == null)
             {
-                throw new ArgumentNullException("check_SpectralSampling: One or more spectral wavelength arrays are null.");
+                throw new ArgumentNullException("CheckSpectralSampling: One or more spectral wavelength arrays are null.");
             }
 
             // Get lengths
@@ -1177,7 +1187,7 @@ namespace Models.Sail
 
             if (lambdaLeafConstants == null || lambdaSoil == null || lambdaAtm == null)
             {
-                throw new ArgumentNullException("check_SpectralSampling: One or more spectral wavelength arrays are null.");
+                throw new ArgumentNullException("CheckSpectralSampling: One or more spectral wavelength arrays are null.");
             }
                 
             if (lambdaLeafConstants.Length != lambdaSoil.Length || lambdaLeafConstants.Length != lambdaAtm.Length)
@@ -1214,13 +1224,19 @@ namespace Models.Sail
         /// <param name="inputProspectList">A list of ProspectInput parameters (used only to check count for warning message).</param>
         public static void CheckBrownLOP(LeafOptics? brownLOP, double[] referenceLambda, List<ProspectInputs> inputProspectList)
         {
+            // Check wavelength immediately if brownLOP has value
+            if (brownLOP.HasValue && brownLOP.Value.Wavelength == null)
+            {
+                throw new ArgumentException("Wavelength cannot be null", nameof(brownLOP));
+            }
+
             // Only perform checks if a BrownLOP object was actually passed in and has value
             if (brownLOP.HasValue && brownLOP.Value.HasValue)
             {
                 // Check spectral domain matching against the reference simulation wavelengths
                 if (referenceLambda == null)
                 {
-                    throw new ArgumentNullException(nameof(referenceLambda), "check_BrownLOP: Reference lambda array cannot be null.");
+                    throw new ArgumentNullException(nameof(referenceLambda), "CheckBrownLOP: Reference lambda array cannot be null.");
                 }
 
                 // Compare lengths and values of wavelength arrays
