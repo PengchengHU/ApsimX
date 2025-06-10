@@ -10,8 +10,8 @@ using System.Diagnostics;
 using System.IO;
 using System.Linq;
 using static Models.Prosail.ProsailCore;
-using static Models.Prospect.ProspectCore;
-using static Models.Sail.SailUtilities;
+using static Models.PROSAIL.PROSPECT.ProspectCore;
+using static Models.PROSAIL.SAIL.SailUtilities;
 
 namespace UnitTests.PROSAIL
 {

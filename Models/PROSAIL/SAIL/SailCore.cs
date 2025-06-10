@@ -9,11 +9,11 @@ using MathNet.Numerics.IntegralTransforms;
 using Newtonsoft.Json;
 using Models.Core;
 using APSIM.Shared.Utilities;
-using static Models.Sail.SailUtilities;
-using static Models.Prospect.ProspectCore;
+using static Models.PROSAIL.SAIL.SailUtilities;
+using static Models.PROSAIL.PROSPECT.ProspectCore;
 
 
-namespace Models.Sail
+namespace Models.PROSAIL.Sail
 {
     /// <summary>
     /// Implements the core 4SAIL and 4SAIL2 canopy reflectance models.

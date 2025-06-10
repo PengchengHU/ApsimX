@@ -6,8 +6,7 @@ using System.Collections.Generic;
 using System.Linq;
 using MathNet.Numerics.LinearAlgebra;
 using Newtonsoft.Json;
-using Models.Prospect;
-using static Models.Prospect.ProspectCore;
+using static Models.PROSAIL.PROSPECT.ProspectCore;
 
 namespace UnitTests.PROSAIL
 {

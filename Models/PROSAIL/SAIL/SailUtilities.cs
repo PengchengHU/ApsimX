@@ -1,13 +1,13 @@
 ﻿using System;
 using System.Collections.Generic;
 using System.Linq;
-using MathNet.Numerics; 
+using MathNet.Numerics;
 using MathNet.Numerics.LinearAlgebra;
-using Models.Prospect;
-using static Models.Prospect.ProspectCore;
+using Models.PROSAIL.PROSPECT;
+using static Models.PROSAIL.PROSPECT.ProspectCore;
 
 // Define the namespace for SAIL utilities
-namespace Models.Sail
+namespace Models.PROSAIL.SAIL
 {
     /// <summary>
     /// Provides static utility functions for SAIL model calculations.
@@ -310,7 +310,7 @@ namespace Models.Sail
                     double incident = directIrradiance + diffuseIrradiance;
 
                     // Calculate absorbed energy: AbsDirect * DirectIrrad + AbsHemispheric * DiffuseIrrad
-                    double absorbed = (abs_dir[i] * directIrradiance + abs_hem[i] * diffuseIrradiance);
+                    double absorbed = abs_dir[i] * directIrradiance + abs_hem[i] * diffuseIrradiance;
 
                     // Accumulate total incident and absorbed PAR energy
                     // NOTE: This performs simple summation, assuming equal spectral bandwidths.
@@ -385,7 +385,7 @@ namespace Models.Sail
                     double incident = directIrradiance + diffuseIrradiance;
 
                     // Calculate reflected energy: Rsd* * DirectIrrad + Rdd* * DiffuseIrrad
-                    double reflected = (rsdstar[i] * directIrradiance + rddstar[i] * diffuseIrradiance);
+                    double reflected = rsdstar[i] * directIrradiance + rddstar[i] * diffuseIrradiance;
 
                     // Accumulate totals
                     // NOTE: Simple summation assumes equal spectral bandwidths. Integration needed for non-uniform sampling.
@@ -481,7 +481,7 @@ namespace Models.Sail
                 double denom = 1.0 - rinf2 * e2; // 1 - rinf^2 * exp(-2*m*LAI)
                 if (Math.Abs(denom) < 1e-12)
                 {
-                    denom = (denom >= 0 ? 1e-12 : -1e-12);
+                    denom = denom >= 0 ? 1e-12 : -1e-12;
                 }
 
                 // Calculate J functions using helper methods
@@ -512,12 +512,12 @@ namespace Models.Sail
                 // Avoid division by zero
                 if (Math.Abs(g1_denom) < 1e-12)
                 {
-                    g1_denom = (g1_denom >= 0 ? 1e-12 : -1e-12);
+                    g1_denom = g1_denom >= 0 ? 1e-12 : -1e-12;
                 }
 
                 if (Math.Abs(g2_denom) < 1e-12)
                 {
-                    g2_denom = (g2_denom >= 0 ? 1e-12 : -1e-12);
+                    g2_denom = g2_denom >= 0 ? 1e-12 : -1e-12;
                 }
 
                 // Intermediate g1, g2 terms
@@ -532,9 +532,9 @@ namespace Models.Sail
                 double T3 = (rdo[i] * Qs + tdo[i] * Ps) * rinf;
 
                 // Denominator for Rsod
-                double rsod_denom = (1.0 - rinf2);
+                double rsod_denom = 1.0 - rinf2;
                 // Avoid division by zero
-                if (Math.Abs(rsod_denom) < 1e-12) rsod_denom = (rsod_denom >= 0 ? 1e-12 : -1e-12);
+                if (Math.Abs(rsod_denom) < 1e-12) rsod_denom = rsod_denom >= 0 ? 1e-12 : -1e-12;
 
                 // Multiple scattering contribution to bidirectional canopy reflectance
                 rsod[i] = (T1 + T2 - T3) / rsod_denom;
@@ -596,8 +596,8 @@ namespace Models.Sail
                 double denom_rtp = 1.0 + amsig * J4_val;
                 double denom_rtm = 1.0 + apsig * J4_val;
                 // Avoid division by zero
-                if (Math.Abs(denom_rtp) < 1e-12) denom_rtp = (denom_rtp >= 0 ? 1e-12 : -1e-12);
-                if (Math.Abs(denom_rtm) < 1e-12) denom_rtm = (denom_rtm >= 0 ? 1e-12 : -1e-12);
+                if (Math.Abs(denom_rtp) < 1e-12) denom_rtp = denom_rtp >= 0 ? 1e-12 : -1e-12;
+                if (Math.Abs(denom_rtm) < 1e-12) denom_rtm = denom_rtm >= 0 ? 1e-12 : -1e-12;
 
                 // Intermediate rtp, rtm terms
                 double rtp = (1.0 - amsig * J4_val) / denom_rtp;
@@ -611,8 +611,8 @@ namespace Models.Sail
                 // Denominators involving extinction coefficients and m
                 double dns = ks * ks - mi * mi; // k_sun^2 - m^2
                 double dno = ko * ko - mi * mi; // k_obs^2 - m^2
-                if (Math.Abs(dns) < 1e-12) dns = (dns >= 0 ? 1e-12 : -1e-12);
-                if (Math.Abs(dno) < 1e-12) dno = (dno >= 0 ? 1e-12 : -1e-12);
+                if (Math.Abs(dns) < 1e-12) dns = dns >= 0 ? 1e-12 : -1e-12;
+                if (Math.Abs(dno) < 1e-12) dno = dno >= 0 ? 1e-12 : -1e-12;
 
                 // Intermediate coefficients cks, cko, dks, dko (Verhoef notation?)
                 double cks = (sbi * (ks - atti) - sfi * sigbi) / dns;
@@ -623,7 +623,7 @@ namespace Models.Sail
                 // Intermediate bidirectional coefficient ho
                 double ko_plus_ks = ko + ks;
                 // Avoid division by zero
-                if (Math.Abs(ko_plus_ks) < 1e-12) ko_plus_ks = (ko_plus_ks >= 0 ? 1e-12 : -1e-12);
+                if (Math.Abs(ko_plus_ks) < 1e-12) ko_plus_ks = ko_plus_ks >= 0 ? 1e-12 : -1e-12;
                 double ho = (sfi * cko + sbi * dko) / ko_plus_ks;
 
                 // Calculate reflectance and transmittance terms using conservative formulae
@@ -678,8 +678,8 @@ namespace Models.Sail
                 // Handle potential tan(90) issues
                 double cos_tl1 = Math.Cos(tl1[i]);
                 double cos_tl2 = Math.Cos(tl2[i]);
-                double tan_tl1 = (Math.Abs(cos_tl1) < 1e-9) ? double.PositiveInfinity : Math.Tan(tl1[i]);
-                double tan_tl2 = (Math.Abs(cos_tl2) < 1e-9) ? double.PositiveInfinity : Math.Tan(tl2[i]);
+                double tan_tl1 = Math.Abs(cos_tl1) < 1e-9 ? double.PositiveInfinity : Math.Tan(tl1[i]);
+                double tan_tl2 = Math.Abs(cos_tl2) < 1e-9 ? double.PositiveInfinity : Math.Tan(tl2[i]);
                 double tan_tl1_sq = tan_tl1 * tan_tl1;
                 double tan_tl2_sq = tan_tl2 * tan_tl2;
 
@@ -687,10 +687,10 @@ namespace Models.Sail
                 double x1, x2;
                 // Avoid division by zero or issues with infinite tan
                 if (double.IsInfinity(tan_tl1_sq)) x1 = 0;
-                else x1 = excent / (Math.Sqrt(1.0 + excent * excent * tan_tl1_sq));
+                else x1 = excent / Math.Sqrt(1.0 + excent * excent * tan_tl1_sq);
 
                 if (double.IsInfinity(tan_tl2_sq)) x2 = 0;
-                else x2 = excent / (Math.Sqrt(1.0 + excent * excent * tan_tl2_sq));
+                else x2 = excent / Math.Sqrt(1.0 + excent * excent * tan_tl2_sq);
 
                 // Check for spherical distribution case (excent == 1)
                 if (Math.Abs(excent - 1.0) < 1e-9)
@@ -729,8 +729,8 @@ namespace Models.Sail
                             // Calculate log terms carefully, avoiding log(<=0)
                             double log_arg1 = x1 + alpx1;
                             double log_arg2 = x2 + alpx2;
-                            double log_term1 = (log_arg1 > 1e-12) ? Math.Log(log_arg1) : Math.Log(1e-12); // Use small positive floor
-                            double log_term2 = (log_arg2 > 1e-12) ? Math.Log(log_arg2) : Math.Log(1e-12);
+                            double log_term1 = log_arg1 > 1e-12 ? Math.Log(log_arg1) : Math.Log(1e-12); // Use small positive floor
+                            double log_term2 = log_arg2 > 1e-12 ? Math.Log(log_arg2) : Math.Log(1e-12);
 
                             // Integrate between bounds
                             dum1 = x1 * alpx1 + alpha2 * log_term1;
@@ -748,8 +748,8 @@ namespace Models.Sail
 
                             // Calculate asin terms carefully, ensuring argument is in [-1, 1]
                             // Avoid division by zero if alpha is zero (shouldn't happen if excent!=1)
-                            double asin_arg1 = (Math.Abs(alpha) < 1e-9) ? 0 : x1 / alpha;
-                            double asin_arg2 = (Math.Abs(alpha) < 1e-9) ? 0 : x2 / alpha;
+                            double asin_arg1 = Math.Abs(alpha) < 1e-9 ? 0 : x1 / alpha;
+                            double asin_arg2 = Math.Abs(alpha) < 1e-9 ? 0 : x2 / alpha;
                             // Clamp argument to valid domain for Asin
                             asin_arg1 = Math.Max(-1.0, Math.Min(1.0, asin_arg1));
                             asin_arg2 = Math.Max(-1.0, Math.Min(1.0, asin_arg2));
@@ -1074,8 +1074,8 @@ namespace Models.Sail
             // Calculate transition angles (beta_s, beta_o)
             // These relate to angles where sun/view crosses the leaf normal plane.
             // Calculate cos(beta_s) and cos(beta_o)
-            double cosbts = (Math.Abs(ss) > 1e-6) ? -cs / ss : 5.0; // Use sentinel > 1 if ss is zero
-            double cosbto = (Math.Abs(so) > 1e-6) ? -co / so : 5.0; // Use sentinel > 1 if so is zero
+            double cosbts = Math.Abs(ss) > 1e-6 ? -cs / ss : 5.0; // Use sentinel > 1 if ss is zero
+            double cosbto = Math.Abs(so) > 1e-6 ? -co / so : 5.0; // Use sentinel > 1 if so is zero
 
             // Determine beta_s and intermediate ds
             double bts, ds;
@@ -1091,7 +1091,7 @@ namespace Models.Sail
                 ds = cs; // Use different intermediate factor ds
             }
             // Calculate Chi_s: Average projection G factor for solar direction
-            double chi_s = (2.0 / PI) * ((bts - PI * 0.5) * cs + Math.Sin(bts) * ss);
+            double chi_s = 2.0 / PI * ((bts - PI * 0.5) * cs + Math.Sin(bts) * ss);
 
             // Determine beta_o and intermediate doo
             double bto, doo;
@@ -1112,7 +1112,7 @@ namespace Models.Sail
                 doo = -co; // R sets doo = -co
             }
             // Calculate Chi_o: Average projection G factor for view direction
-            double chi_o = (2.0 / PI) * ((bto - PI * 0.5) * co + Math.Sin(bto) * so);
+            double chi_o = 2.0 / PI * ((bto - PI * 0.5) * co + Math.Sin(bto) * so);
 
             // Ensure non-negative interception factors (can be slightly negative due to precision)
             chi_s = Math.Max(0.0, chi_s);
@@ -1303,7 +1303,7 @@ namespace Models.Sail
             try
             {
                 // Call the Prospect method from ProspectCore
-                greenLOP = ProspectCore.Prospect(ProspectInputs: greenIn,
+                greenLOP = Prospect(ProspectInputs: greenIn,
                     LeafOpticalConstants: leafOpticalConstants);
             }
             catch (Exception ex) // Catch potential errors during PROSPECT run
@@ -1359,7 +1359,7 @@ namespace Models.Sail
                             try
                             {
                                 // Call ProspectCore.Prospect for the brown leaf parameters
-                                finalBrownLOP = ProspectCore.Prospect(ProspectInputs: brownIn,
+                                finalBrownLOP = Prospect(ProspectInputs: brownIn,
                                      LeafOpticalConstants: leafOpticalConstants // Use same spectral constants
                                 );
                             }
