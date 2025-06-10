@@ -13,33 +13,80 @@ using static Models.Prosail.ProsailCore;
 using static Models.Prospect.ProspectCore;
 using static Models.Sail.SailUtilities;
 
-namespace UnitTests
+namespace UnitTests.PROSAIL
 {
-    [TestFixture] // NUnit attribute for a test class
+    [TestFixture]
     public class SailUtilitiesTests
     {
+        #region setup
         private readonly string RScriptPath = @"C:\Program Files\R\R-4.4.1\bin\Rscript.exe";
-        //private readonly string RSailScriptWrapper = Path.Combine(TestContext.CurrentContext.TestDirectory, "SailUtilitiesWrapper.R");
-        private readonly string RSailScriptWrapper = @"D:\ApsimX\Tests\UnitTests\PROSPECT\SailUtilitiesWrapper.R";
-                
+
+        // SailUtilitiesWrapper.R path
+        private static readonly string RelativeRSailScriptWrapperPath = "..\\..\\..\\Tests\\UnitTests\\PROSAIL\\SailUtilitiesWrapper.R";
+        private static string RSailScriptWrapperPath => PathUtilities.GetAbsolutePath(RelativeRSailScriptWrapperPath, AppDomain.CurrentDomain.BaseDirectory);
+
         // Leaf optical constants data
-        private static readonly string RelativeOpticalDataPath = "..\\..\\..\\Tests\\UnitTests\\PROSPECT\\SpecPROSPECT_FullRange.json";
+        private static readonly string RelativeOpticalDataPath = "..\\..\\..\\Tests\\UnitTests\\PROSAIL\\SpecPROSPECT_FullRange.json";
         private static string DefaultOpticalDataPath => PathUtilities.GetAbsolutePath(RelativeOpticalDataPath, AppDomain.CurrentDomain.BaseDirectory);
 
         // Atmospheric data (direct and diffuse radiation for clear conditions)
-        private static readonly string RelativeSpecATMDataPath = "..\\..\\..\\Tests\\UnitTests\\PROSPECT\\SpecATM.json";
+        private static readonly string RelativeSpecATMDataPath = "..\\..\\..\\Tests\\UnitTests\\PROSAIL\\SpecATM.json";
         private static string DefaultSpecATMDataPath => PathUtilities.GetAbsolutePath(RelativeSpecATMDataPath, AppDomain.CurrentDomain.BaseDirectory);
 
         // Soil reflectance data
-        private static readonly string RelativeSpecSoilDataPath = "..\\..\\..\\Tests\\UnitTests\\PROSPECT\\SpecSOIL.json";
+        private static readonly string RelativeSpecSoilDataPath = "..\\..\\..\\Tests\\UnitTests\\PROSAIL\\SpecSOIL.json";
         private static string DefaultSpecSoilDataPath => PathUtilities.GetAbsolutePath(RelativeSpecSoilDataPath, AppDomain.CurrentDomain.BaseDirectory);
 
         // Example Prospect simualted data
-        private static readonly string RelativeProspectOutDataPath = "..\\..\\..\\Tests\\UnitTests\\PROSPECT\\prospectOut.json";
+        private static readonly string RelativeProspectOutDataPath = "..\\..\\..\\Tests\\UnitTests\\PROSAIL\\prospectOut.json";
         private static string DefaultProspectOutDataPath => PathUtilities.GetAbsolutePath(RelativeProspectOutDataPath, AppDomain.CurrentDomain.BaseDirectory);
 
         private readonly double Tolerance = 3e-3;
+        private void CheckRPackage(string packageName)
+        {
+            ProcessStartInfo psi = new ProcessStartInfo
+            {
+                FileName = RScriptPath,
+                Arguments = $"-e \"if(!requireNamespace('{packageName}', quietly = TRUE)) q(status=1)\"",
+                RedirectStandardOutput = true,
+                RedirectStandardError = true,
+                UseShellExecute = false,
+                CreateNoWindow = true
+            };
 
+            try
+            {
+                using (var process = Process.Start(psi))
+                {
+                    string output = process.StandardOutput.ReadToEnd(); // Consume output
+                    string error = process.StandardError.ReadToEnd();   // Consume error
+                    process.WaitForExit(30000); // 30 second timeout
+
+                    Assert.That(process.ExitCode == 0, $"R package '{packageName}' not found. Please install it using: install.packages('{packageName}')\nOutput: {output}\nError: {error}");
+                }
+            }
+            catch (Exception ex)
+            {
+                Assert.Fail($"Failed to check for R package '{packageName}'. Exception: {ex.Message}");
+            }
+        }
+
+        [OneTimeSetUp]
+        public void CheckRSetup()
+        {
+            Assert.That(File.Exists(RScriptPath), $"Rscript.exe not found at: {RScriptPath}.");
+            Assert.That(File.Exists(RSailScriptWrapperPath), $"R wrapper script not found at: {RSailScriptWrapperPath}.");
+            Assert.That(File.Exists(DefaultOpticalDataPath), $"R wrapper script not found at: {DefaultOpticalDataPath}.");
+            Assert.That(File.Exists(DefaultSpecATMDataPath), $"R wrapper script not found at: {DefaultSpecATMDataPath}.");
+            Assert.That(File.Exists(DefaultSpecSoilDataPath), $"R wrapper script not found at: {DefaultSpecSoilDataPath}.");
+            Assert.That(File.Exists(DefaultProspectOutDataPath), $"R wrapper script not found at: {DefaultProspectOutDataPath}.");
+
+            // Check for R package 'jsonlite'
+            CheckRPackage("jsonlite");
+        }        
+        #endregion
+
+        #region Read inputs
         // Helper class for JSON deserialization
         private class SpecATMDataJason
         {
@@ -77,52 +124,8 @@ namespace UnitTests
 
             /// <summary> Leaf transmittance spectrum (unitless fraction).</summary>
             public double[] Transmittance { get; set; }
-        }
+        }        
 
-        [OneTimeSetUp]
-        public void CheckRSetup()
-        {
-            Assert.That(File.Exists(RScriptPath), $"Rscript.exe not found at: {RScriptPath}.");
-            Assert.That(File.Exists(RSailScriptWrapper), $"R wrapper script not found at: {RSailScriptWrapper}.");
-            Assert.That(File.Exists(DefaultOpticalDataPath), $"R wrapper script not found at: {DefaultOpticalDataPath}.");
-            Assert.That(File.Exists(DefaultSpecATMDataPath), $"R wrapper script not found at: {DefaultSpecATMDataPath}.");
-            Assert.That(File.Exists(DefaultSpecSoilDataPath), $"R wrapper script not found at: {DefaultSpecSoilDataPath}.");
-            Assert.That(File.Exists(DefaultProspectOutDataPath), $"R wrapper script not found at: {DefaultProspectOutDataPath}.");
-
-            // Check for R package 'jsonlite'
-            CheckRPackage("jsonlite");
-        }
-
-        private void CheckRPackage(string packageName)
-        {
-            ProcessStartInfo psi = new ProcessStartInfo
-            {
-                FileName = RScriptPath,
-                Arguments = $"-e \"if(!requireNamespace('{packageName}', quietly = TRUE)) q(status=1)\"",
-                RedirectStandardOutput = true,
-                RedirectStandardError = true,
-                UseShellExecute = false,
-                CreateNoWindow = true
-            };
-
-            try
-            {
-                using (var process = Process.Start(psi))
-                {
-                    string output = process.StandardOutput.ReadToEnd(); // Consume output
-                    string error = process.StandardError.ReadToEnd();   // Consume error
-                    process.WaitForExit(30000); // 30 second timeout
-
-                    Assert.That(process.ExitCode == 0, $"R package '{packageName}' not found. Please install it using: install.packages('{packageName}')\nOutput: {output}\nError: {error}");
-                }
-            }
-            catch (Exception ex)
-            {
-                Assert.Fail($"Failed to check for R package '{packageName}'. Exception: {ex.Message}");
-            }
-        }
-
-        #region Read inputs
         // Helper to load atmospheric data
         private static SpecAtmSensor CreateSampleAtm(string DefaultSpecATMDataPath)
         {
@@ -184,7 +187,7 @@ namespace UnitTests
         }
         #endregion
 
-        #region Helpers
+        #region Helpers for comparisons
 
         // Helpers for comparisons
         private double CompareScalars(double expected, double actual, string context = "")
@@ -228,8 +231,7 @@ namespace UnitTests
             if (rResultValue == null) return null;
             if (rResultValue is double[] dArray) return dArray;
             if (rResultValue is JArray jArray) return jArray.ToObject<double[]>();
-            if (rResultValue is List<object> objList) return objList.Select(Convert.ToDouble).ToArray(); // Handle list of numbers
-                                                                                                         // Add other potential conversions if needed
+            if (rResultValue is List<object> objList) return objList.Select(Convert.ToDouble).ToArray(); 
             throw new InvalidCastException($"Cannot convert R result value of type {rResultValue.GetType()} to double[]. Value: {rResultValue}");
         }
 
@@ -306,7 +308,7 @@ namespace UnitTests
 
                 // 2. Construct Rscript arguments
                 // Ensure paths with spaces are quoted properly
-                string arguments = $"\"{RSailScriptWrapper}\" \"{functionName}\" \"{tempInputFile}\" \"{tempOutputFile}\"";
+                string arguments = $"\"{RSailScriptWrapperPath}\" \"{functionName}\" \"{tempInputFile}\" \"{tempOutputFile}\"";
 
                 // 3. Configure and start the R process
                 ProcessStartInfo psi = new ProcessStartInfo
@@ -323,8 +325,7 @@ namespace UnitTests
 
                 using (var process = Process.Start(psi))
                 {
-                    // Read output/error streams asynchronously or synchronously
-                    // Synchronous read (simpler for tests, might hang if R produces excessive output)
+                    // Read output/error streams
                     string output = process.StandardOutput.ReadToEnd();
                     string error = process.StandardError.ReadToEnd();
 
@@ -333,7 +334,7 @@ namespace UnitTests
 
                     if (!exited)
                     {
-                        try { process.Kill(); } catch { } // Try to kill runaway process
+                        try { process.Kill(); } catch { }
                         Assert.Fail($"R process timed out for function {functionName}. Output: {output} Error: {error}");
                     }
 
@@ -379,7 +380,7 @@ namespace UnitTests
         #endregion
 
 
-        // Test methods in SailUtilities
+        #region Test methods in SailUtilities
 
         [Test]
         public void TestComputeBRF()
@@ -400,7 +401,7 @@ namespace UnitTests
                 { "rsot", rsot_in },
                 { "tts", tts_in },
                 { "SpecATM_Sensor", new {
-                     Wavelength = atm_in.Wavelength, // Pass wavelength needed by wrapper
+                     atm_in.Wavelength, // Pass wavelength needed by the wrapper
                      Direct_Light = atm_in.DirectLight,
                      Diffuse_Light = atm_in.DiffuseLight}
                 }
@@ -411,7 +412,7 @@ namespace UnitTests
 
             // Act (R)
             var r_results = RunRImplementation("Compute_BRF", r_params);
-            double[] expected_brf = ExtractDoubleArray(r_results["BRF"]); // Extract result using helper
+            double[] expected_brf = ExtractDoubleArray(r_results["BRF"]);
 
             // Assert
             CompareArrays(expected_brf, actual_brf, "Compute_BRF");
@@ -437,7 +438,7 @@ namespace UnitTests
                 { "abs_hem", abs_hem_in },
                 { "tts", tts_in },
                 { "SpecATM_Sensor", new {
-                     Wavelength = atm_in.Wavelength, // Pass Wavelength needed by R wrapper
+                     atm_in.Wavelength, // Pass Wavelength needed by R wrapper
                      Direct_Light = atm_in.DirectLight,
                      Diffuse_Light = atm_in.DiffuseLight }
                  },
@@ -460,9 +461,6 @@ namespace UnitTests
         public void TestComputeAlbedo()
         {
             // Arrange C# Inputs
-            //double[] wavelengths = { 400, 800, 1200, 1600, 2000, 2400 };
-            //double[] rsdstar_in = { 0.1, 0.4, 0.5, 0.4, 0.3, 0.2 };
-            //double[] rddstar_in = { 0.12, 0.42, 0.52, 0.42, 0.32, 0.22 };
             double tts_in = 20.0;
             var atm_in = CreateSampleAtm(DefaultSpecATMDataPath);
             double rangeMin = 400, rangeMax = 2400;
@@ -479,7 +477,7 @@ namespace UnitTests
                  { "rddstar", rddstar_in },
                  { "tts", tts_in },
                  { "SpecATM_Sensor", new {
-                      Wavelength = atm_in.Wavelength, // Pass Wavelength needed by R wrapper
+                      atm_in.Wavelength, // Pass Wavelength needed by R wrapper
                       Direct_Light = atm_in.DirectLight,
                       Diffuse_Light = atm_in.DiffuseLight }
                   },
@@ -575,27 +573,27 @@ namespace UnitTests
         [TestCase(1.0, 0.5, 1.0, TestName = "Jfunc1_Normal")]
         [TestCase(0.5, 0.5, 1.0, TestName = "Jfunc1_Singularity")]
         [TestCase(0.001, 0.0005, 1.0, TestName = "Jfunc1_SmallDiff")]
-        [TestCase(0.5, 0.5, 0.0, TestName = "Jfunc1_ZeroT")] // Added test case
+        [TestCase(0.5, 0.5, 0.0, TestName = "Jfunc1_ZeroT")]
         public void TestJfunc1(double k, double l, double t)
         {
             var r_params = new Dictionary<string, object> { { "k", k }, { "l", l }, { "t", t } };
             double actual = Jfunc1(k, l, t);
             var r_results = RunRImplementation("Jfunc1", r_params);
-            double expected = Convert.ToDouble(r_results["Jfunc1"]); // Wrapper names result after function
+            double expected = Convert.ToDouble(r_results["Jfunc1"]);
             CompareScalars(expected, actual, $"Jfunc1(k={k},l={l},t={t})");
         }
 
         [TestCase(1.0, 0.5, 1.0, TestName = "Jfunc2_Normal")]
         [TestCase(0.5, -0.5, 1.0, TestName = "Jfunc2_SumZero")]
-        [TestCase(0.001, -0.001, 0.001, TestName = "Jfunc2_SumZeroSmallT")] // Added test case
+        [TestCase(0.001, -0.001, 0.001, TestName = "Jfunc2_SumZeroSmallT")] 
         [TestCase(0.0001, 0.0001, 1.0, TestName = "Jfunc2_SmallSum")]
-        [TestCase(0.5, 0.5, 0.0, TestName = "Jfunc2_ZeroT")] // Added test case
+        [TestCase(0.5, 0.5, 0.0, TestName = "Jfunc2_ZeroT")] 
         public void TestJfunc2(double k, double l, double t)
         {
             var r_params = new Dictionary<string, object> { { "k", k }, { "l", l }, { "t", t } };
             double actual = Jfunc2(k, l, t);
             var r_results = RunRImplementation("Jfunc2", r_params);
-            double expected = Convert.ToDouble(r_results["Jfunc2"]); // Wrapper names result after function
+            double expected = Convert.ToDouble(r_results["Jfunc2"]);
             CompareScalars(expected, actual, $"Jfunc2(k={k},l={l},t={t})");
         }
 
@@ -604,13 +602,13 @@ namespace UnitTests
         [TestCase(0.5, 1.0, TestName = "Jfunc4_Normal")]
         [TestCase(0.0001, 1.0, TestName = "Jfunc4_NearZeroM")]
         [TestCase(0.0, 1.0, TestName = "Jfunc4_ZeroM")]
-        [TestCase(0.5, 0.0, TestName = "Jfunc4_ZeroT")] // Added test case
+        [TestCase(0.5, 0.0, TestName = "Jfunc4_ZeroT")]
         public void TestJfunc4_R(double m, double t)
         {
             var r_params = new Dictionary<string, object> { { "m", m }, { "t", t } };
             double actual = Jfunc4(m, t);
             var r_results = RunRImplementation("Jfunc4", r_params);
-            double expected = Convert.ToDouble(r_results["Jfunc4"]); // Wrapper names result after function
+            double expected = Convert.ToDouble(r_results["Jfunc4"]);
             CompareScalars(expected, actual, $"Jfunc4(m={m},t={t})");
         }
 
@@ -641,7 +639,6 @@ namespace UnitTests
             CompareVolscattResult(expected, actual, "Volscatt");
         }
 
-        // --- Tests for Check Functions ---
         [Test]
         public void TestCheckSpectralSamplingValid() // No R comparison needed
         {
@@ -660,7 +657,6 @@ namespace UnitTests
             var atm = CreateSampleAtm(DefaultSpecATMDataPath);
 
             // Introduce a length mismatch
-            // Ensure leafOpticalConstants.Wavelength is not null and has some elements before trying to modify
             if (leafOpticalConstants.Wavelength != null && leafOpticalConstants.Wavelength.Count > 0)
             {
                 var modifiedWavelengths = leafOpticalConstants.Wavelength.ToList();
@@ -701,7 +697,7 @@ namespace UnitTests
             if (leafOpticalConstants.Wavelength != null && leafOpticalConstants.Wavelength.Count > 0)
             {
                 var modifiedWavelengths = leafOpticalConstants.Wavelength.ToArray();
-                modifiedWavelengths[0] += 0.5; // Change a value
+                modifiedWavelengths[0] += 0.5; // Change a value, should not a integer
                 var modifiedLeafConstants = new LeafOpticalConsts
                 {
                     Wavelength = Vector<double>.Build.DenseOfArray(modifiedWavelengths),
@@ -729,7 +725,6 @@ namespace UnitTests
         [Test]
         public void TestCheckBrownLopValid() // No R comparison needed
         {
-            //double[] lambda = { 400, 500, 600 };
             var brownLop = CreateSampleLeafOptics(DefaultProspectOutDataPath);
             double[] lambda = brownLop.Wavelength;
             var inputs = new List<ProspectInputs> { new ProspectInputs() };
@@ -739,7 +734,6 @@ namespace UnitTests
         [Test]
         public void TestCheckBrownLopNullData() // No R comparison needed
         {
-            //double[] lambda = { 400, 500, 600 };
             var brownLop = CreateSampleLeafOptics(DefaultProspectOutDataPath);
             double[] lambda = brownLop.Wavelength;
             brownLop.Wavelength = null;
@@ -859,10 +853,6 @@ namespace UnitTests
 
             // Assert
             CompareAdjustedProspectResult(expected, actual, "adjust_PROSPECT_2_SAIL (ExtBrown)");
-            // Also verify C# returned the *exact* external object reference if that's the expected behavior (it should)
-            // This check is subtle: Did adjust_PROSPECT_2_SAIL just pass the reference through?
-            // Assert.AreSame(externalBrownLop, actual.BrownLOP, "External BrownLOP object reference should be preserved.");
-            // However, the R comparison is the primary goal.
         }
 
         [Test]
@@ -876,7 +866,6 @@ namespace UnitTests
                    new ProspectInputs(cab: 50, car: 10) // Green input
               };
             double fractionBrown = 0.0; // Zero brown fraction
-            //LeafOptics externalBrownLop;
 
             // Arrange R Inputs Dictionary
             var r_params = new Dictionary<string, object> {
@@ -890,7 +879,7 @@ namespace UnitTests
 
             // Act (R)
             var r_results = RunRImplementation("adjust_PROSPECT_2_SAIL", r_params);
-            // R code sets BrownLOP <- GreenLOP in this case
+
             var expected = new AdjustedProspectResult
             {
                 GreenLOP = new LeafOptics
@@ -943,22 +932,6 @@ namespace UnitTests
             var r_results = RunRImplementation("adjust_PROSPECT_2_SAIL", r_params);
 
             // R code simulates both Green and Brown
-            /*var expected = new AdjustedProspectResult
-            {
-                GreenLOP = new LeafOptics
-                {
-                    Wavelength = lambda,
-                    Reflectance = ExtractDoubleArray(r_results["GreenLOP_Reflectance"]),
-                    Transmittance = ExtractDoubleArray(r_results["GreenLOP_Transmittance"])
-                },
-                BrownLOP = new LeafOptics
-                { // Expect distinct Brown LOP from R
-                    Wavelength = lambda,
-                    Reflectance = ExtractDoubleArray(r_results["BrownLOP_Reflectance"]),
-                    Transmittance = ExtractDoubleArray(r_results["BrownLOP_Transmittance"])
-                }
-            };*/
-
             var expected = new AdjustedProspectResult
             {
                 GreenLOP = new LeafOptics
@@ -983,6 +956,7 @@ namespace UnitTests
             CompareAdjustedProspectResult(expected, actual, "adjust_PROSPECT_2_SAIL (TwoInput)");
         }
 
+        [Test]
         public void TestAdjustProspectToSail2TwoInputsFractionZero()
         {
             // Arrange C# Inputs
@@ -1062,9 +1036,7 @@ namespace UnitTests
         public void TestNonConservativeScattering()
         {
             // Arrange C# Inputs
-            //double[] wavelengths = { 500, 700 }; 
-            //int n = wavelengths.Length;
-            // Example plausible inputs (ensure m > 0.01)
+            // Example inputs (ensure m > 0.01)
             double[] m_in = { 0.1, 0.15 };
             double lai_in = 2.0;
             double[] att_in = { 0.9, 0.85 };
@@ -1109,9 +1081,7 @@ namespace UnitTests
         public void TestConservativeScattering()
         {
             // Arrange C# Inputs
-            //double[] wavelengths = { 500, 700 }; 
-            //int n = wavelengths.Length;
-            // Example plausible inputs (ensure m <= 0.01, often near 0)
+            // Example inputs (ensure m <= 0.01, often near 0)
             double[] m_in = { 0.005, 0.001 };
             double lai_in = 2.0;
             // For near conservative, att ≈ sigb
@@ -1154,4 +1124,6 @@ namespace UnitTests
         }
 
     } // End TestFixture class
-} // End namespace
+}
+#endregion
+// End namespace

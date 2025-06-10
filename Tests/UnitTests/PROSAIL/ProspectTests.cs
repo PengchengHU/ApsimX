@@ -9,14 +9,14 @@ using Newtonsoft.Json;
 using Models.Prospect;
 using static Models.Prospect.ProspectCore;
 
-namespace UnitTests
+namespace UnitTests.PROSAIL
 {
     [TestFixture]
     public class ProspecCoreTests
     {
         private readonly string RScriptPath = @"C:\Program Files\R\R-4.4.1\bin\Rscript.exe";
-        private readonly string RProspectScript = @"D:\ApsimX\Tests\UnitTests\PROSPECT\ProspectImplementation.R";
-        private readonly string TestCasesFile = @"D:\ApsimX\Tests\UnitTests\\PROSPECT\ProspectTestCases.json";
+        private readonly string RProspectScript = @"D:\ApsimX\Tests\UnitTests\PROSAIL\ProspectImplementation.R";
+        private readonly string TestCasesFile = @"D:\ApsimX\Tests\UnitTests\\PROSAIL\ProspectTestCases.json";
         private readonly double Tolerance = 1e-2;
 
         public class ProspectTestCase
@@ -53,7 +53,7 @@ namespace UnitTests
             return JsonConvert.DeserializeObject<List<ProspectTestCase>>(File.ReadAllText(TestCasesFile));
         }
 
-        private LeafOptics RunCSharpImplementation(ProspectTestCase testCase)
+        private static LeafOptics RunCSharpImplementation(ProspectTestCase testCase)
         {
             try
             {
@@ -100,7 +100,7 @@ namespace UnitTests
             }
         }
 
-        private double CompareArrays(double[] a, double[] b)
+        private static double CompareArrays(double[] a, double[] b)
         {
             if (a.Length != b.Length) throw new ArgumentException("Array length mismatch");
             return a.Zip(b, (x, y) => Math.Abs(x - y)).Max();
