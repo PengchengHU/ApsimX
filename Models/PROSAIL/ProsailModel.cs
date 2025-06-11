@@ -1,0 +1,967 @@
+﻿using APSIM.Shared.Utilities;
+using MathNet.Numerics.LinearAlgebra;
+using Microsoft.CodeAnalysis;
+using Models.Core;
+using Models.Functions;
+using Models.PMF;
+using Models.PMF.Organs;
+using Models.Prosail;
+using Models.PROSAIL.PROSPECT;
+using System;
+using System.Collections.Generic;
+using System.Data;
+using System.IO;
+using System.Linq;
+using System.Text;
+using System.Threading;
+using static Models.Prosail.ProsailCore;
+using static Models.PROSAIL.PROSPECT.ProspectCore;
+using static Models.PROSAIL.SAIL.SailUtilities;
+
+namespace Models.PROSAIL
+{
+    /// <summary>
+    /// Model implementing the PROSAIL radiative transfer model for canopy optical properties in APSIM
+    /// with configurable parameter expressions and spectral data output to SQLite
+    /// </summary>
+    [Serializable]
+    [ViewName("UserInterface.Views.PropertyView")]
+    [PresenterName("UserInterface.Presenters.PropertyPresenter")]
+    [ValidParent(ParentType = typeof(Plant))]
+    public class ProsailModel : Model
+    {
+        #region Links to other APSIM Components
+        /// <summary>Link to the clock for daily outputs</summary>
+        [Link]
+        private Clock Clock = null;
+
+        /// <summary>Link to summary file for outputs</summary>
+        [Link]
+        private ISummary Summary = null;
+
+        /// <summary> Link to simulation for file paths and name</summary>
+        [Link]
+        private Simulation Simulation = null;
+
+        /// <summary>
+        /// Link to the parent Plant model to check IsAlive
+        /// </summary>
+        [Link(IsOptional = true)]
+        private Plant ParentPlant = null;
+        #endregion
+
+        #region PROSAIL Input Parameters (Expressions)
+        /// <summary>APSIM-PROSPECT: leaf optics</summary>
+        [Separator("Expressions to link APSIM variables and PROSPECT inputs")]
+
+        // <summary>The expression for N (Leaf structure parameter)</summary>
+        [Description("N - Leaf structure parameter (unitless)")]
+        public string N { get; set; } = "1.5";
+
+        /// <summary>The expression for CAB (Chlorophyll a + b content)</summary>
+        [Description("CAB - Chlorophyll a + b content (μg/cm²)")]
+        public string CAB { get; set; } = "40.0";
+
+        /// <summary>The expression for CAR (Carotenoid content)</summary>
+        [Description("CAR - Carotenoid content (μg/cm²)")]
+        public string CAR { get; set; } = "8.0";
+
+        /// <summary>The expression for EWT (Equivalent Water Thickness)</summary>
+        [Description("EWT or CW - Equivalent Water Thickness or Water depth (cm)")]
+        public string EWT { get; set; } = "0.01";
+
+        /// <summary>The expression for LMA (Leaf Mass per Area)</summary>
+        [Description("LMA or CM - Leaf Mass per Area or Dry matter content (g/cm²)")]
+        public string LMA { get; set; } = "0.008";
+
+        /// <summary>The expression for BROWN (Brown pigment content)</summary>
+        [Description("BROWN - Brown pigment content (unitless)")]
+        public string BROWN { get; set; } = "0.0";
+
+        /// <summary>The expression for ANT (Anthocyanin content)</summary>
+        [Description("ANT - Anthocyanin content (μg/cm²)")]
+        public string ANT { get; set; } = "0.0";
+
+        /// <summary>The expression for PROT (Protein content)</summary>
+        [Description("PROT - Protein content (g/cm²)")]
+        public string PROT { get; set; } = "0.0";
+
+        /// <summary>The expression for CBC (NonProt Carbon-based constituent content)</summary>
+        [Description("CBC - NonProt Carbon-based constituent content (g/cm²)")]
+        public string CBC { get; set; } = "0.0";
+
+        /// <summary>The expression for alpha (Incidence angle in degrees)</summary>
+        [Description("Alpha - Incidence angle in degrees (°}")]
+        public string Alpha { get; set; } = "40.0";
+
+
+        /// <summary>SAIL: Canopy optics </summary>
+        [Separator("Canopy Properties (SAIL)")]
+        // <summary>Expression to evaluate for the simulation name</summary>
+        [Description("Sail version ('4SAIL' or '4SAIL2')")]
+        public string SailVersion { get; set; } = "4SAIL";
+             
+        /// <summary>The expression for Leaf Area Index (LAI)</summary>
+        [Description("LAI - Leaf Area Index (m²/m²)")]
+        public string LAI { get; set; } = "3.0";
+
+        /// <summary>The expression for the Hot Spot parameter (q).</summary>
+        [Description("q - Hot Spot parameter (unitless, 0-1)")]
+        public string HotSpot { get; set; } = "0.1";
+
+        /// <summary>The expression for the LIDF type.</summary>
+        [Description("TypeLidf - LIDF type (1 for Verhoef, 2 for Campbell)")]
+        public string TypeLidf { get; set; } = "2";
+
+        /// <summary>The expression for LIDF parameter 'a'.</summary>
+        [Description("LIDFa - Average leaf slope (TypeLidf=1) or angle (TypeLidf=2)")]
+        public string LIDFa { get; set; } = "60.0";
+
+        /// <summary>The expression for LIDF parameter 'b'.</summary>
+        [Description("LIDFb - Bimodality (TypeLidf=1 only)")]
+        public string LIDFb { get; set; } = "-0.35";
+
+        /// <summary>The expression for the fraction of brown leaf area.</summary>
+        [Description("FractionBrown - Fraction of brown/senesced leaf area (unitless, 0-1)")]
+        public string FractionBrown { get; set; } = "0.0";
+
+        /// <summary>The expression for the layer dissociation factor (diss).</summary>
+        [Description("Diss - Layer dissociation factor for green/brown leaves (unitless, 0-1)")]
+        public string Dissociation { get; set; } = "0.0";
+
+        /// <summary>The expression for the vertical crown cover percentage (cv).</summary>
+        [Description("Cv - Vertical crown cover percentage (unitless, 0-1)")]
+        public string CrownCover { get; set; } = "1.0";
+
+        /// <summary>The expression for the tree shape factor (zeta).</summary>
+        [Description("Zeta - Tree shape factor (crown diameter to height ratio; unitless)")]
+        public string TreeShape { get; set; } = "1.0";
+
+
+        /// <summary>SAIL: Canopy optics </summary>
+        [Separator("Soil reflectance")]
+        // <summary>The expression for the soil brightness parameter (rsoil).</summary>
+        [Description("Path to .Json file containing the data of wet and dry soil reflectance.\nIt must have the Wavelength, Dry_Soil and Wet_Soil lists.\nIf not specificed, a defualt file will be used!")]
+        public string WetDrySoilReflectanceJsonPath { get; set; }
+
+        /// <summary>The expression for the soil brightness parameter (psoil).</summary>
+        [Description("psoil - Dry to Wet soil factor (unitless; 0 for wet, 1 for dry)")]
+        public string Psoil { get; set; } = "0.5";      
+
+        /// <summary>Sun-Observer Geometry</summary>
+        [Separator("Sun-Observer Geometry")]
+        // <summary>The expression for the sun zenith angle (tts).</summary>
+        [Description("TTS - Sun zenith angle in degrees (0-90)")]
+        public string SunZenithAngle { get; set; } = "30.0";
+
+        /// <summary>The expression for the observer zenith angle (tto).</summary>
+        [Description("TTO - Observer zenith angle in degrees (0-90)")]
+        public string ObserverZenithAngle { get; set; } = "0.0";
+
+        /// <summary>The expression for the relative azimuth angle (psi).</summary>
+        [Description("psi - Relative azimuth angle between sun and observer (0-360)")]
+        public string RelativeAzimuthAngle { get; set; } = "0.0";
+        #endregion
+
+        #region Control and Output Settings
+        /// <summary>Control</summary>
+        [Separator("Control the outputs")]
+        // <summary> Spectral range to simulate (start-end in nm)</summary>
+        [Description("Spectral range to simulate in nm supports ranges (e.g., '400-500'), lists (e.g., '400, 500, 600'), and mixed formats (e.g., '400, 500-600, 700')")]
+        public string OutputWavelengthRange { get; set; } = "400-2500";
+
+        /// <summary> Flag to enable daily SQLite database output </summary>
+        [Description("Enable output to SQLite database")]
+        public bool EnableSQLiteOutput { get; set; } = true;
+                
+
+        /// <summary>
+        /// Defines the logging verbosity levels
+        /// </summary>
+        public enum LogLevel
+        {
+            /// <summary>Log only errors</summary>
+            Error,
+            /// <summary>Log errors and warnings</summary>
+            Warning,
+            /// <summary>Log errors, warnings, and informational messages</summary>
+            Info,
+            /// <summary>Log all messages, including debug details</summary>
+            Debug
+        }
+
+        /// <summary>Logging verbosity level</summary>
+        [Description("Logging verbosity level (Error, Warning, Info, Debug)")]
+        public LogLevel LoggingLevel { get; set; } = LogLevel.Info;
+        #endregion
+
+        #region Private Fields and Cached Data
+        // Soil reflectance data
+        private static readonly string RelativeSpecSoilDataPath = "..\\..\\..\\Models\\PROSAIL\\SAIL\\SpecSOIL.json";
+        private static string DefaultSpecSoilDataPath => PathUtilities.GetAbsolutePath(RelativeSpecSoilDataPath, AppDomain.CurrentDomain.BaseDirectory);
+
+        /// <summary>Path to the SQLite database file (relative to simulation directory)</summary>
+        private string ProsailSQLiteDatabasePath;
+
+        /// <summary>The cached leaf spectral constants loaded at simulation start</summary>
+        private LeafOpticalConsts? cachedLeafOpticalConstants = null;
+
+        /// <summary>The cached wet and dry soil reflectance at simulation start</summary>
+        private WetDrySoilReflectance? cachedWetDrySoilReflectance = null;
+
+        /// <summary>Cached PROSAIL results for the current day</summary>
+        private CanopyOptics cachedProsailOutputs = null;
+
+        /// <summary>The date of the last cached results</summary>
+        private DateTime? lastCalculationDate = null;
+
+        /// <summary>Database connection</summary>
+        private SQLite dbConnection = null;
+
+        /// <summary>Current simulation name for database records</summary>
+        private string simulationName = null;
+        
+        /// <summary>Current parameter values after expression evaluation</summary>
+        private Dictionary<string, object> CurrentParameterValues { get; set; } = new Dictionary<string, object>();
+        #endregion
+
+        /*
+        #region Public Output Properties
+        /// <summary>Gets the wavelengths used in the last calculation.</summary>
+        [Description("Wavelengths (nm)")]
+        public double[] Wavelengths => cachedResults?.Wavelengths.ToArray() ?? Array.Empty<double>();
+
+        /// <summary>Bi-directional reflectance (Observer-Direct / Sun-Direct).</summary>
+        [Units("unitless")]
+        [Description("Bi-directional reflectance (rdot)")]
+        public double[] BiDirectionalReflectance => GetResult(r => r.rdot);
+
+        /// <summary>Hemispherical-directional reflectance (Observer-Direct / Sun-Hemispherical).</summary>
+        [Units("unitless")]
+        [Description("Hemispherical-directional reflectance (rsot)")]
+        public double[] HemisphericalDirectionalReflectance => GetResult(r => r.rsot);
+
+        /// <summary>Bi-hemispherical reflectance (Observer-Hemispherical / Sun-Hemispherical).</summary>
+        [Units("unitless")]
+        [Description("Bi-hemispherical reflectance (rddt)")]
+        public double[] BiHemisphericalReflectance => GetResult(r => r.rddt);
+
+        /// <summary>Directional-hemispherical reflectance (Observer-Hemispherical / Sun-Direct).</summary>
+        [Units("unitless")]
+        [Description("Directional-hemispherical reflectance (rsdt)")]
+        public double[] DirectionalHemisphericalReflectance => GetResult(r => r.rsdt);
+        #endregion
+        */
+
+        /// <summary>
+        /// Helper method to write messages based on logging level
+        /// </summary>
+        private void WriteMessage(LogLevel messageLevel, string message)
+        {
+            if ((int)messageLevel <= (int)LoggingLevel)
+            {
+                MessageType messageType = messageLevel switch
+                {
+                    LogLevel.Error => MessageType.Error,
+                    LogLevel.Warning => MessageType.Warning,
+                    _ => MessageType.Information // Info and Debug map to Information
+                };
+                Summary.WriteMessage(this, message, messageType);
+            }
+        }
+
+        #region Event Handlers
+        /// <summary>Called when [simulation commencing].</summary>
+        /// <param name="sender">The sender.</param>
+        /// <param name="e">The <see cref="EventArgs"/> instance containing the event data.</param>
+        [EventSubscribe("Commencing")]
+        private void OnCommencing(object sender, EventArgs e)
+        {
+            WriteMessage(LogLevel.Info, "ProsailModel: Simulation commencing.");
+            // Load leaf optical constants from local file
+            try
+            {
+                cachedLeafOpticalConstants = LoadLocalLeafOpticalData();
+                WriteMessage(LogLevel.Info, $"ProsailModel: Leaf optical constants loaded, Wavelengths count: {cachedLeafOpticalConstants.Value.Wavelength.Count}.");
+            }
+            catch (Exception ex)
+            {
+                WriteMessage(LogLevel.Error, $"ProsailModel: Failed to load leaf optical constants: {ex.Message}");
+                throw; // Halt simulation if data is missing
+            }
+
+            // Load wet and dry soil reflectance data
+            try
+            {
+                if (string.IsNullOrWhiteSpace(WetDrySoilReflectanceJsonPath))
+                {
+                    // Use default soil reflectance data if not specified
+                    cachedWetDrySoilReflectance = LoadWetDrySoilReflectanData(DefaultSpecSoilDataPath);
+                    WriteMessage(LogLevel.Info, "ProsailModel: Using default soil reflectance data.");
+                }
+                else
+                {
+                    cachedWetDrySoilReflectance = LoadWetDrySoilReflectanData(WetDrySoilReflectanceJsonPath);
+                    WriteMessage(LogLevel.Info, $"ProsailModel: Soil reflectance data loaded from {WetDrySoilReflectanceJsonPath}.");
+                }
+            }
+            catch (Exception ex)
+            {
+                WriteMessage(LogLevel.Error, $"ProsailModel: Failed to load wet and dry soil reflectance data: {ex.Message}");
+                throw; // Halt simulation if data is missing
+            }
+
+
+            if (EnableSQLiteOutput)
+            {
+                // Set default ProsailSQLiteDatabasePath based on simulation file name
+                string simulationFileName = Path.GetFileNameWithoutExtension(Simulation.FileName);
+                ProsailSQLiteDatabasePath = $"{simulationFileName}_Prosail.db";
+
+                InitializeDatabase();
+            }
+        }
+
+        /// <summary>Called when [do management calculations].</summary>
+        /// <param name="sender">The sender.</param>
+        /// <param name="e">The <see cref="EventArgs"/> instance containing the event data.</param>
+        [EventSubscribe("EndOfDay")]
+        private void OnDoEndOfDay(object sender, EventArgs e)
+        {
+            if (ParentPlant?.IsAlive != true)
+            {
+                WriteMessage(LogLevel.Info, $"ProsailModel: Skipping calculations on {Clock.Today:yyyy-MM-dd} as Plant is not alive.");
+                return;
+            }
+
+            if (ParentPlant?.IsEmerged != true)
+            {
+                WriteMessage(LogLevel.Info, $"ProsailModel: Skipping calculations on {Clock.Today:yyyy-MM-dd} as Plant has not emerged.");
+                return;
+            }
+
+            WriteMessage(LogLevel.Info, $"ProsailModel: OnDoEndOfDay called on {Clock.Today:yyyy-MM-dd}.");
+            // Initialize 
+            CurrentParameterValues.Clear();
+            // Evaluate all parameters
+            EvaluateAllParameters();
+            // Validate parameter ranges
+            ValidateParameterRanges();
+            // Clear cached results to force recalculation
+            cachedProsailOutputs = null;
+            lastCalculationDate = null;
+            try
+            {
+                // Calculate PROSAIL outputs
+                var results = CalculateProsail();
+                cachedProsailOutputs = results; // Cache results
+                lastCalculationDate = Clock.Today;
+
+                WriteMessage(LogLevel.Info, message: $"ProsailModel: PROSAIL calculation completed, Wavelength[{results.Wavelength.Length}]");
+
+                // Save to database only if enabled
+                if (EnableSQLiteOutput)
+                {
+                    WriteToDatabase(Clock.Today, results);
+                    WriteMessage(LogLevel.Info, $"ProsailModel: Wrote results to database for {Clock.Today:yyyy-MM-dd}.");
+                }
+                else
+                {
+                    WriteMessage(LogLevel.Info, $"ProsailModel: SQLite output disabled, results not saved to database.");
+                }
+            }
+            catch (Exception ex)
+            {
+                WriteMessage(LogLevel.Error, $"ProsailModel: Error in OnDoEndOfDay: {ex.Message}");
+            }
+        }
+
+        /// <summary>Called when [simulation completed].</summary>
+        /// <param name="sender">The sender.</param>
+        /// <param name="e">The <see cref="EventArgs"/> instance containing the event data.</param>
+        [EventSubscribe("Completed")]
+        private void OnCompleted(object sender, EventArgs e)
+        {
+            if (dbConnection != null)
+            {
+                dbConnection.CloseDatabase();
+                dbConnection = null;
+                string dbPath = GetFullDatabasePath();
+                WriteMessage(LogLevel.Info, $"PROSAIL results database saved to: {dbPath}");
+            }
+        }
+
+        /// <summary>
+        /// Initialize the SQLite database for PROSAIL results
+        /// </summary>
+        private void InitializeDatabase()
+        {
+            try
+            {
+                string dbPath = GetFullDatabasePath();
+                string dbDir = Path.GetDirectoryName(dbPath);
+                if (!string.IsNullOrEmpty(dbDir) && !Directory.Exists(dbDir))
+                {
+                    Directory.CreateDirectory(dbDir);
+                }
+
+                dbConnection = new SQLite();
+                dbConnection.OpenDatabase(dbPath, false);
+
+                simulationName = Simulation.Name.Replace("'", "''");
+
+                // Clear existing tables
+                dbConnection.ExecuteNonQuery("DROP TABLE IF EXISTS Spectra;");
+                dbConnection.ExecuteNonQuery("DROP TABLE IF EXISTS Parameters;");
+                dbConnection.ExecuteNonQuery("DROP TABLE IF EXISTS Simulations;");
+
+                // Create new tables
+                dbConnection.ExecuteNonQuery(@"
+                    CREATE TABLE IF NOT EXISTS Simulations (
+                        SimulationName TEXT PRIMARY KEY,
+                        StartDate TEXT,
+                        EndDate TEXT,
+                        CreatedAt TEXT
+                    )");
+
+                dbConnection.ExecuteNonQuery(@"
+                    CREATE TABLE IF NOT EXISTS Parameters (
+                        SimulationName TEXT,
+                        Date TEXT,
+                        N REAL,
+                        CAB REAL,
+                        CAR REAL,
+                        EWT REAL,
+                        LMA REAL,
+                        ANT REAL,
+                        BROWN REAL,
+                        PROT REAL,
+                        CBC REAL,
+                        Alpha REAL,
+                        LAI REAL,
+                        HotSpot REAL,
+                        TypeLidf REAL,
+                        LIDFa REAL,
+                        LIDFb REAL,
+                        FractionBrown REAL,
+                        Dissociation REAL,
+                        CrownCover REAL,
+                        TreeShape REAL,
+                        WetDrySoilReflectanceJsonPath TEXT,
+                        Psoil REAL,
+                        SunZenithAngle REAL,
+                        ObserverZenithAngle REAL,
+                        RelativeAzimuthAngle REAL,        
+                        PRIMARY KEY (SimulationName, Date),
+                        FOREIGN KEY (SimulationName) REFERENCES Simulations(SimulationName)
+                    )");
+
+                dbConnection.ExecuteNonQuery(@"
+                    CREATE TABLE IF NOT EXISTS Spectra (
+                        SimulationName TEXT,
+                        Date TEXT,
+                        WavelengthNM REAL,
+                        Reflectance REAL,
+                        Transmittance REAL,
+                        PRIMARY KEY (SimulationName, Date, WavelengthNM),
+                        FOREIGN KEY (SimulationName, Date) REFERENCES Parameters(SimulationName, Date)
+                    )");
+
+                string sql = $@"
+                    INSERT INTO Simulations (SimulationName, StartDate, EndDate, CreatedAt)
+                    VALUES ('{simulationName}', '{Clock.StartDate:yyyy-MM-dd}', '{Clock.EndDate:yyyy-MM-dd}', '{DateTime.Now:yyyy-MM-dd HH:mm:ss}')";
+                dbConnection.ExecuteNonQuery(sql);
+
+                WriteMessage(LogLevel.Info, $"PROSAIL database initialized: {dbPath}");
+            }
+            catch (Exception ex)
+            {
+                if (dbConnection != null)
+                {
+                    dbConnection.CloseDatabase();
+                    dbConnection = null;
+                }
+                WriteMessage(LogLevel.Error, $"Failed to initialize PROSAIL database: {ex.Message}");
+                EnableSQLiteOutput = false;
+            }
+        }
+
+        /// <summary>
+        /// Get the full path to the database file
+        /// </summary>
+        private string GetFullDatabasePath()
+        {
+            string simDir = Path.GetDirectoryName(Simulation.FileName);
+            if (Path.IsPathRooted(ProsailSQLiteDatabasePath))
+                return ProsailSQLiteDatabasePath;
+            else
+                return Path.Combine(simDir, ProsailSQLiteDatabasePath);
+        }
+
+        /// <summary>
+        /// Parses the wavelength range from the specified string and returns the list of wavelengths.
+        /// </summary>
+        /// <returns>A sorted list of wavelengths (in nm) parsed from the input string. Returns an empty list if parsing fails.</returns>
+        private List<double> ParseWavelengthRange()
+        {
+            List<double> wavelengths = new List<double>();
+
+            // Default range if input is empty
+            if (string.IsNullOrWhiteSpace(OutputWavelengthRange))
+            {
+                WriteMessage(LogLevel.Info, "ProsailModel: OutputWavelengthRange is empty, using default range 400-2500 nm.");
+                for (int wl = 400; wl <= 2500; wl++)
+                {
+                    wavelengths.Add(wl);
+                }
+                return wavelengths;
+            }
+
+            // Split by commas to handle multiple parts (e.g., "500-600, 700-800")
+            string[] parts = OutputWavelengthRange.Split(',', StringSplitOptions.TrimEntries);
+            if (parts.Length == 0)
+            {
+                WriteMessage(LogLevel.Warning, "ProsailModel: OutputWavelengthRange is empty after splitting.");
+                return wavelengths; // Empty list
+            }
+
+            foreach (string part in parts)
+            {
+                // Check if the part is a range (contains a "-")
+                if (part.Contains('-'))
+                {
+                    string[] rangeParts = part.Split('-', StringSplitOptions.TrimEntries);
+                    if (rangeParts.Length != 2)
+                    {
+                        WriteMessage(LogLevel.Warning, $"ProsailModel: Invalid wavelength range format: {part}.");
+                        continue;
+                    }
+
+                    if (!double.TryParse(rangeParts[0], out double startWavelength) || !double.TryParse(rangeParts[1], out double endWavelength))
+                    {
+                        WriteMessage(LogLevel.Warning, $"ProsailModel: Failed to parse wavelength range values: {part}.");
+                        continue;
+                    }
+
+                    if (startWavelength < 0 || endWavelength < startWavelength)
+                    {
+                        WriteMessage(LogLevel.Warning, $"ProsailModel: Invalid wavelength range values (start < 0 or end < start): {part}.");
+                        continue;
+                    }
+
+                    // Add all integer wavelengths in the range (inclusive)
+                    for (int wl = (int)Math.Ceiling(startWavelength); wl <= (int)Math.Floor(endWavelength); wl++)
+                    {
+                        wavelengths.Add(wl);
+                    }
+                    WriteMessage(LogLevel.Info, $"ProsailModel: Parsed wavelength range: {startWavelength}-{endWavelength} nm.");
+                }
+                else
+                {
+                    // Parse as a single wavelength
+                    if (!double.TryParse(part, out double wavelength))
+                    {
+                        WriteMessage(LogLevel.Warning, $"ProsailModel: Failed to parse wavelength value: {part}.");
+                        continue;
+                    }
+
+                    if (wavelength < 0)
+                    {
+                        WriteMessage(LogLevel.Warning, $"ProsailModel: Invalid wavelength value (wavelength < 0): {part}.");
+                        continue;
+                    }
+
+                    wavelengths.Add(wavelength);
+                    WriteMessage(LogLevel.Info, $"ProsailModel: Parsed single wavelength: {wavelength} nm.");
+                }
+            }
+
+            // Remove duplicates and sort
+            wavelengths = wavelengths.Distinct().OrderBy(w => w).ToList();
+
+            if (wavelengths.Count == 0)
+            {
+                WriteMessage(LogLevel.Warning, $"ProsailModel: No valid wavelengths parsed from: {OutputWavelengthRange}.");
+            }
+            else
+            {
+                WriteMessage(LogLevel.Info, $"ProsailModel: Total wavelengths parsed: {wavelengths.Count}.");
+            }
+
+            return wavelengths;
+        }
+
+        /// <summary>
+        /// Write PROSAIL results to the database
+        /// </summary>
+        private void WriteToDatabase(DateTime date, CanopyOptics canopyOptics)
+        {
+            double[] Rdot = canopyOptics.Rdot;
+            double[] Rsot = canopyOptics.Rsot;
+            double[] Rddt = canopyOptics.Rddt;
+            double[] Rsdt = canopyOptics.Rsdt;
+            double[] FCover = canopyOptics.FCover;
+            double[] Abs_dir = canopyOptics.Abs_dir;
+            double[] Abs_hem = canopyOptics.Abs_hem;
+            double[] Rsdstar = canopyOptics.Rsdstar;
+            double[] Rddstar = canopyOptics.Rddstar;
+            double[] usedWavelength = canopyOptics.Wavelength;
+
+            if (dbConnection == null || Rdot == null || Rsot == null || Rddt == null || Rsdt == null ||
+                FCover == null || Abs_dir == null || Abs_hem == null || Rsdstar == null || Rddstar == null || usedWavelength == null)
+            {
+                WriteMessage(LogLevel.Warning, "ProsailModel: WriteToDatabase skipped due to null dbConnection and canopy radiative properties.");
+                return;
+            }
+
+            // Validate array lengths
+            if (Rdot.Length != usedWavelength.Length ||
+                Rsot.Length != usedWavelength.Length ||
+                Rddt.Length != usedWavelength.Length ||
+                Rsdt.Length != usedWavelength.Length ||
+                Abs_dir.Length != usedWavelength.Length ||
+                Abs_hem.Length != usedWavelength.Length ||
+                Rsdstar.Length != usedWavelength.Length ||
+                Rddstar.Length != usedWavelength.Length)
+            {
+                WriteMessage(LogLevel.Error, $"ProsailModel: Array length mismatch in WriteToDatabase");
+                throw new InvalidOperationException("Array length mismatch in WriteToDatabase.");
+            }
+
+            try
+            {
+                dbConnection.ExecuteNonQuery("BEGIN TRANSACTION;");
+
+                // Parse wavelength range
+                List<double> outputWavelengths = ParseWavelengthRange();
+                if (outputWavelengths.Count == 0)
+                {
+                    WriteMessage(LogLevel.Warning, $"ProsailModel: No valid wavelengths to save, skipping database write.");
+                    return;
+                }
+
+                // Create a dictionary for fast lookup of output wavelengths
+                var outputWavelengthSet = new HashSet<double>(outputWavelengths);
+
+                string dateStr = date.ToString("yyyy-MM-dd");
+
+                // Parameters INSERT
+                string paramSql = $@"
+            INSERT OR REPLACE INTO Parameters (
+                SimulationName, Date, N, CAB, CAR, EWT, LMA, ANT, BROWN, PROT, CBC, Alpha,
+                LAI, HotSpot, TypeLidf, LIDFa, LIDFb, FractionBrown, Dissociation, CrownCover, TreeShape,
+                WetDrySoilReflectanceJsonPath, Psoil, SunZenithAngle, ObserverZenithAngle, RelativeAzimuthAngle
+            ) VALUES (
+                '{simulationName}', '{dateStr}', {CurrentParameterValues["N"]}, {CurrentParameterValues["CAB"]}, {CurrentParameterValues["CAR"]},
+                {CurrentParameterValues["EWT"]}, {CurrentParameterValues["LMA"]}, {CurrentParameterValues["ANT"]}, {CurrentParameterValues["BROWN"]},
+                {CurrentParameterValues["PROT"]}, {CurrentParameterValues["CBC"]}, {CurrentParameterValues["Alpha"]},
+                {CurrentParameterValues["LAI"]}, {CurrentParameterValues["HotSpot"]}, {CurrentParameterValues["TypeLidf"]},
+                {CurrentParameterValues["LIDFa"]}, {CurrentParameterValues["LIDFb"]}, {CurrentParameterValues["FractionBrown"]},
+                {CurrentParameterValues["Dissociation"]}, {CurrentParameterValues["CrownCover"]}, {CurrentParameterValues["TreeShape"]},
+                '{WetDrySoilReflectanceJsonPath?.Replace("'", "''") ?? ""}', {CurrentParameterValues["Psoil"]},
+                {CurrentParameterValues["SunZenithAngle"]}, {CurrentParameterValues["ObserverZenithAngle"]}, {CurrentParameterValues["RelativeAzimuthAngle"]}
+            )";
+
+                // Canopy spectra INSERT
+                StringBuilder spectraSql = new StringBuilder("INSERT OR REPLACE INTO Spectra (SimulationName, Date, WavelengthNM, Rdot, Rsot, Rddt, Rsdt, Abs_dir, Abs_hem, Rsdstar, Rddstar) VALUES ");
+                bool firstSpectra = true;
+
+                // Process all wavelengths
+                for (int i = 0; i < usedWavelength.Length; i++)
+                {
+                    double wavelength = usedWavelength[i];
+                    if (outputWavelengthSet.Contains(wavelength))
+                    {
+                        if (!firstSpectra)
+                            spectraSql.Append(",");
+                        spectraSql.Append($"('{simulationName}', '{dateStr}', {wavelength}, {Rdot[i]}, {Rsot[i]}, {Rddt[i]}, {Rsdt[i]}, " +
+                            $"{Abs_dir[i]}, {Abs_hem[i]}, {Rsdstar[i]}, {Rddstar})"); // need to deal with fcover and other parameters if needed
+                        firstSpectra = false;
+                    }
+                }
+
+                if (!firstSpectra)
+                {
+                    spectraSql.Append(";");
+                    WriteMessage(LogLevel.Debug, $"ProsailModel: Executing Spectra INSERT with {spectraSql.Length} characters.");
+                    dbConnection.ExecuteNonQuery(spectraSql.ToString());
+                }
+
+                dbConnection.ExecuteNonQuery("COMMIT;");
+
+                WriteMessage(LogLevel.Info, $"ProsailModel: Wrote results for {date:yyyy-MM-dd} to database.");
+            }
+            catch (Exception ex)
+            {
+                dbConnection.ExecuteNonQuery("ROLLBACK;");
+                WriteMessage(LogLevel.Error, $"ProsailModel: Failed to write to database: {ex.Message}");
+                throw;
+            }
+        }
+
+        /// <summary>
+        /// Evaluates an expression and returns its value
+        /// </summary>
+        /// <param name="expression">The expression to evaluate</param>
+        /// <returns>The evaluated expression value</returns>
+        private double EvaluateExpression(string expression)
+        {
+            try
+            {
+                if (double.TryParse(expression, out double result))
+                {
+                    WriteMessage(LogLevel.Debug, $"Parameter expression '{expression}' parsed as {result} on {Clock?.Today:yyyy-MM-dd}.");
+                    return result;
+                }
+
+                object value = ExpressionFunction.Evaluate(expression, this);
+                if (value == null)
+                {
+                    WriteMessage(LogLevel.Error, $"Parameter expression '{expression}' evaluated to null on {Clock?.Today:yyyy-MM-dd}.");
+                    throw new InvalidOperationException($"Parameter expression '{expression}' evaluated to null.");
+                }
+                if (value is double d)
+                {
+                    WriteMessage(LogLevel.Debug, $"Parameter expression '{expression}' evaluated to {d} on {Clock?.Today:yyyy-MM-dd}.");
+                    return d;
+                }
+                else if (value is double[] arr && arr.Length > 0)
+                {
+                    WriteMessage(LogLevel.Warning, $"Parameter expression '{expression}' evaluated to array, using first value {arr[0]} on {Clock?.Today:yyyy-MM-dd}.");
+                    return arr[0];
+                }
+                else
+                {
+                    double resultValue = Convert.ToDouble(value);
+                    WriteMessage(LogLevel.Debug, $"Parameter expression '{expression}' converted to {resultValue} on {Clock?.Today:yyyy-MM-dd}.");
+                    return resultValue;
+                }
+            }
+            catch (Exception ex)
+            {
+                WriteMessage(LogLevel.Error, $"Failed to evaluate parameter expression '{expression}' on {Clock?.Today:yyyy-MM-dd}: {ex.Message}");
+                throw;
+            }
+        }
+
+        /// <summary>
+        /// Evaluate all PROSAIL parameters and store them in CurrentParameterValues
+        /// </summary>
+        private void EvaluateAllParameters()
+        {
+            // Leaf/PROSPECT parameters
+            CurrentParameterValues["N"] = EvaluateExpression(N);
+            CurrentParameterValues["CAB"] = EvaluateExpression(CAB);
+            CurrentParameterValues["CAR"] = EvaluateExpression(CAR);
+            CurrentParameterValues["EWT"] = EvaluateExpression(EWT);
+            CurrentParameterValues["LMA"] = EvaluateExpression(LMA);
+            CurrentParameterValues["BROWN"] = EvaluateExpression(BROWN);
+            CurrentParameterValues["ANT"] = EvaluateExpression(ANT);
+            CurrentParameterValues["PROT"] = EvaluateExpression(PROT);
+            CurrentParameterValues["CBC"] = EvaluateExpression(CBC);
+            CurrentParameterValues["Alpha"] = EvaluateExpression(Alpha);
+
+            // SAIL/canopy parameters
+            CurrentParameterValues["LAI"] = EvaluateExpression(LAI);
+            CurrentParameterValues["HotSpot"] = EvaluateExpression(HotSpot);
+            double typeLidfVal = EvaluateExpression(TypeLidf);
+            int typeLidfInt = Convert.ToInt32(typeLidfVal);
+            CurrentParameterValues["TypeLidf"] = typeLidfInt;
+
+            CurrentParameterValues["LIDFa"] = EvaluateExpression(LIDFa);
+            CurrentParameterValues["LIDFb"] = EvaluateExpression(LIDFb);
+            CurrentParameterValues["FractionBrown"] = EvaluateExpression(FractionBrown);
+            CurrentParameterValues["Dissociation"] = EvaluateExpression(Dissociation);
+            CurrentParameterValues["CrownCover"] = EvaluateExpression(CrownCover);
+            CurrentParameterValues["TreeShape"] = EvaluateExpression(TreeShape);
+
+            // Soil/geometry parameters
+            CurrentParameterValues["Psoil"] = EvaluateExpression(Psoil);
+            CurrentParameterValues["SunZenithAngle"] = EvaluateExpression(SunZenithAngle);
+            CurrentParameterValues["ObserverZenithAngle"] = EvaluateExpression(ObserverZenithAngle);
+            CurrentParameterValues["RelativeAzimuthAngle"] = EvaluateExpression(RelativeAzimuthAngle);
+
+            // SailVersion as string
+            CurrentParameterValues["SailVersion"] = SailVersion;
+        }
+
+        /// <summary>
+        /// Validate the ranges of all PROSAIL parameters
+        /// </summary>
+        private void ValidateParameterRanges()
+        {
+            // Example ranges based on literature and your comments
+            var ranges = new Dictionary<string, (double min, double max, string description)>
+            {
+                { "N", (1.0, 2.6, "Leaf structure parameter (unitless)") },
+                { "CAB", (10.0, 80.0, "Chlorophyll a+b content (μg/cm²)") },
+                { "CAR", (1.0, 24.0, "Carotenoid content (μg/cm²)") },
+                { "EWT", (0.001, 0.08, "Equivalent Water Thickness (cm)") },
+                { "LMA", (0.001, 0.02, "Leaf Mass per Area (g/cm²)") },
+                { "BROWN", (0.0, 1.0, "Brown pigment content (unitless)") },
+                { "ANT", (0.0, 10.0, "Anthocyanin content (μg/cm²)") }, // adjust as needed
+                { "PROT", (0.0, 10.0, "Protein content (g/cm²)") }, // adjust as needed
+                { "CBC", (0.0, 10.0, "NonProt Carbon-based constituent content (g/cm²)") }, // adjust as needed
+                { "Alpha", (0.0, 90.0, "Incidence angle (degrees)") },
+                { "LAI", (0.0, 10.0, "Leaf Area Index (m²/m²)") },
+                { "HotSpot", (0.0, 1.0, "Hot Spot parameter (unitless)") },
+                { "TypeLidf", (1.0, 2.0, "LIDF type (1 or 2)") },
+                { "LIDFa", (-90.0, 90.0, "LIDF parameter a") }, // adjust as needed
+                { "LIDFb", (-1.0, 1.0, "LIDF parameter b") }, // adjust as needed
+                { "FractionBrown", (0.0, 1.0, "Fraction of brown leaf area") },
+                { "Dissociation", (0.0, 1.0, "Layer dissociation factor") },
+                { "CrownCover", (0.0, 1.0, "Vertical crown cover") },
+                { "TreeShape", (0.0, 10.0, "Tree shape factor") }, // adjust as needed
+                { "Psoil", (0.0, 1.0, "Dry to Wet soil factor") },
+                { "SunZenithAngle", (0.0, 90.0, "Sun zenith angle (degrees)") },
+                { "ObserverZenithAngle", (0.0, 90.0, "Observer zenith angle (degrees)") },
+                { "RelativeAzimuthAngle", (0.0, 360.0, "Relative azimuth angle (degrees)") }
+            };
+
+            foreach (var param in ranges)
+            {
+                if (CurrentParameterValues.TryGetValue(param.Key, out object value))
+                {
+                    if (value < param.Value.min || value > param.Value.max)
+                    {
+                        string msg = $"Parameter '{param.Key}' value {value} is out of range [{param.Value.min}, {param.Value.max}] ({param.Value.description}) on {Clock?.Today:yyyy-MM-dd}.";
+                        WriteMessage(LogLevel.Error, msg);
+                        throw new InvalidOperationException(msg);
+                    }
+                }
+                else
+                {
+                    string msg = $"Parameter '{param.Key}' is missing from CurrentParameterValues on {Clock?.Today:yyyy-MM-dd}.";
+                    WriteMessage(LogLevel.Error, msg);
+                    throw new InvalidOperationException(msg);
+                }
+            }
+
+            // TypeLidf as int
+            if (CurrentParameterValues.TryGetValue("TypeLidf", out object typeLidfObj))
+            {
+                int typeLidf = Convert.ToInt32(typeLidfObj);
+                if (typeLidf != 1 && typeLidf != 2)
+                {
+                    string msg = $"Parameter 'TypeLidf' value {typeLidf} is invalid (must be 1 or 2) on {Clock?.Today:yyyy-MM-dd}.";
+                    WriteMessage(LogLevel.Error, msg);
+                    throw new InvalidOperationException(msg);
+                }
+            }
+            else
+            {
+                string msg = $"Parameter 'TypeLidf' is missing from CurrentParameterValues on {Clock?.Today:yyyy-MM-dd}.";
+                WriteMessage(LogLevel.Error, msg);
+                throw new InvalidOperationException(msg);
+            }
+
+            // SailVersion as string
+            if (CurrentParameterValues.TryGetValue("SailVersion", out object sailVersionObj))
+            {
+                string sailVersion = sailVersionObj as string;
+                if (sailVersion != "4SAIL" && sailVersion != "4SAIL2")
+                {
+                    string msg = $"Parameter 'SailVersion' value '{sailVersion}' is invalid (must be '4SAIL' or '4SAIL2') on {Clock?.Today:yyyy-MM-dd}.";
+                    WriteMessage(LogLevel.Error, msg);
+                    throw new InvalidOperationException(msg);
+                }
+            }
+            else
+            {
+                string msg = $"Parameter 'SailVersion' is missing from CurrentParameterValues on {Clock?.Today:yyyy-MM-dd}.";
+                WriteMessage(LogLevel.Error, msg);
+                throw new InvalidOperationException(msg);
+            }
+        }
+
+        /// <summary>
+        /// Calculate leaf optical properties using the PROSAIL model
+        /// </summary>
+        /// <remarks>
+        /// The realistic ranges of inputs are from this paper:
+        /// Berger, K., Atzberger, C., Danner, M., D’Urso, G., Mauser, W., Vuolo, F., Hank, T., 2018. Evaluation of the PROSAIL Model Capabilities for Future Hyperspectral Model Environments: 
+        /// A Review Study. Remote Sensing 10, 85. https://doi.org/10.3390/rs10010085
+        /// </remarks>
+        /// <returns>A tuple containing reflectance and transmittance vectors</returns>
+        public CanopyOptics CalculateProsail()
+        {
+            if (cachedLeafOpticalConstants == null)
+            {
+                WriteMessage(LogLevel.Error, $"ProsailModel: CalculateProsail called without leaf optical constants on {Clock?.Today:yyyy-MM-dd}.");
+                throw new InvalidOperationException("Leaf optical constants not loaded when CalculateProsail called.");
+            }
+            WriteMessage(LogLevel.Info, $"ProsailModel: CalculateProsail called on {Clock?.Today:yyyy-MM-dd}.");
+
+            // Parse the wavelength range from OutputWavelengthRange
+            double[] wavelengths = ParseWavelengthRange().ToArray();
+            double[] inputWavelengths = wavelengths.Length > 0 ? wavelengths : cachedLeafOpticalConstants.Value.Wavelength.ToArray();
+
+            // Retrieve parameters
+            int typeLidf = Convert.ToInt32(CurrentParameterValues["TypeLidf"]);
+            string sailVersion = CurrentParameterValues["SailVersion"] as string ?? "4SAIL";
+
+            CanopyOptics results = ProsailCore.PRO4SAIL(
+                // leaf
+                leafOpticalConstants: cachedLeafOpticalConstants,
+                N: Convert.ToDouble(CurrentParameterValues["N"]),
+                CAB: Convert.ToDouble(CurrentParameterValues["CAB"]),
+                CAR: Convert.ToDouble(CurrentParameterValues["CAR"]),
+                EWT: Convert.ToDouble(CurrentParameterValues["EWT"]),
+                LMA: Convert.ToDouble(CurrentParameterValues["LMA"]),
+                ANT: Convert.ToDouble(CurrentParameterValues["ANT"]),
+                BROWN: Convert.ToDouble(CurrentParameterValues["BROWN"]),
+                PROT: Convert.ToDouble(CurrentParameterValues["PROT"]),
+                CBC: Convert.ToDouble(CurrentParameterValues["CBC"]),
+                Alpha: Convert.ToDouble(CurrentParameterValues["Alpha"]),
+                // canopy and soil
+                SailVersion: sailVersion,
+                LAI: Convert.ToDouble(CurrentParameterValues["LAI"]),
+                HotSpot: Convert.ToDouble(CurrentParameterValues["HotSpot"]),
+                TypeLidf: typeLidf,
+                LIDFa: Convert.ToDouble(CurrentParameterValues["LIDFa"]),
+                LIDFb: Convert.ToDouble(CurrentParameterValues["LIDFb"]),
+                FractionBrown: Convert.ToDouble(CurrentParameterValues["FractionBrown"]),
+                Diss: Convert.ToDouble(CurrentParameterValues["Dissociation"]),
+                Cv: Convert.ToDouble(CurrentParameterValues["CrownCover"]),
+                Zeta: Convert.ToDouble(CurrentParameterValues["TreeShape"]),
+                SoilReflectance: cachedWetDrySoilReflectance?.GetSoilReflectance(Convert.ToDouble(CurrentParameterValues["Psoil"]), inputWavelengths),
+                // sun-observer geometry
+                TTS: Convert.ToDouble(CurrentParameterValues["SunZenithAngle"]),
+                TTO: Convert.ToDouble(CurrentParameterValues["ObserverZenithAngle"]),
+                PSI: Convert.ToDouble(CurrentParameterValues["RelativeAzimuthAngle"]),
+                Wavelengths: inputWavelengths
+            );
+
+            WriteMessage(LogLevel.Info, $"ProspectModel: CalculateProspect completed, Wavelengths[{inputWavelengths.Length}]");
+
+            // Validate that the results match the input wavelengths
+            if (results.Rdot.Length != inputWavelengths.Length ||
+                results.Rsot.Length != inputWavelengths.Length ||
+                results.Rddt.Length != inputWavelengths.Length ||
+                results.Rsdt.Length != inputWavelengths.Length ||
+                results.Abs_dir.Length != inputWavelengths.Length ||
+                results.Abs_hem.Length != inputWavelengths.Length ||
+                results.Rsdstar.Length != inputWavelengths.Length ||
+                results.Rddstar.Length != inputWavelengths.Length)
+            {
+                WriteMessage(LogLevel.Error, $"ProsailModel: Mismatch between PROSAIL output and input wavelengths.");
+                throw new InvalidOperationException("Mismatch between PROSAIL output and input wavelengths.");
+            }
+
+            return new CanopyOptics
+            {
+                Rdot = results.Rdot,
+                Rsot = results.Rsot,
+                Rddt = results.Rddt,
+                Rsdt = results.Rsdt,
+                FCover = results.FCover,
+                Abs_dir = results.Abs_dir,
+                Abs_hem = results.Abs_hem,
+                Rsdstar = results.Rsdstar,
+                Rddstar = results.Rddstar,
+                Wavelength = inputWavelengths
+            };
+        }
+    }
+}
+#endregion
