@@ -1,9 +1,10 @@
-﻿using System;
-using System.Collections.Generic;
-using System.Linq;
-using MathNet.Numerics;
+﻿using MathNet.Numerics;
 using MathNet.Numerics.LinearAlgebra;
 using Models.PROSAIL.PROSPECT;
+using System;
+using System.Collections.Generic;
+using System.Linq;
+using static Models.Prosail.ProsailCore;
 using static Models.PROSAIL.PROSPECT.ProspectCore;
 
 // Define the namespace for SAIL utilities
@@ -162,7 +163,7 @@ namespace Models.PROSAIL.SAIL
         /// Represents the output of the SAIL models (FourSAIL, FourSAIL2).
         /// Contains various reflectance factors and derived quantities like fCover and absorptance.
         /// </summary>
-        public class SailResult 
+        public class CanopyOptics
         {
             /// <summary>Hemispherical-directional reflectance factor in viewing direction (R_o).</summary>
             public double[] Rdot { get; set; }
@@ -182,6 +183,14 @@ namespace Models.PROSAIL.SAIL
             public double[] Rsdstar { get; set; }
             /// <summary>Contribution of hemispherical diffuse incident flux to albedo (Hemispherical reflectance for diffuse incidence, Rdd*).</summary>
             public double[] Rddstar { get; set; }
+
+            /// <summary>Wavelength array in nanometers (nm)</summary>
+            public double[] Wavelength;
+
+            /*/// <summary> Indicates whether this LeafOptics object holds data.
+            /// Returns false if Wavelength, Reflectance, or Transmittance is null.
+            /// </summary>
+            public readonly bool HasValue => Wavelength != null && Reflectance != null && Transmittance != null;*/
         }
         #endregion
 
@@ -1311,7 +1320,6 @@ namespace Models.PROSAIL.SAIL
                 throw new InvalidOperationException($"PROSPECT simulation failed for Green LOP: {ex.Message}", ex);
             }
 
-
             // Determine Brown Leaf Optical Properties based on SAIL version and inputs
             LeafOptics? finalBrownLOP = null; // Initialize Brown LOP result
 
@@ -1378,6 +1386,37 @@ namespace Models.PROSAIL.SAIL
 
             // Return the struct containing the final GreenLOP and BrownLOP
             return new AdjustedProspectResult {GreenLOP = greenLOP, BrownLOP = finalBrownLOP};
+        }
+
+        /// <summary>
+        /// Computes soil reflectance based on the wet and dry soil reflectance data.
+        /// </summary>
+        /// <param name="wetDryReflectanceJsonPath">Path of Json file containing Wavelenght, Wet_Soil and Dry_Soil</param>
+        /// <param name="psoil">Dry to Wet soil factor (unitless; 0 for wet, 1 for dry)</param>
+        /// <returns>An object of SoilOptics containing Wavelength and Reflectance.</returns>
+        public static SoilOptics CalculateSoilReflectanceFromWetDry(string wetDryReflectanceJsonPath, double psoil = 0.5)
+        {
+            WetDrySoilReflectance wetDrySoilReflectance = LoadLocalWetDrySoilReflectanData(wetDryReflectanceJsonPath);
+            // Create the wavelength-to-index mapping for speeding up the subset of the specified wavelengths
+            var wavelengthToIndex = new Dictionary<double, int>();
+            for (int i = 0; i < wetDrySoilReflectance.Wavelength.Count; i++)
+            {
+                wavelengthToIndex[wetDrySoilReflectance.Wavelength[i]] = i;
+            }
+
+            // Calculate the weighted reflectance vector
+            Vector<double> weightedReflectance = psoil * wetDrySoilReflectance.DryReflectance +
+                                                 (1 - psoil) * wetDrySoilReflectance.WetReflectance;
+
+            SoilOptics soilOpticalData;
+            soilOpticalData = new SoilOptics
+            {
+                Wavelength = wetDrySoilReflectance.Wavelength,
+                Reflectance = weightedReflectance,
+                WavelengthToIndex = wavelengthToIndex
+            };
+
+            return soilOpticalData;
         }
         #endregion
     }
