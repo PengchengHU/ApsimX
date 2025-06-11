@@ -30,9 +30,7 @@ namespace Models.Prosail
         //private static readonly string RelativeSoilOpticalDataPath = "..\\..\\..\\Models\\PROSAIL\\PROSPECT\\SpecPROSPECT_FullRange.json";
         //private static string DefaultSoilOpticalDataPath => PathUtilities.GetAbsolutePath(RelativeSoilOpticalDataPath, AppDomain.CurrentDomain.BaseDirectory);
 
-        /// <summary>
-        /// Contains reflectance data of wet and dry soil
-        /// </summary>
+        /// <summary>Contains reflectance data of wet and dry soil</summary>
         public struct WetDrySoilReflectance
         {
             /// <summary>Wavelength array in nanometers (nm)</summary>
@@ -188,17 +186,50 @@ namespace Models.Prosail
         /// <summary>
         /// Load spectral data of wet and dry soil from a local JSON file
         /// </summary>
-        public static WetDrySoilReflectance LoadLocalWetDrySoilReflectanData(string SoilOpticalDataPath)
+        /// <param> WetDrySoilReflectanceDataPath </param>
+        /// <param name="WetDrySoilReflectanceDataPath">Path of Json file containting reflectance of wet and dry soil.</param>
+        /// <returns> WetDrySoilReflectance object containing wavelength and reflectance data</returns>
+        public static WetDrySoilReflectance LoadWetDrySoilReflectanData(string WetDrySoilReflectanceDataPath)
         {
-            if (!File.Exists(SoilOpticalDataPath))
+            if (!File.Exists(WetDrySoilReflectanceDataPath))
             {
-                throw new FileNotFoundException($"Soil optical data file not found at {SoilOpticalDataPath}. Please provide a valid SoilOptics or ensure the file exists.");
+                throw new FileNotFoundException($"Soil optical data file not found at {WetDrySoilReflectanceDataPath}. Please provide a valid SoilOptics or ensure the file exists.");
             }
 
             try
             {
-                string json = File.ReadAllText(SoilOpticalDataPath);
+                string json = File.ReadAllText(WetDrySoilReflectanceDataPath);
                 var OpticalData = JsonConvert.DeserializeObject<WetDrySoilOpticalDataJason>(json);
+
+                // Check if deserialization was successful
+                if (OpticalData == null)
+                {
+                    throw new Exception("Deserialization returned null - invalid JSON format or empty file");
+                }
+
+                // Check if required arrays exist and have data
+                if (OpticalData.Wavelength == null || OpticalData.Wavelength.Length == 0)
+                {
+                    throw new Exception("Wavelength data is missing or empty");
+                }
+
+                if (OpticalData.Wet_Soil == null || OpticalData.Wet_Soil.Length == 0)
+                {
+                    throw new Exception("Wet_Soil data is missing or empty");
+                }
+
+                if (OpticalData.Dry_Soil == null || OpticalData.Dry_Soil.Length == 0)
+                {
+                    throw new Exception("Dry_Soil data is missing or empty");
+                }
+
+                // Check if all arrays have the same length
+                if (OpticalData.Wavelength.Length != OpticalData.Wet_Soil.Length ||
+                    OpticalData.Wavelength.Length != OpticalData.Dry_Soil.Length)
+                {
+                    throw new Exception($"Array length mismatch - Wavelength: {OpticalData.Wavelength.Length}, " +
+                                      $"Wet_Soil: {OpticalData.Wet_Soil.Length}, Dry_Soil: {OpticalData.Dry_Soil.Length}");
+                }
 
                 return new WetDrySoilReflectance
                 {
@@ -207,9 +238,13 @@ namespace Models.Prosail
                     WetSoilReflectance = Vector<double>.Build.DenseOfArray(OpticalData.Wet_Soil)
                 };
             }
+            catch (JsonException jsonEx)
+            {
+                throw new Exception($"JSON parsing error in {WetDrySoilReflectanceDataPath}: {jsonEx.Message}", jsonEx);
+            }
             catch (Exception ex)
             {
-                throw new Exception($"Failed to load soil optical data from {SoilOpticalDataPath}: {ex.Message}", ex);
+                throw new Exception($"Failed to load soil optical data from {WetDrySoilReflectanceDataPath}: {ex.Message}", ex);
             }
         }
 
