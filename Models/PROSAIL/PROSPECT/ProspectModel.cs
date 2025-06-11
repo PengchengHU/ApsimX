@@ -9,11 +9,10 @@ using Models.Core;
 using Models.Functions;
 using APSIM.Shared.Utilities;
 using Models.PMF;
-using Models.Prospect;
 using System.Threading;
-using static Models.Prospect.ProspectCore;
+using static Models.PROSAIL.PROSPECT.ProspectCore;
 
-namespace Models.Prospect
+namespace Models.PROSAIL.PROSPECT
 {
     /// <summary>
     /// Model implementing the PROSPECT radiative transfer model for leaf optical properties in APSIM
@@ -25,27 +24,19 @@ namespace Models.Prospect
     [ValidParent(ParentType = typeof(Plant))]
     public class ProspectModel : Model
     {
-        /// <summary>
-        /// Link to the clock for daily outputs
-        /// </summary>
+        /// <summary> Link to the clock for daily outputs </summary>
         [Link]
         private Clock Clock = null;
 
-        /// <summary>
-        /// Link to summary file for outputs
-        /// </summary>
+        /// <summary> Link to summary file for outputs </summary>
         [Link]
         private ISummary Summary = null;
 
-        /// <summary>
-        /// Link to simulation for file paths and name
-        /// </summary>
+        /// <summary> Link to simulation for file paths and name </summary>
         [Link]
         private Simulation Simulation = null;
 
-        /// <summary>
-        /// Link to the parent Plant model to check IsAlive
-        /// </summary>
+        /// <summary> Link to the parent Plant model to check IsAlive</summary>
         [Link(IsOptional = true)]
         private Plant ParentPlant = null;
 
@@ -95,22 +86,16 @@ namespace Models.Prospect
         /// <summary>Control</summary>
         [Separator("Control the outputs")]
 
-        // <summary>
-        // Flag to enable daily SQLite database output
-        // </summary>
+        // <summary> Flag to enable daily SQLite database output</summary>
         [Description("Enable output to SQLite database")]
         public bool EnableSQLiteOutput { get; set; } = true;
         
 
-        /// <summary>
-        /// Spectral range to simulate (start-end in nm)
-        /// </summary>
+        /// <summary> Spectral range to simulate (start-end in nm) </summary>
         [Description("Spectral range to simulate (in nm; supports ranges (e.g., '400-500'), lists (e.g., '400, 500, 600'), and mixed formats (e.g., '400, 500-600, 700')")]
         public string OutputWavelengthRange { get; set; } = "400-2500";
 
-        /// <summary>
-        /// Defines the logging verbosity levels
-        /// </summary>
+        /// <summary> Defines the logging verbosity levels</summary>
         public enum LogLevel
         {
             /// <summary>Log only errors</summary>
@@ -123,105 +108,32 @@ namespace Models.Prospect
             Debug
         }
 
-        /// <summary>
-        /// Logging verbosity level
-        /// </summary>
+        /// <summary> Logging verbosity level</summary>
         [Description("Logging verbosity level (Error, Warning, Info, Debug)")]
         public LogLevel LoggingLevel { get; set; } = LogLevel.Info;
 
-        /// <summary>
-        /// Path to the SQLite database file (relative to simulation directory)
-        /// </summary>
+        /// <summary> Path to the SQLite database file (relative to simulation directory) </summary>
         private string ProspectSQLiteDatabasePath;
 
-        /// <summary>
-        /// The cached spectral constants loaded at simulation start
-        /// </summary>
-        private ProspectCore.LeafOpticalConsts? cachedOpticalConstants = null;
+        /// <summary>The cached spectral constants loaded at simulation start</summary>
+        private LeafOpticalConsts? cachedOpticalConstants = null;
 
-        /// <summary>
-        /// Cached PROSPECT results for the current day
-        /// </summary>
+        /// <summary>Cached PROSPECT results for the current day</summary>
         private LeafOptics? cachedResults = null;
 
-        /// <summary>
-        /// The date of the last cached results
-        /// </summary>
+        /// <summary>The date of the last cached results</summary>
         private DateTime? lastCalculationDate = null;
 
-        /// <summary>
-        /// Database connection
-        /// </summary>
+        /// <summary>Database connection</summary>
         private SQLite dbConnection = null;
 
-        /// <summary>
-        /// Current simulation name for database records
-        /// </summary>
+        /// <summary>Current simulation name for database records</summary>
         private string simulationName = null;
 
-        /// <summary>
-        /// Cached wavelengths (nm) from the spectral constants
-        /// </summary>
-        [Description("Wavelengths (nm)")]
-        public double[] Wavelengths
-        {
-            get
-            {
-                if (cachedOpticalConstants == null)
-                {
-                    WriteMessage(LogLevel.Warning, "ProspectModel: Wavelengths accessed before leaf optical constants loaded.");
-                    return Array.Empty<double>();
-                }
-                return cachedOpticalConstants.Value.Wavelength.ToArray();
-            }
-        }
-
-        /// <summary>
-        /// Current parameter values after expression evaluation
-        /// </summary>
+        /// <summary>Current parameter values after expression evaluation</summary>
         private Dictionary<string, double> CurrentParameterValues { get; set; } = new Dictionary<string, double>();
 
-        /// <summary>
-        /// Gets the leaf reflectance spectrum calculated by PROSPECT
-        /// </summary>
-        [Units("unitless")]
-        [Description("Leaf reflectance (0-1)")]
-        public double[] LeafReflectance
-        {
-            get
-            {
-                if (Clock == null || cachedResults == null || lastCalculationDate != Clock.Today)
-                {
-                    WriteMessage(LogLevel.Warning, $"ProspectModel: LeafReflectance accessed without valid cached results on {Clock?.Today:yyyy-MM-dd}. Recalculating.");
-                    var results = CalculateProspect();
-                    return results.Reflectance.ToArray();
-                }
-                return cachedResults.Value.Reflectance.ToArray();
-            }
-        }
-
-        /// <summary>
-        /// Gets the leaf transmittance spectrum calculated by PROSPECT
-        /// </summary>
-        [Units("unitless")]
-        [Description("Leaf transmittance (0-1)")]
-        public double[] LeafTransmittance
-        {
-            get
-            {
-                if (Clock == null || cachedResults == null || lastCalculationDate != Clock.Today)
-                {
-                    WriteMessage(LogLevel.Warning, $"ProspectModel: LeafTransmittance accessed without valid cached results on {Clock?.Today:yyyy-MM-dd}. Recalculating.");
-                    var results = CalculateProspect();
-                    return results.Transmittance.ToArray();
-                }
-                return cachedResults.Value.Transmittance.ToArray();
-            }
-        }
-
-        /// <summary>
-        /// Helper method to write messages based on logging level
-        /// </summary>
+        /// <summary>Helper method to write messages based on logging level</summary>
         private void WriteMessage(LogLevel messageLevel, string message)
         {
             if ((int)messageLevel <= (int)LoggingLevel)
@@ -329,9 +241,7 @@ namespace Models.Prospect
             }
         }
 
-        /// <summary>
-        /// Initialize the SQLite database for PROSPECT results
-        /// </summary>
+        /// <summary>Initialize the SQLite database for PROSPECT results</summary>
         private void InitializeDatabase()
         {
             try
@@ -410,9 +320,7 @@ namespace Models.Prospect
             }
         }
 
-        /// <summary>
-        /// Get the full path to the database file
-        /// </summary>
+        /// <summary>Get the full path to the database file</summary>
         private string GetFullDatabasePath()
         {
             string simDir = Path.GetDirectoryName(Simulation.FileName);
@@ -654,11 +562,6 @@ namespace Models.Prospect
         /// <summary>
         /// Calculate leaf optical properties using the PROSPECT model
         /// </summary>
-        /// <remarks>
-        /// The realistic ranges of inputs are from this paper:
-        /// Berger, K., Atzberger, C., Danner, M., D’Urso, G., Mauser, W., Vuolo, F., Hank, T., 2018. Evaluation of the PROSAIL Model Capabilities for Future Hyperspectral Model Environments: 
-        /// A Review Study. Remote Sensing 10, 85. https://doi.org/10.3390/rs10010085
-        /// </remarks>
         /// <returns>A tuple containing reflectance and transmittance vectors</returns>
         public LeafOptics CalculateProspect()
         {
@@ -791,7 +694,7 @@ namespace Models.Prospect
                 WriteMessage(LogLevel.Error, $"ProspectModel: Mismatch between PROSPECT output and input wavelengths: Reflectance[{results.Reflectance.Length}], Transmittance[{results.Transmittance.Length}], InputWavelengths[{inputWavelengths.Length}].");
                 throw new InvalidOperationException("Mismatch between PROSPECT output and input wavelengths.");
             }
-            return (results);
+            return results;
         }
 
         /// <summary>
