@@ -119,7 +119,7 @@ namespace Models.PROSAIL.PROSPECT
         private LeafOpticalConsts? cachedOpticalConstants = null;
 
         /// <summary>Cached PROSPECT results for the current day</summary>
-        private LeafOptics? cachedResults = null;
+        private LeafOptics? cachedProspectResults = null;
 
         /// <summary>The date of the last cached results</summary>
         private DateTime? lastCalculationDate = null;
@@ -198,13 +198,13 @@ namespace Models.PROSAIL.PROSPECT
             // Initialize 
             CurrentParameterValues.Clear();
             // Clear cached results to force recalculation
-            cachedResults = null;
+            cachedProspectResults = null;
             lastCalculationDate = null;
             try
             {
                 // Calculate PROSPECT outputs
                 var results = CalculateProspect();
-                cachedResults = results; // Cache results
+                cachedProspectResults = results; // Cache results
                 lastCalculationDate = Clock.Today;
 
                 WriteMessage(LogLevel.Info, message: $"ProspectModel: PROSPECT calculation completed, Reflectance[{results.Reflectance.Length}], Transmittance[{results.Transmittance.Length}]");

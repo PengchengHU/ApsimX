@@ -41,7 +41,7 @@ namespace Models.PROSAIL.Sail
         /// <returns>A SailResult object containing calculated reflectance factors, fCover, and absorptance.</returns>
         /// <exception cref="ArgumentNullException">Thrown if leafOptics or soilProperties are null.</exception>
         /// <exception cref="ArgumentException">Thrown if input array lengths mismatch.</exception>
-        public static SailResult FourSAIL(LeafOptics leafOptics, int typeLidf, double lidfA, double? lidfB,
+        public static CanopyOptics FourSAIL(LeafOptics leafOptics, int typeLidf, double lidfA, double? lidfB,
                                  double lai, double q, double tts, double tto, double psi,
                                  SoilOptics soilOptics)
         {
@@ -104,7 +104,7 @@ namespace Models.PROSAIL.Sail
                     Console.WriteLine("Warning: LAI is negative. Results computed assuming LAI = 0.");
                 }
 
-                return new SailResult
+                return new CanopyOptics
                 {
                     Rdot = rdot,
                     Rsot = rsot,
@@ -443,7 +443,7 @@ namespace Models.PROSAIL.Sail
                 fCover[i] = 1.0 - too[i];
             } // End of wavelength loop
 
-            return new SailResult
+            return new CanopyOptics
             {
                 Rdot = rdot,
                 Rsot = rsot,
@@ -478,7 +478,7 @@ namespace Models.PROSAIL.Sail
         /// <returns>A SailResult object containing calculated reflectance factors, fCover, and absorptance.</returns>
         /// <exception cref="ArgumentNullException">Thrown if leafGreen, leafBrown or soilProperties are null.</exception>
         /// <exception cref="ArgumentException">Thrown if input array lengths mismatch or parameters are invalid.</exception>
-        public static SailResult FourSAIL2(LeafOptics leafGreen, LeafOptics leafBrown,
+        public static CanopyOptics FourSAIL2(LeafOptics leafGreen, LeafOptics leafBrown,
                                   int typeLidf, double lidfA, double? lidfB, double lai,
                                   double q, double tts, double tto, double psi, SoilOptics soilOptics,
                                   double fractionBrown, double diss, double cv, double zeta)
@@ -561,7 +561,7 @@ namespace Models.PROSAIL.Sail
                     rsdstar[i] = rsoil[i]; // Albedo component is just soil
                     rddstar[i] = rsoil[i];
                 }
-                return new SailResult { Rdot = rdot, Rsot = rsot, Rddt = rddt, Rsdt = rsdt, FCover = fCover, 
+                return new CanopyOptics { Rdot = rdot, Rsot = rsot, Rddt = rddt, Rsdt = rsdt, FCover = fCover, 
                     Abs_dir = abs_dir, Abs_hem = abs_hem, Rsdstar = rsdstar, Rddstar = rddstar };
             }
 
@@ -1180,7 +1180,7 @@ namespace Models.PROSAIL.Sail
             } // End wavelength loop
 
 
-            return new SailResult
+            return new CanopyOptics
             {
                 Rdot = rdot,
                 Rsot = rsot,

@@ -8,9 +8,9 @@ using Newtonsoft.Json;
 using Models.Core;
 using APSIM.Shared.Utilities;
 using Microsoft.CodeAnalysis.CSharp.Syntax;
-using System.Collections.Generic; // Add this for PathUtilities
+using System.Collections.Generic;
 
-namespace Models.Prospect
+namespace Models.PROSAIL.PROSPECT
 {
     /// <summary>
     /// Implements the PROSPECT radiative transfer model for leaf optical properties
@@ -113,8 +113,7 @@ namespace Models.Prospect
             /// <summary>Leaf transmittance spectrum (unitless fraction)</summary>
             public double[] Transmittance;
 
-            /// <summary>
-            /// Indicates whether this LeafOptics object holds data.
+            /// <summary> Indicates whether this LeafOptics object holds data.
             /// Returns false if Wavelength, Reflectance, or Transmittance is null.
             /// </summary>
             public readonly bool HasValue => Wavelength != null && Reflectance != null && Transmittance != null;
@@ -299,7 +298,7 @@ namespace Models.Prospect
                 Reflectance = reflectance.ToArray(),
                 Transmittance = transmittance.ToArray()
             };
-            return (LeafOpticsResult);
+            return LeafOpticsResult;
         }
 
         /// <summary>
@@ -326,7 +325,7 @@ namespace Models.Prospect
                     // where γ is the Euler-Mascheroni constant (0.5772156649...)
                     const double gamma = 0.5772156649015329;
                     double delta = k_i - 1.0;
-                    double eiApprox = -gamma - Math.Log(k_i) + k_i - (k_i * k_i) / 4.0 + (k_i * k_i * k_i) / 18.0;
+                    double eiApprox = -gamma - Math.Log(k_i) + k_i - k_i * k_i / 4.0 + k_i * k_i * k_i / 18.0;
                     double expTerm = (1 - k_i) * Math.Exp(-k_i);
                     double tauApprox = expTerm + k_i * k_i * eiApprox;
 

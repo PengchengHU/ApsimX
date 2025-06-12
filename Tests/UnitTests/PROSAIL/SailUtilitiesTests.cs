@@ -143,7 +143,7 @@ namespace UnitTests.PROSAIL
         // Helper to create simple soil properties
         private static SoilOptics CreateSampleSoil(double psoil = 0.5)
         {
-            WetDrySoilReflectance wetDrySoilReflectance = LoadLocalWetDrySoilOpticalData(DefaultSpecSoilDataPath);
+            WetDrySoilReflectance wetDrySoilReflectance = LoadWetDrySoilReflectanData(DefaultSpecSoilDataPath);
             // Create the wavelength-to-index mapping for speeding up the subset of the specified wavelengths
             var wavelengthToIndex = new Dictionary<double, int>();
             for (int i = 0; i < wetDrySoilReflectance.Wavelength.Count; i++)
@@ -152,8 +152,8 @@ namespace UnitTests.PROSAIL
             }
 
             // Calculate the weighted reflectance vector
-            Vector<double> weightedReflectance = psoil * wetDrySoilReflectance.ReflectanceDry +
-                                                 (1 - psoil) * wetDrySoilReflectance.ReflectanceWet;
+            Vector<double> weightedReflectance = psoil * wetDrySoilReflectance.DrySoilReflectance +
+                                                 (1 - psoil) * wetDrySoilReflectance.WetSoilReflectance;
 
             SoilOptics soilOpticalData;
             soilOpticalData = new SoilOptics
