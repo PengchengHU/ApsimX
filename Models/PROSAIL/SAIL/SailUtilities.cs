@@ -1,8 +1,10 @@
 ﻿using MathNet.Numerics;
 using MathNet.Numerics.LinearAlgebra;
 using Models.PROSAIL.PROSPECT;
+using Newtonsoft.Json;
 using System;
 using System.Collections.Generic;
+using System.IO;
 using System.Linq;
 using static Models.Prosail.ProsailCore;
 using static Models.PROSAIL.PROSPECT.ProspectCore;
@@ -43,6 +45,14 @@ namespace Models.PROSAIL.SAIL
             /// Diffuse sky radiation spectrum (e.g., W/m²/nm).
             /// </summary>
             public double[] DiffuseLight { get; set; }
+        }
+
+        // Helper class for JSON deserialization
+        private class WetDrySoilReflectanceDataJason
+        {
+            public double[] Wavelength { get; set; }
+            public double[] Dry_Soil { get; set; }
+            public double[] Wet_Soil { get; set; }
         }
 
         /// <summary>
@@ -1389,14 +1399,78 @@ namespace Models.PROSAIL.SAIL
         }
 
         /// <summary>
+        /// Load spectral data of wet and dry soil from a local JSON file
+        /// </summary>
+        /// <param> WetDrySoilReflectanceDataPath </param>
+        /// <param name="WetDrySoilReflectanceDataPath">Path of Json file containting reflectance of wet and dry soil.</param>
+        /// <returns> WetDrySoilReflectance object containing wavelength and reflectance data</returns>
+        public static WetDrySoilReflectance LoadWetDrySoilReflectanData(string WetDrySoilReflectanceDataPath)
+        {
+            if (!File.Exists(WetDrySoilReflectanceDataPath))
+            {
+                throw new FileNotFoundException($"Soil optical data file not found at {WetDrySoilReflectanceDataPath}. Please provide a valid SoilOptics or ensure the file exists.");
+            }
+
+            try
+            {
+                string json = File.ReadAllText(WetDrySoilReflectanceDataPath);
+                var OpticalData = JsonConvert.DeserializeObject<WetDrySoilReflectanceDataJason>(json);
+
+                // Check if deserialization was successful
+                if (OpticalData == null)
+                {
+                    throw new Exception("Deserialization returned null - invalid JSON format or empty file");
+                }
+
+                // Check if required arrays exist and have data
+                if (OpticalData.Wavelength == null || OpticalData.Wavelength.Length == 0)
+                {
+                    throw new Exception("Wavelength data is missing or empty");
+                }
+
+                if (OpticalData.Wet_Soil == null || OpticalData.Wet_Soil.Length == 0)
+                {
+                    throw new Exception("Wet_Soil data is missing or empty");
+                }
+
+                if (OpticalData.Dry_Soil == null || OpticalData.Dry_Soil.Length == 0)
+                {
+                    throw new Exception("Dry_Soil data is missing or empty");
+                }
+
+                // Check if all arrays have the same length
+                if (OpticalData.Wavelength.Length != OpticalData.Wet_Soil.Length ||
+                    OpticalData.Wavelength.Length != OpticalData.Dry_Soil.Length)
+                {
+                    throw new Exception($"Array length mismatch - Wavelength: {OpticalData.Wavelength.Length}, " +
+                                      $"Wet_Soil: {OpticalData.Wet_Soil.Length}, Dry_Soil: {OpticalData.Dry_Soil.Length}");
+                }
+
+                return new WetDrySoilReflectance
+                {
+                    Wavelength = Vector<double>.Build.DenseOfArray(OpticalData.Wavelength),
+                    DrySoilReflectance = Vector<double>.Build.DenseOfArray(OpticalData.Dry_Soil),
+                    WetSoilReflectance = Vector<double>.Build.DenseOfArray(OpticalData.Wet_Soil)
+                };
+            }
+            catch (JsonException jsonEx)
+            {
+                throw new Exception($"JSON parsing error in {WetDrySoilReflectanceDataPath}: {jsonEx.Message}", jsonEx);
+            }
+            catch (Exception ex)
+            {
+                throw new Exception($"Failed to load soil optical data from {WetDrySoilReflectanceDataPath}: {ex.Message}", ex);
+            }
+        }
+
+        /// <summary>
         /// Computes soil reflectance based on the wet and dry soil reflectance data.
         /// </summary>
-        /// <param name="wetDryReflectanceJsonPath">Path of Json file containing Wavelenght, Wet_Soil and Dry_Soil</param>
+        /// <param name="wetDrySoilReflectance">Object of WetDrySoilReflectance, containing Wavelenght, Wet_Soil and Dry_Soil</param>
         /// <param name="psoil">Dry to Wet soil factor (unitless; 0 for wet, 1 for dry)</param>
         /// <returns>An object of SoilOptics containing Wavelength and Reflectance.</returns>
-        public static SoilOptics CalculateSoilReflectanceFromWetDry(string wetDryReflectanceJsonPath, double psoil = 0.5)
+        public static SoilOptics CalculateSoilReflectanceFromWetDry(WetDrySoilReflectance wetDrySoilReflectance, double psoil = 0.5)
         {
-            WetDrySoilReflectance wetDrySoilReflectance = LoadLocalWetDrySoilReflectanData(wetDryReflectanceJsonPath);
             // Create the wavelength-to-index mapping for speeding up the subset of the specified wavelengths
             var wavelengthToIndex = new Dictionary<double, int>();
             for (int i = 0; i < wetDrySoilReflectance.Wavelength.Count; i++)
@@ -1405,8 +1479,8 @@ namespace Models.PROSAIL.SAIL
             }
 
             // Calculate the weighted reflectance vector
-            Vector<double> weightedReflectance = psoil * wetDrySoilReflectance.DryReflectance +
-                                                 (1 - psoil) * wetDrySoilReflectance.WetReflectance;
+            Vector<double> weightedReflectance = psoil * wetDrySoilReflectance.DrySoilReflectance +
+                                                 (1 - psoil) * wetDrySoilReflectance.WetSoilReflectance;
 
             SoilOptics soilOpticalData;
             soilOpticalData = new SoilOptics

@@ -76,7 +76,7 @@ namespace Models.Prosail
         /// <exception cref="ArgumentException">Thrown if input parameters are invalid or array lengths mismatch.</exception>
         /// <exception cref="ArgumentNullException">Thrown if required inputs are null for specific configurations.</exception>
         /// <exception cref="FileNotFoundException">Thrown if spectral data file is missing when leafOpticalConstants is null.</exception>
-        public CanopyOptics PRO4SAIL(
+        public static CanopyOptics PRO4SAIL(
             LeafOpticalConsts? leafOpticalConstants = null,
             List<ProspectInputs> inputProspectList = null,
             double N = 1.5,
@@ -181,80 +181,5 @@ namespace Models.Prosail
 
             return result;
         }
-
-
-        /// <summary>
-        /// Load spectral data of wet and dry soil from a local JSON file
-        /// </summary>
-        /// <param> WetDrySoilReflectanceDataPath </param>
-        /// <param name="WetDrySoilReflectanceDataPath">Path of Json file containting reflectance of wet and dry soil.</param>
-        /// <returns> WetDrySoilReflectance object containing wavelength and reflectance data</returns>
-        public static WetDrySoilReflectance LoadWetDrySoilReflectanData(string WetDrySoilReflectanceDataPath)
-        {
-            if (!File.Exists(WetDrySoilReflectanceDataPath))
-            {
-                throw new FileNotFoundException($"Soil optical data file not found at {WetDrySoilReflectanceDataPath}. Please provide a valid SoilOptics or ensure the file exists.");
-            }
-
-            try
-            {
-                string json = File.ReadAllText(WetDrySoilReflectanceDataPath);
-                var OpticalData = JsonConvert.DeserializeObject<WetDrySoilOpticalDataJason>(json);
-
-                // Check if deserialization was successful
-                if (OpticalData == null)
-                {
-                    throw new Exception("Deserialization returned null - invalid JSON format or empty file");
-                }
-
-                // Check if required arrays exist and have data
-                if (OpticalData.Wavelength == null || OpticalData.Wavelength.Length == 0)
-                {
-                    throw new Exception("Wavelength data is missing or empty");
-                }
-
-                if (OpticalData.Wet_Soil == null || OpticalData.Wet_Soil.Length == 0)
-                {
-                    throw new Exception("Wet_Soil data is missing or empty");
-                }
-
-                if (OpticalData.Dry_Soil == null || OpticalData.Dry_Soil.Length == 0)
-                {
-                    throw new Exception("Dry_Soil data is missing or empty");
-                }
-
-                // Check if all arrays have the same length
-                if (OpticalData.Wavelength.Length != OpticalData.Wet_Soil.Length ||
-                    OpticalData.Wavelength.Length != OpticalData.Dry_Soil.Length)
-                {
-                    throw new Exception($"Array length mismatch - Wavelength: {OpticalData.Wavelength.Length}, " +
-                                      $"Wet_Soil: {OpticalData.Wet_Soil.Length}, Dry_Soil: {OpticalData.Dry_Soil.Length}");
-                }
-
-                return new WetDrySoilReflectance
-                {
-                    Wavelength = Vector<double>.Build.DenseOfArray(OpticalData.Wavelength),
-                    DrySoilReflectance = Vector<double>.Build.DenseOfArray(OpticalData.Dry_Soil),
-                    WetSoilReflectance = Vector<double>.Build.DenseOfArray(OpticalData.Wet_Soil)
-                };
-            }
-            catch (JsonException jsonEx)
-            {
-                throw new Exception($"JSON parsing error in {WetDrySoilReflectanceDataPath}: {jsonEx.Message}", jsonEx);
-            }
-            catch (Exception ex)
-            {
-                throw new Exception($"Failed to load soil optical data from {WetDrySoilReflectanceDataPath}: {ex.Message}", ex);
-            }
-        }
-
-        // Helper class for JSON deserialization
-        private class WetDrySoilOpticalDataJason
-        {
-            public double[] Wavelength { get; set; }
-            public double[] Dry_Soil { get; set; }
-            public double[] Wet_Soil { get; set; }
-        }
-
     }
 }
