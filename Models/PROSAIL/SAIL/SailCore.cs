@@ -1,16 +1,17 @@
-﻿using System;
+﻿using APSIM.Shared.Utilities;
+using DocumentFormat.OpenXml.Spreadsheet;
+using MathNet.Numerics;
+using MathNet.Numerics.IntegralTransforms;
+using MathNet.Numerics.LinearAlgebra;
+using Models.Core;
+using Newtonsoft.Json;
+using System;
 using System.Collections.Generic;
+using System.IO;
 using System.Linq;
 using System.Numerics; // If complex numbers were needed
-using System.IO;
-using MathNet.Numerics;
-using MathNet.Numerics.LinearAlgebra;
-using MathNet.Numerics.IntegralTransforms;
-using Newtonsoft.Json;
-using Models.Core;
-using APSIM.Shared.Utilities;
-using static Models.PROSAIL.SAIL.SailUtilities;
 using static Models.PROSAIL.PROSPECT.ProspectCore;
+using static Models.PROSAIL.SAIL.SailUtilities;
 
 
 namespace Models.PROSAIL.Sail
@@ -55,12 +56,12 @@ namespace Models.PROSAIL.Sail
             }
             if (leafOptics.Reflectance == null || leafOptics.Transmittance == null || soilOptics.Reflectance == null) 
             {
-                throw new ArgumentException("Reflectance/Transmittance arrays in leafOptics and soilProperties cannot be null.");
+                throw new ArgumentException("Reflectance/Transmittance arrays in leafOptics and soilOptics cannot be null.");
             }
 
             if (leafOptics.Reflectance.Length != leafOptics.Transmittance.Length || leafOptics.Reflectance.Length != soilOptics.Reflectance.Count) 
             {
-                throw new ArgumentException("Input reflectance/transmittance arrays must have the same length.");
+                throw new ArgumentException("Input reflectance/transmittance arrays in leafOptics and soilOptics must have the same length.");
             }                
 
             // ########################################################################### #
@@ -223,8 +224,8 @@ namespace Models.PROSAIL.Sail
             double[] vf = new double[nLambda];   // View forward scattering coeff [rho, tau]
             double[] w = new double[nLambda];    // Bidirectional scattering coeff [rho, tau]
 
-            double[] tss = new double[nLambda];  // Directional transmittance solar (k, lai)
-            double[] too = new double[nLambda];  // Directional transmittance observer (k, lai)
+            //double[] tss = new double[nLambda];  // Directional transmittance solar (k, lai)
+            //double[] too = new double[nLambda];  // Directional transmittance observer (k, lai)
             double[] rdd = new double[nLambda];  // Canopy bi-hemispherical reflectance (no soil)
             double[] tdd = new double[nLambda];  // Canopy bi-hemispherical transmittance (no soil)
             double[] rsd = new double[nLambda];  // Canopy directional-hemispherical reflectance (no soil)
@@ -236,6 +237,85 @@ namespace Models.PROSAIL.Sail
             double[] rsod = new double[nLambda]; // Multiple scattering contribution to rso
             double[] rsost = new double[nLambda];// Single scattering + soil interaction
             double[] rsodt = new double[nLambda];// Multiple scattering + soil interaction
+
+            // Calculate scalar transmittances and hotspot parameters before the wavelength loop
+            // Direct transmittances through the canopy layer
+            double tss = Math.Exp(-ks * lai); // exp(-ks*LAI), Directional transmittance solar (k, lai)
+            double too = Math.Exp(-ko * lai); // exp(-ko*LAI), Directional transmittance observer (k, lai)
+
+            //	Treatment of the hotspot-effect
+            double alf = 1e6; // Default large value (no hotspot)
+                              //	Apply correction 2/(K+k) suggested by F.-M. Breon
+            if (q > 0) // q = hotspot parameter
+            {
+                double ks_plus_ko = ks + ko;
+                if (Math.Abs(ks_plus_ko) < 1e-9) ks_plus_ko = 1e-9; // Avoid division by zero
+                alf = (dso / q) * 2.0 / ks_plus_ko; // Hotspot intensity parameter
+            }
+            // inserted H. Bach 1/3/04 - Limit alpha
+            if (alf > 200.0) alf = 200.0;
+
+            double tsstoo; // Joint probability gap fraction (solar and view)
+            double sumint; // Integral for single scattering hotspot correction
+
+            if (Math.Abs(alf) < 1e-9) // If alpha is zero (or very close) -> Pure hotspot - no shadow
+            {
+                tsstoo = tss; // Joint = Solar transmittance if paths coincide
+                sumint = (Math.Abs(ks * lai) < 1e-9) ? 1.0 : (1.0 - tss) / (ks * lai); // Integral limit
+            }
+            else // Outside the hotspot -> Calculate overlap integral
+            {
+                double fhot = lai * Math.Sqrt(ko * ks); // Hotspot function amplitude
+                                                        //	Integrate by exponential Simpson method in 20 steps
+                                                        //	the steps are arranged according to equal partitioning
+                                                        //	of the slope of the joint probability function
+                double x1 = 0, y1 = 0, sumint_acc = 0;
+                double f1 = 1.0; // exp(y1) where y1=0
+                double fint = (1.0 - Math.Exp(-alf)) * 0.05; // Step size in probability space
+                int nsteps = 20;
+
+                for (int j = 1; j <= nsteps; j++)
+                {
+                    double x2;
+                    if (j < nsteps)
+                    {
+                        // Inverse transformation to find integration point x2 in geometric space
+                        double prob_target = j * fint;
+                        if (prob_target >= 1.0) x2 = 1.0; // Clip if needed due to precision
+                        else x2 = -Math.Log(1.0 - prob_target) / alf;
+                    }
+                    else
+                    {
+                        x2 = 1.0; // Final step goes to full path length
+                    }
+
+                    // Calculate exponent for joint probability at x2
+                    double y2 = -(ko + ks) * lai * x2 + fhot * (1.0 - Math.Exp(-alf * x2)) / alf;
+                    double f2 = Math.Exp(y2); // Joint probability P(x2)
+
+                    // Simpson's rule component (trapezoidal approx here, matches R code)
+                    // Integral of P(x) dx from x1 to x2
+                    // R code uses (f2-f1)*(x2-x1)/(y2-y1) which is approx (f1+f2)/2 * (x2-x1) if y is linear in x
+                    // Let's use trapezoidal rule for simplicity and matching R code's likely intent
+                    if (Math.Abs(y2 - y1) > 1e-9) // Avoid division by zero if y values are the same
+                    {
+                        sumint_acc += (f2 - f1) * (x2 - x1) / (y2 - y1); // R code's formula
+                    }
+                    else
+                    { // If y values are same, use simple average probability * dx
+                        sumint_acc += 0.5 * (f1 + f2) * (x2 - x1);
+                    }
+
+                    // Update for next step
+                    x1 = x2;
+                    y1 = y2;
+                    f1 = f2;
+                }
+                tsstoo = f1; // Final joint probability exp(-(ko+ks)lai + correction)
+                sumint = sumint_acc; // The accumulated integral result
+            }
+            //	End of hotspot calculation
+
 
             for (int i = 0; i < nLambda; i++)
             {
@@ -292,10 +372,6 @@ namespace Models.PROSAIL.Sail
                 rdo[i] = (Qv - re * Pv) / denom;      // Hemispherical-directional Reflectance (view)
                 tdo[i] = (Pv - re * Qv) / denom;      // Hemispherical-directional Transmittance (view)
 
-                // Direct transmittances through the canopy layer
-                tss[i] = Math.Exp(-ks * lai); // exp(-ks*LAI) - Solar beam transmittance
-                too[i] = Math.Exp(-ko * lai); // exp(-ko*LAI) - Observer beam transmittance
-
                 // Calculate multiple scattering component (rsod)
                 double z = Jfunc3(ks, ko, lai); // J3(ks, ko, lai) - Note J3 is same as J2 in R code
                 double g1_denom = ko + mi;
@@ -303,8 +379,8 @@ namespace Models.PROSAIL.Sail
                 if (Math.Abs(g1_denom) < 1e-12) g1_denom = 1e-12; // Avoid division by zero
                 if (Math.Abs(g2_denom) < 1e-12) g2_denom = 1e-12; // Avoid division by zero
 
-                double g1 = (z - J1ks_val * too[i]) / g1_denom;
-                double g2 = (z - J1ko_val * tss[i]) / g2_denom;
+                double g1 = (z - J1ks_val * too) / g1_denom;
+                double g2 = (z - J1ko_val * tss) / g2_denom;
 
                 double Tv1 = (vfi * rinf + vbi) * g1;
                 double Tv2 = (vfi + vbi * rinf) * g2;
@@ -315,80 +391,7 @@ namespace Models.PROSAIL.Sail
                 //	Multiple scattering contribution to bidirectional canopy reflectance
                 double rsod_denom = (1.0 - rinf2);
                 if (Math.Abs(rsod_denom) < 1e-12) rsod_denom = 1e-12; // Avoid division by zero
-                rsod[i] = (T1 + T2 - T3) / rsod_denom; //
-
-                //	Treatment of the hotspot-effect
-                double alf = 1e6; // Default large value (no hotspot)
-                                  //	Apply correction 2/(K+k) suggested by F.-M. Breon
-                if (q > 0) // q = hotspot parameter
-                {
-                    double ks_plus_ko = ks + ko;
-                    if (Math.Abs(ks_plus_ko) < 1e-9) ks_plus_ko = 1e-9; // Avoid division by zero
-                    alf = (dso / q) * 2.0 / ks_plus_ko; // Hotspot intensity parameter
-                }
-                // inserted H. Bach 1/3/04 - Limit alpha
-                if (alf > 200.0) alf = 200.0;
-
-                double tsstoo; // Joint probability gap fraction (solar and view)
-                double sumint; // Integral for single scattering hotspot correction
-
-                if (Math.Abs(alf) < 1e-9) // If alpha is zero (or very close) -> Pure hotspot - no shadow
-                {
-                    tsstoo = tss[i]; // Joint = Solar transmittance if paths coincide
-                    sumint = (Math.Abs(ks * lai) < 1e-9) ? 1.0 : (1.0 - tss[i]) / (ks * lai); // Integral limit
-                }
-                else // Outside the hotspot -> Calculate overlap integral
-                {
-                    double fhot = lai * Math.Sqrt(ko * ks); // Hotspot function amplitude
-                                                            //	Integrate by exponential Simpson method in 20 steps
-                                                            //	the steps are arranged according to equal partitioning
-                                                            //	of the slope of the joint probability function
-                    double x1 = 0, y1 = 0, sumint_acc = 0;
-                    double f1 = 1.0; // exp(y1) where y1=0
-                    double fint = (1.0 - Math.Exp(-alf)) * 0.05; // Step size in probability space
-                    int nsteps = 20;
-
-                    for (int j = 1; j <= nsteps; j++)
-                    {
-                        double x2;
-                        if (j < nsteps)
-                        {
-                            // Inverse transformation to find integration point x2 in geometric space
-                            double prob_target = j * fint;
-                            if (prob_target >= 1.0) x2 = 1.0; // Clip if needed due to precision
-                            else x2 = -Math.Log(1.0 - prob_target) / alf;
-                        }
-                        else
-                        {
-                            x2 = 1.0; // Final step goes to full path length
-                        }
-
-                        // Calculate exponent for joint probability at x2
-                        double y2 = -(ko + ks) * lai * x2 + fhot * (1.0 - Math.Exp(-alf * x2)) / alf;
-                        double f2 = Math.Exp(y2); // Joint probability P(x2)
-
-                        // Simpson's rule component (trapezoidal approx here, matches R code)
-                        // Integral of P(x) dx from x1 to x2
-                        // R code uses (f2-f1)*(x2-x1)/(y2-y1) which is approx (f1+f2)/2 * (x2-x1) if y is linear in x
-                        // Let's use trapezoidal rule for simplicity and matching R code's likely intent
-                        if (Math.Abs(y2 - y1) > 1e-9) // Avoid division by zero if y values are the same
-                        {
-                            sumint_acc += (f2 - f1) * (x2 - x1) / (y2 - y1); // R code's formula
-                        }
-                        else
-                        { // If y values are same, use simple average probability * dx
-                            sumint_acc += 0.5 * (f1 + f2) * (x2 - x1);
-                        }
-
-                        // Update for next step
-                        x1 = x2;
-                        y1 = y2;
-                        f1 = f2;
-                    }
-                    tsstoo = f1; // Final joint probability exp(-(ko+ks)lai + correction)
-                    sumint = sumint_acc; // The accumulated integral result
-                }
-                //	End of hotspot calculation
+                rsod[i] = (T1 + T2 - T3) / rsod_denom; //                
 
                 //	Bidirectional reflectance calculations
                 //	Single scattering contribution (including hotspot)
@@ -405,12 +408,12 @@ namespace Models.PROSAIL.Sail
                 // rddt: bi-hemispherical reflectance factor (Canopy + Soil)
                 rddt[i] = rdd[i] + tdd[i] * rsoil_i * tdd[i] / dn;
                 // rsdt: directional-hemispherical reflectance factor for solar incident flux (Canopy + Soil)
-                rsdt[i] = rsd[i] + (tsd[i] + tss[i]) * rsoil_i * tdd[i] / dn;
+                rsdt[i] = rsd[i] + (tsd[i] + tss) * rsoil_i * tdd[i] / dn;
                 // rdot: hemispherical-directional reflectance factor in viewing direction (Canopy + Soil)
-                rdot[i] = rdo[i] + tdd[i] * rsoil_i * (tdo[i] + too[i]) / dn;
+                rdot[i] = rdo[i] + tdd[i] * rsoil_i * (tdo[i] + too) / dn;
                 // rsot: bi-directional reflectance factor (Canopy + Soil)
                 // Multiple scattering part + soil interaction
-                rsodt[i] = rsod[i] + ((tss[i] + tsd[i]) * tdo[i] + (tsd[i] + tss[i] * rsoil_i * rdd[i]) * too[i]) * rsoil_i / dn;
+                rsodt[i] = rsod[i] + ((tss + tsd[i]) * tdo[i] + (tsd[i] + tss * rsoil_i * rdd[i]) * too) * rsoil_i / dn;
                 // Single scattering part + soil interaction (hotspot included in tsstoo)
                 rsost[i] = rsos[i] + tsstoo * rsoil_i;
                 // Total bi-directional reflectance factor
@@ -436,11 +439,11 @@ namespace Models.PROSAIL.Sail
 
                 // compute Albedo components (from J. Gomez Dans cited in R code)
                 // These represent the hemispherical reflectance factors for direct and diffuse incidence separately.
-                rsdstar[i] = rsd[i] + (tss[i] + tsd[i]) * rsoil_i * tdd[i] / dn; // == rsdt[i] - seems redundant? No, Tsd vs Tdd. Okay.
+                rsdstar[i] = rsd[i] + (tss + tsd[i]) * rsoil_i * tdd[i] / dn; // == rsdt[i] - seems redundant? No, Tsd vs Tdd. Okay.
                 rddstar[i] = rdd[i] + (tdd[i] * tdd[i] * rsoil_i) / dn;          // == rddt[i]? Check formula: rddt = rdd + tdd*rs*tdd/dn. Yes, seems rddstar = rddt.
 
                 // fCover: Fraction of green Vegetation Cover (= 1 - beam transmittance in the target-view path)
-                fCover[i] = 1.0 - too[i];
+                fCover[i] = 1.0 - too;
             } // End of wavelength loop
 
             return new CanopyOptics
@@ -500,7 +503,7 @@ namespace Models.PROSAIL.Sail
                 leafBrown.Reflectance == null || leafBrown.Transmittance == null ||
                 soilOptics.Reflectance == null)
             {
-                throw new ArgumentException("Reflectance/Transmittance arrays in leafOptics and soilProperties cannot be null.");
+                throw new ArgumentException("Reflectance/Transmittance arrays in leafOptics and soilOptics cannot be null.");
             }                
 
             int nLambda = leafGreen.Reflectance.Length;
@@ -508,7 +511,7 @@ namespace Models.PROSAIL.Sail
                 leafBrown.Reflectance.Length != nLambda || leafBrown.Transmittance.Length != nLambda ||
                 soilOptics.Reflectance.Count != nLambda)
             {
-                throw new ArgumentException("Input reflectance/transmittance arrays must have the same length.");
+                throw new ArgumentException("Input reflectance/transmittance arrays in leafOptics and soilOptics must have the same length.");
             }
 
             if (fractionBrown < 0 || fractionBrown > 1)
