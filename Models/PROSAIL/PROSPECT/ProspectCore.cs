@@ -24,6 +24,9 @@ namespace Models.PROSAIL.PROSPECT
     /// </remarks>
     public static class ProspectCore
     {
+        private static LeafOpticalConsts _cachedOpticalConstants;
+        private static readonly object _lock = new object();
+
         /// <summary>
         /// Contains leaf optical constants required for PROSPECT calculations
         /// </summary>
@@ -112,16 +115,47 @@ namespace Models.PROSAIL.PROSPECT
             public double[] Reflectance;
             /// <summary>Leaf transmittance spectrum (unitless fraction)</summary>
             public double[] Transmittance;
+            /// <summary>Dictionary mapping wavelengths to their indices</summary>
+            public Dictionary<double, int> WavelengthToIndex;
 
             /// <summary> Indicates whether this LeafOptics object holds data.
             /// Returns false if Wavelength, Reflectance, or Transmittance is null.
             /// </summary>
             public readonly bool HasValue => Wavelength != null && Reflectance != null && Transmittance != null;
+
+            /// <summary>Constructor that automatically creates WavelengthToIndex</summary>
+            public LeafOptics(double[] wavelength, double[] reflectance, double[] transmittance)
+            {
+                Wavelength = wavelength;
+                Reflectance = reflectance;
+                Transmittance = transmittance;
+                WavelengthToIndex = wavelength?.Select((w, i) => new { Wavelength = w, Index = i })
+                                              .ToDictionary(x => x.Wavelength, x => x.Index);
+            }
         }
 
         // Relative path from APSIM bin directory to Models\PROSAIL\PROSPECT
         private static readonly string RelativeLeafOpticalDataPath = "..\\..\\..\\Models\\PROSAIL\\PROSPECT\\SpecPROSPECT_FullRange.json";
         private static string DefaultLeafOpticalDataPath => PathUtilities.GetAbsolutePath(RelativeLeafOpticalDataPath, AppDomain.CurrentDomain.BaseDirectory);
+
+        /// <summary>
+        /// Gets cached leaf optical constants, loading them if necessary.
+        /// </summary>
+        /// <returns>The cached leaf optical constants.</returns>
+        public static LeafOpticalConsts GetCachedLeafOpticalConstants()
+        {
+            if (_cachedOpticalConstants.Wavelength == null) // Check if not initialized
+            {
+                lock (_lock)
+                {
+                    if (_cachedOpticalConstants.Wavelength == null) // Double-check after acquiring lock
+                    {
+                        _cachedOpticalConstants = LoadLocalLeafOpticalDataUncached();
+                    }
+                }
+            }
+            return _cachedOpticalConstants;
+        }
 
         /// <summary>
         /// Override the method of the PROSPECT model to calculate leaf reflectance and transmittance
@@ -132,7 +166,7 @@ namespace Models.PROSAIL.PROSPECT
         public static LeafOptics Prospect(ProspectInputs ProspectInputs, LeafOpticalConsts? LeafOpticalConstants = null)
         {
             // Load spectral constants if not provided
-            LeafOpticalConsts LeafConstants = LeafOpticalConstants ?? LoadLocalLeafOpticalData();
+            LeafOpticalConsts LeafConstants = LeafOpticalConstants ?? GetCachedLeafOpticalConstants();
 
             LeafOptics res = Prospect(LeafOpticalConstants: LeafConstants, 
                 N: ProspectInputs.N, 
@@ -182,7 +216,7 @@ namespace Models.PROSAIL.PROSPECT
             double[] Wavelengths = null)
         {
             // Load spectral constants if not provided
-            LeafOpticalConsts LeafConstants = LeafOpticalConstants ?? LoadLocalLeafOpticalData();
+            LeafOpticalConsts LeafConstants = LeafOpticalConstants ?? GetCachedLeafOpticalConstants();
 
             // Input validation
             if (N <= 0) throw new ArgumentException("Leaf structure parameter N must be positive.");
@@ -352,7 +386,7 @@ namespace Models.PROSAIL.PROSPECT
                 {
                     // If ExponentialIntegral fails (e.g., due to continued fraction convergence failure),
                     // fall back to a simple approximation: tau ≈ e^(-k_i)
-                    // This is a reasonable approximation for moderate absorption and avoids simulation failure
+                    // This is a reasonable approximation for moderate absorption and avoids simulation failure Using approximation tau ≈ e^(-k_i).");
                     Console.WriteLine($"Warning: ProspectCore: Failed to compute ExponentialIntegral for k_i={k_i:F6}: {ex.Message}. Using approximation tau ≈ e^(-k_i).");
                     double tauFallback = Math.Exp(-k_i);
 
@@ -403,7 +437,7 @@ namespace Models.PROSAIL.PROSPECT
         /// <summary>
         /// Load leaf optical data from a local JSON file
         /// </summary>
-        public static LeafOpticalConsts LoadLocalLeafOpticalData()
+        public static LeafOpticalConsts LoadLocalLeafOpticalDataUncached()
         {
             string path = DefaultLeafOpticalDataPath;
             if (!File.Exists(path))
