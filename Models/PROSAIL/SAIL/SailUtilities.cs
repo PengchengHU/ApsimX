@@ -1,6 +1,4 @@
-﻿using MathNet.Numerics;
-using MathNet.Numerics.LinearAlgebra;
-using Models.PROSAIL.PROSPECT;
+﻿using MathNet.Numerics.LinearAlgebra;
 using Newtonsoft.Json;
 using System;
 using System.Collections.Generic;
@@ -26,6 +24,7 @@ namespace Models.PROSAIL.SAIL
     {
         #region Supporting Data Structures/Classes: define the inputs and outputs for the utility methods
 
+        /*
         /// <summary>
         /// Holds atmospheric sensor spectral data (wavelengths, direct/diffuse irradiance).
         /// </summary>
@@ -45,37 +44,73 @@ namespace Models.PROSAIL.SAIL
             /// Diffuse sky radiation spectrum (e.g., W/m²/nm).
             /// </summary>
             public double[] DiffuseLight { get; set; }
+
+            /// <summary>
+            /// Dictionary mapping wavelengths to their indices
+            /// </summary>
+            public Dictionary<double, int> WavelengthToIndex { get; set; }
+
+            /// <summary>
+            /// Indicates whether this object contains valid data
+            /// </summary>
+            public bool HasValue => Wavelength != null && DirectLight != null && DiffuseLight != null
+                                   && Wavelength.Length == DirectLight.Length && Wavelength.Length == DiffuseLight.Length;
+
+            /// <summary>
+            /// Initialize WavelengthToIndex dictionary
+            /// </summary>
+            public void InitializeWavelengthToIndex()
+            {
+                if (Wavelength != null)
+                {
+                    WavelengthToIndex = Wavelength.Select((w, i) => new { Wavelength = w, Index = i })
+                                                 .ToDictionary(x => x.Wavelength, x => x.Index);
+                }
+            }
         }
 
         // Helper class for JSON deserialization
         private class WetDrySoilReflectanceDataJason
         {
+            /// <summary> Wavelengths (nm).</summary>
             public double[] Wavelength { get; set; }
+            /// <summary> Soil reflectance spectrum of dry soil (unitless fraction).</summary>
             public double[] Dry_Soil { get; set; }
+            /// <summary> Soil reflectance spectrum od wet soil (unitless fraction).</summary>
             public double[] Wet_Soil { get; set; }
+
+            /// <summary> Dictionary mapping wavelengths to their indices. </summary>
+            public Dictionary<double, int> WavelengthToIndex { get; set; }
+
+            /// <summary> Indicates whether this object contains valid data</summary>
+            public bool HasValue => Wavelength != null && Dry_Soil != null && Wet_Soil != null
+                                   && Wavelength.Length == Dry_Soil.Length && Wavelength.Length == Wet_Soil.Length;
+
+            /// <summary> Initialize WavelengthToIndex dictionary</summary>
+            public void InitializeWavelengthToIndex()
+            {
+                if (Wavelength != null)
+                {
+                    WavelengthToIndex = Wavelength.Select((w, i) => new { Wavelength = w, Index = i })
+                                                 .ToDictionary(x => x.Wavelength, x => x.Index);
+                }
+            }
         }
 
-        /// <summary>
-        /// Holds soil spectral data (wavelengths and reflectance).
-        /// </summary>
+
+        /// <summary> Holds soil spectral data (wavelengths and reflectance).</summary>
         public struct SoilOptics 
         {
-            /// <summary>
-            /// Wavelengths (nm). Should match simulation wavelengths.
-            /// </summary>
+            /// <summary>Wavelengths (nm).</summary>
             public Vector<double> Wavelength;
 
-            /// <summary>
-            /// Soil reflectance spectrum (unitless fraction).
-            /// </summary>
+            /// <summary>Soil reflectance spectrum (unitless fraction).</summary>
             public Vector<double> Reflectance;
 
-            /// <summary>Dictionary mapping wavelengths to their indices in the Wavelength array (for optimized filtering).</summary>
+            /// <summary>Dictionary mapping wavelengths to their indices in the Wavelength array.</summary>
             public Dictionary<double, int> WavelengthToIndex;
 
-            /// <summary>
-            /// Initializes a new instance of SoilOptics with default values.
-            /// </summary>
+            /// <summary>Initializes a new instance of SoilOptics with default values.</summary>
             public SoilOptics(Vector<double> wavelength, Vector<double> reflectance, Dictionary<double, int> wavelengthToIndex)
             {
                 Wavelength = wavelength;
@@ -83,12 +118,45 @@ namespace Models.PROSAIL.SAIL
                 WavelengthToIndex = wavelengthToIndex ?? new Dictionary<double, int>();
             }
 
-            /// <summary>
-            /// Indicates whether this LeafOptics object holds data.
-            /// Returns false if Wavelength or Reflectance is null.
-            /// </summary>
+            /// <summary>Indicates whether this LeafOptics object holds data.
+            /// Returns false if Wavelength or Reflectance is null.</summary>
             public readonly bool HasValue => Wavelength != null && Reflectance != null && WavelengthToIndex != null;
-        }
+        }*/
+
+        /*
+        /// <summary>
+        /// Represents the output of the SAIL models (FourSAIL, FourSAIL2).
+        /// Contains various reflectance factors and derived quantities like fCover and absorptance.
+        /// </summary>
+        public class CanopyOptics
+        {
+            /// <summary>Hemispherical-directional reflectance factor in viewing direction (R_o).</summary>
+            public double[] Rdot { get; set; }
+            /// <summary>Bi-directional reflectance factor (R_so).</summary>
+            public double[] Rsot { get; set; }
+            /// <summary>Bi-hemispherical reflectance factor (R_dd).</summary>
+            public double[] Rddt { get; set; }
+            /// <summary>Directional-hemispherical reflectance factor for solar incident flux (R_sd).</summary>
+            public double[] Rsdt { get; set; }
+            /// <summary>Fraction of Vegetation Cover (fCover = 1 - gap fraction in view direction).</summary>
+            public double[] FCover { get; set; }
+            /// <summary>Canopy absorptance for direct solar incident flux (fraction absorbed by canopy+soil system).</summary>
+            public double[] Abs_dir { get; set; }
+            /// <summary>Canopy absorptance for hemispherical diffuse incident flux (fraction absorbed by canopy+soil system).</summary>
+            public double[] Abs_hem { get; set; }
+            /// <summary>Contribution of direct solar incident flux to albedo (Hemispherical reflectance for direct incidence, Rsd*).</summary>
+            public double[] Rsdstar { get; set; }
+            /// <summary>Contribution of hemispherical diffuse incident flux to albedo (Hemispherical reflectance for diffuse incidence, Rdd*).</summary>
+            public double[] Rddstar { get; set; }
+
+            /// <summary>Wavelength array in nanometers (nm)</summary>
+            public double[] Wavelength;
+
+            /// <summary> Indicates whether this LeafOptics object holds data.
+            /// Returns false if Wavelength, Reflectance, or Transmittance is null.
+            /// </summary>
+            //public readonly bool HasValue => Wavelength != null && Reflectance != null && Transmittance != null;
+        }*/
 
 
         /// <summary>
@@ -169,39 +237,7 @@ namespace Models.PROSAIL.SAIL
             public LeafOptics? BrownLOP { get; set; }
         }
 
-        /// <summary>
-        /// Represents the output of the SAIL models (FourSAIL, FourSAIL2).
-        /// Contains various reflectance factors and derived quantities like fCover and absorptance.
-        /// </summary>
-        public class CanopyOptics
-        {
-            /// <summary>Hemispherical-directional reflectance factor in viewing direction (R_o).</summary>
-            public double[] Rdot { get; set; }
-            /// <summary>Bi-directional reflectance factor (R_so).</summary>
-            public double[] Rsot { get; set; }
-            /// <summary>Bi-hemispherical reflectance factor (R_dd).</summary>
-            public double[] Rddt { get; set; }
-            /// <summary>Directional-hemispherical reflectance factor for solar incident flux (R_sd).</summary>
-            public double[] Rsdt { get; set; }
-            /// <summary>Fraction of Vegetation Cover (fCover = 1 - gap fraction in view direction).</summary>
-            public double[] FCover { get; set; }
-            /// <summary>Canopy absorptance for direct solar incident flux (fraction absorbed by canopy+soil system).</summary>
-            public double[] Abs_dir { get; set; }
-            /// <summary>Canopy absorptance for hemispherical diffuse incident flux (fraction absorbed by canopy+soil system).</summary>
-            public double[] Abs_hem { get; set; }
-            /// <summary>Contribution of direct solar incident flux to albedo (Hemispherical reflectance for direct incidence, Rsd*).</summary>
-            public double[] Rsdstar { get; set; }
-            /// <summary>Contribution of hemispherical diffuse incident flux to albedo (Hemispherical reflectance for diffuse incidence, Rdd*).</summary>
-            public double[] Rddstar { get; set; }
-
-            /// <summary>Wavelength array in nanometers (nm)</summary>
-            public double[] Wavelength;
-
-            /*/// <summary> Indicates whether this LeafOptics object holds data.
-            /// Returns false if Wavelength, Reflectance, or Transmittance is null.
-            /// </summary>
-            public readonly bool HasValue => Wavelength != null && Reflectance != null && Transmittance != null;*/
-        }
+        
         #endregion
 
         // Constants used within the class
@@ -1446,11 +1482,18 @@ namespace Models.PROSAIL.SAIL
                                       $"Wet_Soil: {OpticalData.Wet_Soil.Length}, Dry_Soil: {OpticalData.Dry_Soil.Length}");
                 }
 
+                var wavelengthToIndex = new Dictionary<double, int>();
+                for (int i = 0; i < OpticalData.Wavelength.Length; i++)
+                {
+                    wavelengthToIndex[OpticalData.Wavelength[i]] = i;
+                }
+
                 return new WetDrySoilReflectance
                 {
                     Wavelength = Vector<double>.Build.DenseOfArray(OpticalData.Wavelength),
                     DrySoilReflectance = Vector<double>.Build.DenseOfArray(OpticalData.Dry_Soil),
-                    WetSoilReflectance = Vector<double>.Build.DenseOfArray(OpticalData.Wet_Soil)
+                    WetSoilReflectance = Vector<double>.Build.DenseOfArray(OpticalData.Wet_Soil),
+                    WavelengthToIndex = wavelengthToIndex
                 };
             }
             catch (JsonException jsonEx)
@@ -1471,23 +1514,15 @@ namespace Models.PROSAIL.SAIL
         /// <returns>An object of SoilOptics containing Wavelength and Reflectance.</returns>
         public static SoilOptics CalculateSoilReflectanceFromWetDry(WetDrySoilReflectance wetDrySoilReflectance, double psoil = 0.5)
         {
-            // Create the wavelength-to-index mapping for speeding up the subset of the specified wavelengths
-            var wavelengthToIndex = new Dictionary<double, int>();
-            for (int i = 0; i < wetDrySoilReflectance.Wavelength.Count; i++)
-            {
-                wavelengthToIndex[wetDrySoilReflectance.Wavelength[i]] = i;
-            }
-
             // Calculate the weighted reflectance vector
             Vector<double> weightedReflectance = psoil * wetDrySoilReflectance.DrySoilReflectance +
                                                  (1 - psoil) * wetDrySoilReflectance.WetSoilReflectance;
 
-            SoilOptics soilOpticalData;
-            soilOpticalData = new SoilOptics
+            SoilOptics soilOpticalData = new SoilOptics
             {
                 Wavelength = wetDrySoilReflectance.Wavelength,
                 Reflectance = weightedReflectance,
-                WavelengthToIndex = wavelengthToIndex
+                WavelengthToIndex = wetDrySoilReflectance.WavelengthToIndex
             };
 
             return soilOpticalData;
