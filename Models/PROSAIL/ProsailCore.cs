@@ -39,6 +39,8 @@ namespace Models.Prosail
             public Vector<double> DrySoilReflectance;
             /// <summary>Reflectance of dry soil</summary>
             public Vector<double> WetSoilReflectance;
+            /// <summary> Index of wavelength</summary>
+            public Dictionary<double, int> WavelengthToIndex;
         }
 
         /// <summary>
@@ -123,7 +125,7 @@ namespace Models.Prosail
                 throw new ArgumentException("LIDFb is required when TypeLidf is 1.");
 
             // Load spectral constants if not provided
-            LeafOpticalConsts leafOpticalData = leafOpticalConstants ?? LoadLocalLeafOpticalData();
+            LeafOpticalConsts leafOpticalData = leafOpticalConstants ?? GetCachedLeafOpticalConstants();
 
             // Prepare PROSPECT inputs
             if (inputProspectList == null || inputProspectList.Count == 0)

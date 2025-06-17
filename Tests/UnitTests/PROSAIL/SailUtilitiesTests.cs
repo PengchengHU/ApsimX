@@ -169,7 +169,7 @@ namespace UnitTests.PROSAIL
         // Helper to create sample PROSPECT leaf optical constants
         private static LeafOpticalConsts CreateSampleLeafOpticalConstants()
         {
-            var constants = LoadLocalLeafOpticalData();
+            var constants = GetCachedLeafOpticalConstants();
             return constants;
         }
 

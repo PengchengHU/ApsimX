@@ -157,7 +157,7 @@ namespace Models.PROSAIL.PROSPECT
             WriteMessage(LogLevel.Info, "ProspectModel: Simulation commencing.");
             try
             {
-                cachedOpticalConstants = LoadLocalLeafOpticalData();
+                cachedOpticalConstants = GetCachedLeafOpticalConstants();
                 WriteMessage(LogLevel.Info, $"ProspectModel: Leaf optical constants loaded, Wavelengths count: {cachedOpticalConstants.Value.Wavelength.Count}.");
             }
             catch (Exception ex)
