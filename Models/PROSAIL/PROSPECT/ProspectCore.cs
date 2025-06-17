@@ -3,11 +3,8 @@ using System.Linq;
 using System.IO;
 using MathNet.Numerics;
 using MathNet.Numerics.LinearAlgebra;
-using MathNet.Numerics.IntegralTransforms;
 using Newtonsoft.Json;
-using Models.Core;
 using APSIM.Shared.Utilities;
-using Microsoft.CodeAnalysis.CSharp.Syntax;
 using System.Collections.Generic;
 
 namespace Models.PROSAIL.PROSPECT
@@ -69,7 +66,7 @@ namespace Models.PROSAIL.PROSPECT
                                                .ToArray();
             }
         }
-
+        /*
         /// <summary>
         /// Contains leaf optical constants required for PROSPECT calculations
         /// </summary>
@@ -132,7 +129,7 @@ namespace Models.PROSAIL.PROSPECT
                 WavelengthToIndex = wavelength?.Select((w, i) => new { Wavelength = w, Index = i })
                                               .ToDictionary(x => x.Wavelength, x => x.Index);
             }
-        }
+        } */
 
         // Relative path from APSIM bin directory to Models\PROSAIL\PROSPECT
         private static readonly string RelativeLeafOpticalDataPath = "..\\..\\..\\Models\\PROSAIL\\PROSPECT\\SpecPROSPECT_FullRange.json";

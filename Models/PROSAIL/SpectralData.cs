@@ -519,7 +519,7 @@ public struct SoilOptics : ISpectralData
 /// Represents the output of the SAIL models (FourSAIL, FourSAIL2).
 /// Contains various reflectance factors and derived quantities like fCover and absorptance.
 /// </summary>
-public struct CanopyOptics : ISpectralData
+public class CanopyOptics : ISpectralData
 {
     /// <summary>Wavelength array in nanometers (nm)</summary>
     public double[] Wavelength { get; set; }
@@ -549,7 +549,7 @@ public struct CanopyOptics : ISpectralData
     /// Indicates whether this LeafOptics object contains valid data.
     /// Returns false if Wavelength, Reflectance, or Transmittance is null or empty.
     /// </summary>
-    public readonly bool HasValue => Wavelength != null && Rdot != null && Rsot != null &&
+    public bool HasValue => Wavelength != null && Rdot != null && Rsot != null &&
                                       Rddt != null && Rsdt != null && FCover != null &&
                                         Abs_dir != null && Abs_hem != null && Rsdstar != null &&
                                         Rddstar != null && Wavelength.Length > 0 && Wavelength.Length == Rdot.Length && 

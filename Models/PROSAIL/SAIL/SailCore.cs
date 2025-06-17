@@ -115,7 +115,8 @@ namespace Models.PROSAIL.Sail
                     Abs_dir = abs_dir,
                     Abs_hem = abs_hem,
                     Rsdstar = rsdstar,
-                    Rddstar = rddstar
+                    Rddstar = rddstar,
+                    Wavelength = leafOptics.Wavelength // Pass through wavelengths
                 };
             }
 
@@ -456,7 +457,8 @@ namespace Models.PROSAIL.Sail
                 Abs_dir = abs_dir,
                 Abs_hem = abs_hem,
                 Rsdstar = rsdstar,
-                Rddstar = rddstar
+                Rddstar = rddstar,
+                Wavelength = leafOptics.Wavelength // Assuming leafOptics has Wavelengths property
             };
         }
 
@@ -564,8 +566,19 @@ namespace Models.PROSAIL.Sail
                     rsdstar[i] = rsoil[i]; // Albedo component is just soil
                     rddstar[i] = rsoil[i];
                 }
-                return new CanopyOptics { Rdot = rdot, Rsot = rsot, Rddt = rddt, Rsdt = rsdt, FCover = fCover, 
-                    Abs_dir = abs_dir, Abs_hem = abs_hem, Rsdstar = rsdstar, Rddstar = rddstar };
+                return new CanopyOptics 
+                { 
+                    Rdot = rdot, 
+                    Rsot = rsot, 
+                    Rddt = rddt, 
+                    Rsdt = rsdt, 
+                    FCover = fCover, 
+                    Abs_dir = abs_dir, 
+                    Abs_hem = abs_hem, 
+                    Rsdstar = rsdstar, 
+                    Rddstar = rddstar,
+                    Wavelength = leafGreen.Wavelength // Assuming leafOptics has Wavelengths property
+                };
             }
 
             // Geometric Quantities
@@ -1193,7 +1206,8 @@ namespace Models.PROSAIL.Sail
                 Abs_dir = abs_dir,
                 Abs_hem = abs_hem,
                 Rsdstar = rsdstar,
-                Rddstar = rddstar
+                Rddstar = rddstar,
+                Wavelength = leafGreen.Wavelength
             };
         }
     } 
