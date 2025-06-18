@@ -873,6 +873,10 @@ namespace Models.PROSAIL
             double[] wavelengths = ParseWavelengthRange().ToArray();
             inputWavelengths = wavelengths.Length > 0 ? wavelengths : cachedLeafOpticalConstants.Value.Wavelength.ToArray();
 
+            // Deal with the costom wavelengths for leaf optical constants and soil reflectance
+            cachedLeafOpticalConstants = cachedLeafOpticalConstants.Value.SubsetByWavelengths(inputWavelengths);
+            cachedWetDrySoilReflectance = cachedWetDrySoilReflectance.Value.SubsetByWavelengths(inputWavelengths);
+
             // Set default ProsailSQLiteDatabasePath based on simulation file name
             string simulationFileName = Path.GetFileNameWithoutExtension(Simulation.FileName);
             ProsailSQLiteDatabasePath = $"{simulationFileName}_Prosail.db";
