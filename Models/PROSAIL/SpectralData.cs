@@ -445,6 +445,73 @@ public class WetDrySoilReflectanceDataJason : ISpectralData
         });
     }
 }
+/// <summary>
+/// Holds wet/dry soil reflectance data (wavelengths and reflectance)
+/// </summary>
+public struct WetDrySoilReflectance : ISpectralData
+{
+    
+    /// <summary>Wavelength array in nanometers (nm)</summary>
+    public Vector<double> Wavelength { get; set; }
+    /// <summary>Reflectance of dry soil</summary>
+    public Vector<double> DrySoilReflectance{ get; set; }
+    /// <summary>Reflectance of wet soil</summary>
+    public Vector<double> WetSoilReflectance{ get; set; }
+    /// <summary> Index of wavelength</summary>
+    public Dictionary<double, int> WavelengthToIndex{ get; set; } 
+
+    /// <summary>Indicates whether this object contains valid spectral data</summary>
+    public bool HasValue => Wavelength != null && DrySoilReflectance != null && WetSoilReflectance != null &&
+                           Wavelength.Count > 0 && Wavelength.Count == DrySoilReflectance.Count &&
+                           Wavelength.Count == WetSoilReflectance.Count;
+
+    /// <summary>
+    /// Constructor that initializes all properties and creates WavelengthToIndex mapping
+    /// </summary>
+    /// <param name="wavelength">Wavelength vector (nm)</param>
+    /// <param name="drySoilReflectance">Dry soil reflectance vector</param>
+    /// <param name="wetSoilReflectance">Wet soil reflectance vector</param>
+    public WetDrySoilReflectance(Vector<double> wavelength, Vector<double> drySoilReflectance,
+        Vector<double> wetSoilReflectance)
+    {
+        Wavelength = wavelength;
+        DrySoilReflectance = drySoilReflectance;
+        WetSoilReflectance = wetSoilReflectance;
+
+        WavelengthToIndex = wavelength?.Select((w, i) => new { Wavelength = w, Index = i })
+                                     .ToDictionary(x => x.Wavelength, x => x.Index) ?? new Dictionary<double, int>();
+    }
+
+    /// <summary>
+    /// Gets wavelengths as double array (implements ISpectralData)
+    /// </summary>
+    /// <returns>Array of wavelengths in nm</returns>
+    public double[] GetWavelengths() => Wavelength?.ToArray() ?? Array.Empty<double>();
+
+    /// <summary>
+    /// Gets wavelength-to-index mapping (implements ISpectralData)
+    /// </summary>
+    /// <returns>Dictionary mapping wavelengths to indices</returns>
+    public Dictionary<double, int> GetWavelengthToIndex() => WavelengthToIndex;
+
+    /// <summary>
+    /// Creates a subset of WetDrySoilReflectance for specified wavelengths
+    /// </summary>
+    /// <param name="targetWavelengths">Array of wavelengths to extract (nm)</param>
+    /// <returns>New WetDrySoilReflectance with subset data</returns>
+    public WetDrySoilReflectance SubsetByWavelengths(double[] targetWavelengths)
+    {
+        return SpectralDataUtils.SubsetByWavelengths(this, targetWavelengths, (source, indices) =>
+        {
+            return new WetDrySoilReflectance(
+                Vector<double>.Build.DenseOfEnumerable(indices.Select(i => source.Wavelength[i])),
+                Vector<double>.Build.DenseOfEnumerable(indices.Select(i => source.DrySoilReflectance[i])),
+                Vector<double>.Build.DenseOfEnumerable(indices.Select(i => source.WetSoilReflectance[i]))
+            );
+        });
+    }
+}
+
 
 /// <summary>
 /// Holds soil spectral data (wavelengths and reflectance) for radiative transfer modeling
@@ -546,6 +613,14 @@ public class CanopyOptics : ISpectralData
     public Dictionary<double, int> WavelengthToIndex { get; set; }
 
     /// <summary>
+    /// Default constructor for object initializer syntax
+    /// </summary>
+    public CanopyOptics()
+    {
+        WavelengthToIndex = new Dictionary<double, int>();
+    }
+
+    /// <summary>
     /// Indicates whether this LeafOptics object contains valid data.
     /// Returns false if Wavelength, Reflectance, or Transmittance is null or empty.
     /// </summary>
@@ -565,7 +640,7 @@ public class CanopyOptics : ISpectralData
     /// <param name="rdot">Array of hemispherical-directional reflectance factor in viewing direction (R_o)</param>
     /// <param name="rsot">Array of bi-directional reflectance factor (R_so)</param>
     /// <param name="rddt">Array of bi-hemispherical reflectance factor (R_dd).</param>
-    /// <param name="rsdt">Array of firectional-hemispherical reflectance factor for solar incident flux (R_sd).</param>
+    /// <param name="rsdt">Array of directional-hemispherical reflectance factor for solar incident flux (R_sd).</param>
     /// <param name="fCover">Array of fraction of Vegetation Cover (fCover = 1 - gap fraction in view direction).</param>
     /// <param name="abs_dir">Array of canopy absorptance for direct solar incident flux (fraction absorbed by canopy+soil system).</param>
     /// <param name="abs_hem">Array of canopy absorptance for hemispherical diffuse incident flux (fraction absorbed by canopy+soil system).</param>
