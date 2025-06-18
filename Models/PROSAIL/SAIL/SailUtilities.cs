@@ -236,8 +236,6 @@ namespace Models.PROSAIL.SAIL
             /// <summary>Brown leaf optical properties (may be null or same as GreenLOP).</summary>
             public LeafOptics? BrownLOP { get; set; }
         }
-
-        
         #endregion
 
         // Constants used within the class
