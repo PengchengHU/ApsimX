@@ -195,11 +195,18 @@ namespace Models.PROSAIL
         private static readonly string RelativeSpecSoilDataPath = "..\\..\\..\\Models\\PROSAIL\\SAIL\\SpecSOIL.json";
         private static string DefaultSpecSoilDataPath => PathUtilities.GetAbsolutePath(RelativeSpecSoilDataPath, AppDomain.CurrentDomain.BaseDirectory);
 
+        // Atmospheric reflectance data
+        private static readonly string RelativeSpecAtmDataPath = "..\\..\\..\\Models\\PROSAIL\\SAIL\\SpecATM.json";
+        private static string DefaultSpecAtmDataPath => PathUtilities.GetAbsolutePath(RelativeSpecAtmDataPath, AppDomain.CurrentDomain.BaseDirectory);
+
         /// <summary>Path to the SQLite database file (relative to simulation directory)</summary>
         private string ProsailSQLiteDatabasePath;
 
         /// <summary>The cached leaf spectral constants loaded at simulation start</summary>
         private LeafOpticalConsts? cachedLeafOpticalConstants = null;
+
+        /// <summary>The cached atmoospheric spectral data loaded at simulation start</summary>
+        private AtmosphericSpectralData cachedAtmosphericSpectralData;
 
         /// <summary>The cached wet and dry soil reflectance at simulation start</summary>
         private WetDrySoilReflectance? cachedWetDrySoilReflectance = null;
@@ -873,9 +880,22 @@ namespace Models.PROSAIL
             double[] wavelengths = ParseWavelengthRange().ToArray();
             inputWavelengths = wavelengths.Length > 0 ? wavelengths : cachedLeafOpticalConstants.Value.Wavelength.ToArray();
 
+            // Load atmospheric spectral data
+            try 
+            {
+                cachedAtmosphericSpectralData = LoadAtmosphericSpectralData(DefaultSpecAtmDataPath);
+                WriteMessage(LogLevel.Info, $"ProsailModel: Using default wet and dry soil reflectance data from {DefaultSpecAtmDataPath}.");
+            }
+            catch (Exception ex)
+            {
+                WriteMessage(LogLevel.Error, $"ProsailModel: Failed to load atmospheric spectral data: {ex.Message}");
+                throw; // Halt simulation if data is missing
+            }
+
             // Deal with the costom wavelengths for leaf optical constants and soil reflectance
             cachedLeafOpticalConstants = cachedLeafOpticalConstants.Value.SubsetByWavelengths(inputWavelengths);
             cachedWetDrySoilReflectance = cachedWetDrySoilReflectance.Value.SubsetByWavelengths(inputWavelengths);
+            cachedAtmosphericSpectralData = cachedAtmosphericSpectralData.SubsetByWavelengths(inputWavelengths);
 
             // Set default ProsailSQLiteDatabasePath based on simulation file name
             string simulationFileName = Path.GetFileNameWithoutExtension(Simulation.FileName);
@@ -917,7 +937,6 @@ namespace Models.PROSAIL
             }
             SoilReflectance = CalculateSoilReflectanceFromWetDry((WetDrySoilReflectance)cachedWetDrySoilReflectance, psoilValue);
 
-
             // Initialize 
             CurrentParameterValues.Clear();
             // Evaluate all parameters
@@ -939,12 +958,21 @@ namespace Models.PROSAIL
 
                 WriteMessage(LogLevel.Info, message: $"ProsailModel: PROSAIL calculation completed, Wavelength[{results.Wavelength.Length}]");
 
-                // Save to database only if enabled and frequency matches
+                // Compute BRF (Bidirectional Reflectance Factor) for each wavelength
+                double[] BRF = ComputeBRF(rdot: results.Rdot, rsot: results.Rsot, 
+                    tts: Convert.ToDouble(CurrentParameterValues["SunZenithAngle"]),
+                    atmosphericSpectralData: cachedAtmosphericSpectralData);
+
+                // Compute fraction of absorbed photosyntehtically active radiation (fAPAR)
+                double fAPAR = ComputeFAPAR(abs_dir: results.Abs_dir, abs_hem: results.Abs_hem, 
+                    tts: Convert.ToDouble(CurrentParameterValues["SunZenithAngle"]), 
+                    atmosphericSpectralData: cachedAtmosphericSpectralData);                
+
+                // Save to database only if enabled
                 if (EnableSQLiteOutput)
                 {
                     WriteToDatabase(Clock.Today, results);
                     WriteMessage(LogLevel.Info, $"ProsailModel: Wrote results to database for {Clock.Today:yyyy-MM-dd}.");
-               
                 }
                 else
                 {
