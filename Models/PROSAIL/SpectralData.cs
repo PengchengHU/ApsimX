@@ -264,10 +264,10 @@ public struct LeafOptics : ISpectralData
 }
 
 /// <summary>
-/// Holds atmospheric sensor spectral data (wavelengths, direct/diffuse irradiance).
+/// Holds atmospheric spectral data under for clear conditions (wavelengths, direct/diffuse radiation).
 /// Used for atmospheric correction and illumination modeling.
 /// </summary>
-public class SpecAtmSensor : ISpectralData
+public struct AtmosphericSpectralData: ISpectralData
 {
     /// <summary>
     /// Wavelengths in nanometers (nm)
@@ -299,7 +299,7 @@ public class SpecAtmSensor : ISpectralData
     /// <summary>
     /// Default constructor
     /// </summary>
-    public SpecAtmSensor()
+    public AtmosphericSpectralData()
     {
         WavelengthToIndex = new Dictionary<double, int>();
     }
@@ -311,7 +311,7 @@ public class SpecAtmSensor : ISpectralData
     /// <param name="directLight">Array of direct light values (W/m²/nm)</param>
     /// <param name="diffuseLight">Array of diffuse light values (W/m²/nm)</param>
     /// <exception cref="ArgumentException">Thrown when arrays have different lengths</exception>
-    public SpecAtmSensor(double[] wavelength, double[] directLight, double[] diffuseLight)
+    public AtmosphericSpectralData(double[] wavelength, double[] directLight, double[] diffuseLight)
     {
         if (wavelength?.Length != directLight?.Length || wavelength?.Length != diffuseLight?.Length)
             throw new ArgumentException("All arrays must have the same length");
@@ -344,15 +344,100 @@ public class SpecAtmSensor : ISpectralData
     public Dictionary<double, int> GetWavelengthToIndex() => WavelengthToIndex;
 
     /// <summary>
-    /// Creates a subset of SpecAtmSensor for specified wavelengths
+    /// Creates a subset of AtmosphericSpectralData for specified wavelengths
     /// </summary>
     /// <param name="targetWavelengths">Array of wavelengths to extract (nm)</param>
-    /// <returns>New SpecAtmSensor with subset data</returns>
-    public SpecAtmSensor SubsetByWavelengths(double[] targetWavelengths)
+    /// <returns>New AtmosphericSpectralData with subset data</returns>
+    public AtmosphericSpectralData SubsetByWavelengths(double[] targetWavelengths)
     {
         return SpectralDataUtils.SubsetByWavelengths(this, targetWavelengths, (source, indices) =>
         {
-            return new SpecAtmSensor(
+            return new AtmosphericSpectralData(
+                indices.Select(i => source.Wavelength[i]).ToArray(),
+                indices.Select(i => source.DirectLight[i]).ToArray(),
+                indices.Select(i => source.DiffuseLight[i]).ToArray()
+            );
+        });
+    }
+}
+
+/// <summary>
+/// Helper class for JSON deserialization of atmospheric spectral data
+/// </summary>
+public class AtmosphericSpectralDataJason : ISpectralData
+{
+    /// <summary>Wavelengths in nanometers (nm)</summary>
+    public double[] Wavelength { get; set; }
+
+    /// <summary>Direct solar radiation spectrum (W/m²/nm)</summary>
+    public double[] DirectLight { get; set; }
+
+    /// <summary>Diffuse sky radiation spectrum (W/m²/nm)</summary>
+    public double[] DiffuseLight { get; set; }
+
+    /// <summary>Dictionary mapping wavelengths to their indices for optimized access</summary>
+    public Dictionary<double, int> WavelengthToIndex { get; set; }
+
+    /// <summary>Indicates whether this object contains valid spectral data</summary>
+    public bool HasValue => Wavelength != null && DirectLight != null && DiffuseLight != null &&
+                           Wavelength.Length > 0 && Wavelength.Length == DirectLight.Length &&
+                           Wavelength.Length == DiffuseLight.Length;
+
+    /// <summary>
+    /// Default constructor
+    /// </summary>
+    public AtmosphericSpectralDataJason()
+    {
+        WavelengthToIndex = new Dictionary<double, int>();
+    }
+
+    /// <summary>
+    /// Constructor with automatic WavelengthToIndex initialization
+    /// </summary>
+    /// <param name="wavelength">Array of wavelengths (nm)</param>
+    /// <param name="directLight">Array of direct light values (W/m²/nm)</param>
+    /// <param name="diffuseLight">Array of diffuse light values (W/m²/nm)</param>
+    /// <exception cref="ArgumentException">Thrown when arrays have different lengths</exception>
+    public AtmosphericSpectralDataJason(double[] wavelength, double[] directLight, double[] diffuseLight)
+    {
+        if (wavelength?.Length != directLight?.Length || wavelength?.Length != diffuseLight?.Length)
+            throw new ArgumentException("All arrays must have the same length");
+
+        Wavelength = wavelength;
+        DirectLight = directLight;
+        DiffuseLight = diffuseLight;
+        InitializeWavelengthToIndex();
+    }
+
+    /// <summary>Initialize or refresh the WavelengthToIndex dictionary</summary>
+    public void InitializeWavelengthToIndex()
+    {
+        WavelengthToIndex = Wavelength?.Select((w, i) => new { Wavelength = w, Index = i })
+                                     .ToDictionary(x => x.Wavelength, x => x.Index) ?? new Dictionary<double, int>();
+    }
+
+    /// <summary>
+    /// Gets wavelengths as double array (implements ISpectralData)
+    /// </summary>
+    /// <returns>Array of wavelengths in nm</returns>
+    public double[] GetWavelengths() => Wavelength ?? Array.Empty<double>();
+
+    /// <summary>
+    /// Gets wavelength-to-index mapping (implements ISpectralData)
+    /// </summary>
+    /// <returns>Dictionary mapping wavelengths to indices</returns>
+    public Dictionary<double, int> GetWavelengthToIndex() => WavelengthToIndex;
+
+    /// <summary>
+    /// Creates a subset of SpecAtmSensorDataJason for specified wavelengths
+    /// </summary>
+    /// <param name="targetWavelengths">Array of wavelengths to extract (nm)</param>
+    /// <returns>New SpecAtmSensorDataJason with subset data</returns>
+    public AtmosphericSpectralDataJason SubsetByWavelengths(double[] targetWavelengths)
+    {
+        return SpectralDataUtils.SubsetByWavelengths(this, targetWavelengths, (source, indices) =>
+        {
+            return new AtmosphericSpectralDataJason(
                 indices.Select(i => source.Wavelength[i]).ToArray(),
                 indices.Select(i => source.DirectLight[i]).ToArray(),
                 indices.Select(i => source.DiffuseLight[i]).ToArray()
@@ -445,6 +530,7 @@ public class WetDrySoilReflectanceDataJason : ISpectralData
         });
     }
 }
+
 /// <summary>
 /// Holds wet/dry soil reflectance data (wavelengths and reflectance)
 /// </summary>

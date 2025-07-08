@@ -23,142 +23,7 @@ namespace Models.PROSAIL.SAIL
     public static class SailUtilities
     {
         #region Supporting Data Structures/Classes: define the inputs and outputs for the utility methods
-
-        /*
-        /// <summary>
-        /// Holds atmospheric sensor spectral data (wavelengths, direct/diffuse irradiance).
-        /// </summary>
-        public class SpecAtmSensor
-        {
-            /// <summary>
-            /// Wavelengths (nm).
-            /// </summary>
-            public double[] Wavelength { get; set; }
-
-            /// <summary>
-            /// Direct solar radiation spectrum (e.g., W/m²/nm).
-            /// </summary>
-            public double[] DirectLight { get; set; }
-
-            /// <summary>
-            /// Diffuse sky radiation spectrum (e.g., W/m²/nm).
-            /// </summary>
-            public double[] DiffuseLight { get; set; }
-
-            /// <summary>
-            /// Dictionary mapping wavelengths to their indices
-            /// </summary>
-            public Dictionary<double, int> WavelengthToIndex { get; set; }
-
-            /// <summary>
-            /// Indicates whether this object contains valid data
-            /// </summary>
-            public bool HasValue => Wavelength != null && DirectLight != null && DiffuseLight != null
-                                   && Wavelength.Length == DirectLight.Length && Wavelength.Length == DiffuseLight.Length;
-
-            /// <summary>
-            /// Initialize WavelengthToIndex dictionary
-            /// </summary>
-            public void InitializeWavelengthToIndex()
-            {
-                if (Wavelength != null)
-                {
-                    WavelengthToIndex = Wavelength.Select((w, i) => new { Wavelength = w, Index = i })
-                                                 .ToDictionary(x => x.Wavelength, x => x.Index);
-                }
-            }
-        }
-
-        // Helper class for JSON deserialization
-        private class WetDrySoilReflectanceDataJason
-        {
-            /// <summary> Wavelengths (nm).</summary>
-            public double[] Wavelength { get; set; }
-            /// <summary> Soil reflectance spectrum of dry soil (unitless fraction).</summary>
-            public double[] Dry_Soil { get; set; }
-            /// <summary> Soil reflectance spectrum od wet soil (unitless fraction).</summary>
-            public double[] Wet_Soil { get; set; }
-
-            /// <summary> Dictionary mapping wavelengths to their indices. </summary>
-            public Dictionary<double, int> WavelengthToIndex { get; set; }
-
-            /// <summary> Indicates whether this object contains valid data</summary>
-            public bool HasValue => Wavelength != null && Dry_Soil != null && Wet_Soil != null
-                                   && Wavelength.Length == Dry_Soil.Length && Wavelength.Length == Wet_Soil.Length;
-
-            /// <summary> Initialize WavelengthToIndex dictionary</summary>
-            public void InitializeWavelengthToIndex()
-            {
-                if (Wavelength != null)
-                {
-                    WavelengthToIndex = Wavelength.Select((w, i) => new { Wavelength = w, Index = i })
-                                                 .ToDictionary(x => x.Wavelength, x => x.Index);
-                }
-            }
-        }
-
-
-        /// <summary> Holds soil spectral data (wavelengths and reflectance).</summary>
-        public struct SoilOptics 
-        {
-            /// <summary>Wavelengths (nm).</summary>
-            public Vector<double> Wavelength;
-
-            /// <summary>Soil reflectance spectrum (unitless fraction).</summary>
-            public Vector<double> Reflectance;
-
-            /// <summary>Dictionary mapping wavelengths to their indices in the Wavelength array.</summary>
-            public Dictionary<double, int> WavelengthToIndex;
-
-            /// <summary>Initializes a new instance of SoilOptics with default values.</summary>
-            public SoilOptics(Vector<double> wavelength, Vector<double> reflectance, Dictionary<double, int> wavelengthToIndex)
-            {
-                Wavelength = wavelength;
-                Reflectance = reflectance;
-                WavelengthToIndex = wavelengthToIndex ?? new Dictionary<double, int>();
-            }
-
-            /// <summary>Indicates whether this LeafOptics object holds data.
-            /// Returns false if Wavelength or Reflectance is null.</summary>
-            public readonly bool HasValue => Wavelength != null && Reflectance != null && WavelengthToIndex != null;
-        }*/
-
-        /*
-        /// <summary>
-        /// Represents the output of the SAIL models (FourSAIL, FourSAIL2).
-        /// Contains various reflectance factors and derived quantities like fCover and absorptance.
-        /// </summary>
-        public class CanopyOptics
-        {
-            /// <summary>Hemispherical-directional reflectance factor in viewing direction (R_o).</summary>
-            public double[] Rdot { get; set; }
-            /// <summary>Bi-directional reflectance factor (R_so).</summary>
-            public double[] Rsot { get; set; }
-            /// <summary>Bi-hemispherical reflectance factor (R_dd).</summary>
-            public double[] Rddt { get; set; }
-            /// <summary>Directional-hemispherical reflectance factor for solar incident flux (R_sd).</summary>
-            public double[] Rsdt { get; set; }
-            /// <summary>Fraction of Vegetation Cover (fCover = 1 - gap fraction in view direction).</summary>
-            public double[] FCover { get; set; }
-            /// <summary>Canopy absorptance for direct solar incident flux (fraction absorbed by canopy+soil system).</summary>
-            public double[] Abs_dir { get; set; }
-            /// <summary>Canopy absorptance for hemispherical diffuse incident flux (fraction absorbed by canopy+soil system).</summary>
-            public double[] Abs_hem { get; set; }
-            /// <summary>Contribution of direct solar incident flux to albedo (Hemispherical reflectance for direct incidence, Rsd*).</summary>
-            public double[] Rsdstar { get; set; }
-            /// <summary>Contribution of hemispherical diffuse incident flux to albedo (Hemispherical reflectance for diffuse incidence, Rdd*).</summary>
-            public double[] Rddstar { get; set; }
-
-            /// <summary>Wavelength array in nanometers (nm)</summary>
-            public double[] Wavelength;
-
-            /// <summary> Indicates whether this LeafOptics object holds data.
-            /// Returns false if Wavelength, Reflectance, or Transmittance is null.
-            /// </summary>
-            //public readonly bool HasValue => Wavelength != null && Reflectance != null && Transmittance != null;
-        }*/
-
-
+        
         /// <summary>
         /// Represents the result of the Campbell or Dladgen function for Leaf Inclination Distribution (LIDF).
         /// </summary>
@@ -256,13 +121,13 @@ namespace Models.PROSAIL.SAIL
         /// <param name="rdot">Hemispherical-directional reflectance factor (R_o) spectrum from SAIL. Array with one value per wavelength.</param>
         /// <param name="rsot">Bi-directional reflectance factor (R_so) spectrum from SAIL. Array with value per wavelength.</param>
         /// <param name="tts">Solar zenith angle (degrees). Single value used for all wavelengths.</param>
-        /// <param name="specAtmSensor">Atmospheric data containing DirectLight (Es) and DiffuseLight (Ed) spectra.</param>
+        /// <param name="atmosphericSpectralData">Atmospheric spectral data containing DirectLight (Es) and DiffuseLight (Ed) spectra.</param>
         /// <returns>Bidirectional reflectance factor (BRF) spectrum.</returns>
-        public static double[] ComputeBRF(double[] rdot, double[] rsot, double tts, SpecAtmSensor specAtmSensor)
+        public static double[] ComputeBRF(double[] rdot, double[] rsot, double tts, AtmosphericSpectralData atmosphericSpectralData)
         {
             // Section: Direct / Diffuse Light Calculation
-            double[] Es = specAtmSensor.DirectLight;    // Direct irradiance component
-            double[] Ed = specAtmSensor.DiffuseLight;  // Diffuse irradiance component
+            double[] Es = atmosphericSpectralData.DirectLight;    // Direct irradiance component
+            double[] Ed = atmosphericSpectralData.DiffuseLight;  // Diffuse irradiance component
 
             // Input validation: Ensure all spectral arrays have the same length
             if (rdot.Length != rsot.Length || rdot.Length != Es.Length || rdot.Length != Ed.Length)
@@ -322,17 +187,17 @@ namespace Models.PROSAIL.SAIL
         /// <param name="abs_dir">Canopy absorptance spectrum for direct solar flux (from SailResult).</param>
         /// <param name="abs_hem">Canopy absorptance spectrum for hemispherical diffuse flux (from SailResult).</param>
         /// <param name="tts">Solar zenith angle (degrees).</param>
-        /// <param name="specAtmSensor">Atmospheric data (DirectLight, DiffuseLight, Wavelength).</param>
+        /// <param name="atmosphericSpectralData">Atmospheric data (DirectLight, DiffuseLight, Wavelength).</param>
         /// <param name="parRangeMin">Minimum wavelength (nm) for PAR integration (default 400).</param>
         /// <param name="parRangeMax">Maximum wavelength (nm) for PAR integration (default 700).</param>
         /// <returns>Fraction of Absorbed Photosynthetically Active Radiation (fAPAR, unitless).</returns>
-        public static double ComputeFAPAR(double[] abs_dir, double[] abs_hem, double tts, 
-            SpecAtmSensor specAtmSensor, double parRangeMin = 400, double parRangeMax = 700)
+        public static double ComputeFAPAR(double[] abs_dir, double[] abs_hem, double tts,
+            AtmosphericSpectralData atmosphericSpectralData, double parRangeMin = 400, double parRangeMax = 700)
         {
             // Direct / Diffuse Light Calculation
-            double[] Es = specAtmSensor.DirectLight;
-            double[] Ed = specAtmSensor.DiffuseLight;
-            double[] lambda = specAtmSensor.Wavelength;
+            double[] Es = atmosphericSpectralData.DirectLight;
+            double[] Ed = atmosphericSpectralData.DiffuseLight;
+            double[] lambda = atmosphericSpectralData.Wavelength;
 
             // Input validation
             if (abs_dir.Length != abs_hem.Length || abs_dir.Length != Es.Length || abs_dir.Length != Ed.Length || abs_dir.Length != lambda.Length)
@@ -397,17 +262,17 @@ namespace Models.PROSAIL.SAIL
         /// <param name="rsdstar">Contribution of direct solar flux to albedo (from SailResult).</param>
         /// <param name="rddstar">Contribution of hemispherical diffuse flux to albedo (from SailResult).</param>
         /// <param name="tts">Solar zenith angle (degrees).</param>
-        /// <param name="specAtmSensor">Atmospheric data (DirectLight, DiffuseLight, Wavelength).</param>
+        /// <param name="atmosphericSpectralData">Atmospheric spectral data (DirectLight, DiffuseLight, Wavelength).</param>
         /// <param name="albedoRangeMin">Minimum wavelength (nm) for albedo integration (default 400).</param>
         /// <param name="albedoRangeMax">Maximum wavelength (nm) for albedo integration (default 2400).</param>
         /// <returns>Broadband albedo value (unitless fraction) over the specified range.</returns>
         public static double ComputeAlbedo(double[] rsdstar, double[] rddstar, double tts, 
-            SpecAtmSensor specAtmSensor, double albedoRangeMin = 400, double albedoRangeMax = 2400)
+            AtmosphericSpectralData atmosphericSpectralData, double albedoRangeMin = 400, double albedoRangeMax = 2400)
         {
             // Direct / Diffuse Light Calculation
-            double[] Es = specAtmSensor.DirectLight;
-            double[] Ed = specAtmSensor.DiffuseLight;
-            double[] lambda = specAtmSensor.Wavelength;
+            double[] Es = atmosphericSpectralData.DirectLight;
+            double[] Ed = atmosphericSpectralData.DiffuseLight;
+            double[] lambda = atmosphericSpectralData.Wavelength;
 
             // Input validation
             if (rsdstar.Length != rddstar.Length || rsdstar.Length != Es.Length || rsdstar.Length != Ed.Length || rsdstar.Length != lambda.Length)
@@ -1210,12 +1075,12 @@ namespace Models.PROSAIL.SAIL
         /// <param name="leafConstants">PROSPECT leaf optical constants object (must contain Wavelength vector).</param>
         /// <param name="soilProperties">Soil spectral properties object (must contain Wavelength array).</param>
         /// <param name="specAtm">Atmosphere spectral properties object (must contain Wavelength array).</param>
-        public static void CheckSpectralSampling(LeafOpticalConsts leafConstants, SoilOptics soilProperties, SpecAtmSensor specAtm)
+        public static void CheckSpectralSampling(LeafOpticalConsts leafConstants, SoilOptics soilProperties, AtmosphericSpectralData specAtm)
         {
             // Extract wavelength arrays
             double[] lambdaLeafConstants = leafConstants.Wavelength?.ToArray();
             double[] lambdaSoil = soilProperties.Wavelength.ToArray();
-            double[] lambdaAtm = specAtm?.Wavelength;
+            double[] lambdaAtm = specAtm.Wavelength.ToArray();
 
             // Check if any wavelength array is null
             if (lambdaLeafConstants == null || lambdaSoil == null || lambdaAtm == null)
@@ -1525,6 +1390,63 @@ namespace Models.PROSAIL.SAIL
 
             return soilOpticalData;
         }
+
+        /// <summary>
+        /// Load atmospheric spectral data from a local JSON file
+        /// </summary>
+        /// <param name="filePath">Path to the JSON file containing atmospheric spectral data</param>
+        /// <returns>AtmosphericSpectralData object containing the loaded data</returns>
+        /// <exception cref="FileNotFoundException">Thrown when the specified file is not found</exception>
+        /// <exception cref="InvalidDataException">Thrown when the data is missing or invalid</exception>
+        public static AtmosphericSpectralData LoadAtmosphericSpectralData(string filePath)
+        {
+            if (!File.Exists(filePath))
+            {
+                throw new FileNotFoundException($"Atmospheric spectral data file not found at {filePath}");
+            }
+
+            try
+            {
+                string json = File.ReadAllText(filePath);
+                var atmData = JsonConvert.DeserializeObject<AtmosphericSpectralDataJason>(json);
+
+                if (atmData == null || atmData.Wavelength == null ||
+                    atmData.DirectLight == null || atmData.DiffuseLight == null)
+                {
+                    throw new InvalidDataException($"Invalid or missing data in file: {filePath}");
+                }
+
+                // Validate array lengths match
+                if (atmData.Wavelength.Length != atmData.DirectLight.Length ||
+                    atmData.Wavelength.Length != atmData.DiffuseLight.Length)
+                {
+                    throw new InvalidDataException("Wavelength, direct light, and diffuse light arrays must have the same length");
+                }
+
+                // Create the wavelength-to-index mapping for optimized filtering
+                var wavelengthToIndex = new Dictionary<double, int>();
+                for (int i = 0; i < atmData.Wavelength.Length; i++)
+                {
+                    wavelengthToIndex[atmData.Wavelength[i]] = i;
+                }
+
+                return new AtmosphericSpectralData
+                {
+                    Wavelength = atmData.Wavelength,
+                    DirectLight = atmData.DirectLight,
+                    DiffuseLight = atmData.DiffuseLight,
+                    WavelengthToIndex = wavelengthToIndex
+                };
+            }
+            catch (JsonException ex)
+            {
+                throw new InvalidDataException($"Failed to parse JSON from {filePath}: {ex.Message}", ex);
+            }
+            catch (Exception ex)
+            {
+                throw new Exception($"Failed to load atmospheric spectral data from {filePath}: {ex.Message}", ex);
+            }
+        }    
         #endregion
     }
 }
