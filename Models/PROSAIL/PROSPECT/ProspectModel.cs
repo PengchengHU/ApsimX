@@ -696,49 +696,5 @@ namespace Models.PROSAIL.PROSPECT
             }
             return results;
         }
-
-        /// <summary>
-        /// Document the PROSPECT model inputs and outputs
-        /// </summary>
-        /// <param name="tags">The xml tags</param>
-        /// <param name="headingLevel">The heading level</param>
-        /// <param name="indent">The indentation level</param>
-        public void Document(List<AutoDocumentation.ITag> tags, int headingLevel, int indent)
-        {
-            tags.Add(new AutoDocumentation.Heading(Name, headingLevel));
-            tags.Add(new AutoDocumentation.Paragraph("The PROSPECT model simulates leaf optical properties (reflectance and transmittance) " +
-                                                      "based on leaf biochemical and structural properties.", indent));
-
-            tags.Add(new AutoDocumentation.Heading("Input Parameters", headingLevel + 1));
-            tags.Add(new AutoDocumentation.Paragraph("The following parameters control the leaf optical properties:", indent));
-            tags.Add(new AutoDocumentation.Paragraph($"N (Leaf structure parameter): {N}", indent));
-            tags.Add(new AutoDocumentation.Paragraph($"CAB (Chlorophyll a + b content, μg/cm²): {CAB}", indent));
-            tags.Add(new AutoDocumentation.Paragraph($"CAR (Carotenoid content, μg/cm²): {CAR}", indent));
-            tags.Add(new AutoDocumentation.Paragraph($"EWT (Equivalent Water Thickness, g/cm²): {EWT}", indent));
-            tags.Add(new AutoDocumentation.Paragraph($"LMA (Leaf Mass per Area, g/cm²): {LMA}", indent));
-            if (!string.IsNullOrEmpty(ANT) && ANT != "0.0")
-                tags.Add(new AutoDocumentation.Paragraph($"ANT (Anthocyanin content, μg/cm²): {ANT}", indent));
-            if (!string.IsNullOrEmpty(BROWN) && BROWN != "0.0")
-                tags.Add(new AutoDocumentation.Paragraph($"BROWN (Brown pigment content): {BROWN}", indent));
-            if (!string.IsNullOrEmpty(PROT) && PROT != "0.0")
-                tags.Add(new AutoDocumentation.Paragraph($"PROT (Protein content, g/cm²): {PROT}", indent));
-            if (!string.IsNullOrEmpty(CBC) && CBC != "0.0")
-                tags.Add(new AutoDocumentation.Paragraph($"CBC (NonProt Carbon-based constituent content, g/cm²): {CBC}", indent));
-            tags.Add(new AutoDocumentation.Paragraph($"Alpha (Incidence angle, degrees): {Alpha}", indent));
-
-            tags.Add(new AutoDocumentation.Heading("Outputs", headingLevel + 1));
-            tags.Add(new AutoDocumentation.Paragraph("The model provides the following outputs:", indent));
-            tags.Add(new AutoDocumentation.Paragraph("- Full spectrum (400 - 2500 nm) leaf reflectance and transmittance", indent));
-
-            if (EnableSQLiteOutput)
-            {
-                tags.Add(new AutoDocumentation.Heading("Database Output", headingLevel + 1));
-                tags.Add(new AutoDocumentation.Paragraph("Spectral data is saved to a SQLite database with the following details:", indent));
-                tags.Add(new AutoDocumentation.Paragraph($"- Database file: {ProspectSQLiteDatabasePath}", indent));
-                tags.Add(new AutoDocumentation.Paragraph($"- Wavelengths: {OutputWavelengthRange} (supports ranges like '400-500', lists like '400, 500, 600', or mixed formats like '400, 500-600, 700')", indent));
-                tags.Add(new AutoDocumentation.Paragraph($"- Logging level: {LoggingLevel} (controls verbosity of messages)", indent));
-                tags.Add(new AutoDocumentation.Paragraph("The database contains spectral data for each simulation day when the plant is alive, including reflectance and transmittance values.", indent));
-            }
-        }
     }
 }

@@ -1,16 +1,8 @@
-﻿using APSIM.Shared.Utilities;
-using DocumentFormat.OpenXml.Spreadsheet;
-using MathNet.Numerics;
-using MathNet.Numerics.IntegralTransforms;
+﻿
 using MathNet.Numerics.LinearAlgebra;
-using Models.Core;
-using Newtonsoft.Json;
 using System;
 using System.Collections.Generic;
-using System.IO;
 using System.Linq;
-using System.Numerics; // If complex numbers were needed
-using static Models.PROSAIL.PROSPECT.ProspectCore;
 using static Models.PROSAIL.SAIL.SailUtilities;
 
 
@@ -89,19 +81,19 @@ namespace Models.PROSAIL.Sail
                 // If LAI is 0 or invalid, reflectance is just soil reflectance
                 // Transmittances are 1, absorptances are 0
                 // Vectorized operations for better performance
-                var rsoilVector = Vector<double>.Build.DenseOfArray(rsoil);
-                var zeroVector = Vector<double>.Build.Dense(nLambda, 0.0);
-                
+                var rsoilVector = MathNet.Numerics.LinearAlgebra.Vector<double>.Build.DenseOfArray(rsoil);
+                var zeroVector = MathNet.Numerics.LinearAlgebra.Vector<double>.Build.Dense(nLambda, 0.0);
+
                 // Vectorized assignments
-                rsoilVector.CopyTo(rdot);
-                rsoilVector.CopyTo(rsot);
-                rsoilVector.CopyTo(rddt);
-                rsoilVector.CopyTo(rsdt);
-                rsoilVector.CopyTo(rsdstar);
-                rsoilVector.CopyTo(rddstar);
-                zeroVector.CopyTo(fCover);
-                zeroVector.CopyTo(abs_dir);
-                zeroVector.CopyTo(abs_hem);
+                rdot = rsoilVector.ToArray();
+                rsot = rsoilVector.ToArray();
+                rddt = rsoilVector.ToArray();
+                rsdt = rsoilVector.ToArray();
+                rsdstar = rsoilVector.ToArray();
+                rddstar = rsoilVector.ToArray();
+                fCover = zeroVector.ToArray();
+                abs_dir = zeroVector.ToArray();
+                abs_hem = zeroVector.ToArray();
                 
                 if (lai < 0)
                 {
@@ -559,18 +551,18 @@ namespace Models.PROSAIL.Sail
             {
                 if (lai < 0) Console.WriteLine("Warning: LAI is negative. Results computed assuming LAI = 0.");
 
-                var rsoilVector = Vector<double>.Build.DenseOfArray(rsoil);
-                var zeroVector = Vector<double>.Build.Dense(nLambda, 0.0);
-    
-                rsoilVector.CopyTo(rdot);
-                rsoilVector.CopyTo(rsot);
-                rsoilVector.CopyTo(rddt);
-                rsoilVector.CopyTo(rsdt);
-                rsoilVector.CopyTo(rsdstar);
-                rsoilVector.CopyTo(rddstar);
-                zeroVector.CopyTo(fCover);
-                zeroVector.CopyTo(abs_dir);
-                zeroVector.CopyTo(abs_hem);
+                var rsoilVector = MathNet.Numerics.LinearAlgebra.Vector<double>.Build.DenseOfArray(rsoil);
+                var zeroVector = MathNet.Numerics.LinearAlgebra.Vector<double>.Build.Dense(nLambda, 0.0);
+
+                rdot = rsoilVector.ToArray();
+                rsot = rsoilVector.ToArray();
+                rddt = rsoilVector.ToArray();
+                rsdt = rsoilVector.ToArray();
+                rsdstar = rsoilVector.ToArray();
+                rddstar = rsoilVector.ToArray();
+                fCover = zeroVector.ToArray();
+                abs_dir = zeroVector.ToArray();
+                abs_hem = zeroVector.ToArray();
 
                 return new CanopyOptics 
                 { 

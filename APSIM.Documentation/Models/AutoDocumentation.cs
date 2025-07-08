@@ -19,6 +19,7 @@ using Models.AgPasture;
 using Models.Soils.Nutrients;
 using APSIM.Documentation.Bibliography;
 using ModelsMap = Models.Map;
+using Models.PROSAIL.PROSPECT;
 
 namespace APSIM.Documentation.Models
 {
@@ -107,6 +108,7 @@ namespace APSIM.Documentation.Models
                 {typeof(Simulations), typeof(DocSimulations)},
                 {typeof(M.Graph), typeof(DocGraph)},
                 {typeof(Nutrient), typeof(DocNutrient)},
+                {typeof(ProspectModel), typeof(DocProspectModel)},
             };
             return documentMap;
         }
@@ -146,5 +148,6 @@ namespace APSIM.Documentation.Models
             return newTags;
         }
     }
-    
+
+
 }
