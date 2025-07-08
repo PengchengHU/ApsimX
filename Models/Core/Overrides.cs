@@ -6,19 +6,19 @@ using System.IO;
 using System.Linq;
 using System.Text;
 using System.Text.RegularExpressions;
+using APSIM.Core;
 using APSIM.Shared.Utilities;
-using JetBrains.Annotations;
 using Models.Core.ApsimFile;
 
 namespace Models.Core
 {
     /// <summary>
-    /// Encapsulates all property/model overrides in APSIM. An override is defined as a 
+    /// Encapsulates all property/model overrides in APSIM. An override is defined as a
     /// collection of (name, value) pairs. Overrides are applied to a model (usually an
     /// instance of a Simulation or Simulations class).
     /// </summary>
     /// <remarks>
-    /// 
+    ///
     /// </remarks>
     public static class Overrides
     {
@@ -34,7 +34,7 @@ namespace Models.Core
         ///     Whenever a bracketed path is specified, all models that have a name or type name that match the bracketed value
         ///     will be considered for replacement .e.g
         ///         [Report].VariableNames   changes all 'VariableNames' properties in all models of name or type 'Report'
-        ///         
+        ///
         ///     If path starts with 'Name=' then only the specified name will be used to match models to replace. This is used
         ///     by the replacements node. e.g. Name=Wheat will replace all models named 'Wheat'.
         /// Value:
@@ -141,11 +141,11 @@ namespace Models.Core
         /// </summary>
         /// <remarks>
         /// Each line must be of the form:
-        /// 
+        ///
         /// path = value
-        /// 
+        ///
         /// e.g.
-        /// 
+        ///
         /// [Clock].StartDate = 1/1/2019
         /// .Simulations.Simulation.Weather.FileName = asdf.met
         /// </remarks>
@@ -160,14 +160,25 @@ namespace Models.Core
                     continue;
 
                 string[] values = lines[i].Split('=');
-                if (values.Length < 2)
-                    throw new Exception($"Wrong number of values specified on line {lines[i]}");
-
                 string path = values[0].Trim();
-                string value = values[1].Trim();
-                // Handles factor specifications.
-                if (values.Length > 2)
-                    value += " =" + values[2];
+                string value;
+
+                if (values.Length == 2)
+                {
+                    // Handles single-line overrides.
+                    value = values[1].Trim();
+                }
+                else if (values.Length > 2)
+                {
+                    // Handles factor specifications.
+                    values = lines[i].Split("=", 2);
+                    value = values[1];
+                }
+                else
+                {
+                    throw new Exception($"Wrong number of values specified on line {lines[i]}");
+                }
+
                 yield return new Override(path, value, Override.MatchTypeEnum.NameAndType);
             }
         }
@@ -242,7 +253,7 @@ namespace Models.Core
         /// <param name="replacementPath">Path to the model in replacementFile which will be used to replace a model in topLevel.</param>
         private static IModel GetModelFromFile(Type typeToFind, string replacementFile, string replacementPath)
         {
-            IModel extFile = FileFormat.ReadFromFile<IModel>(replacementFile, e => throw e, false).NewModel as IModel;
+            IModel extFile = FileFormat.ReadFromFile<IModel>(replacementFile).Model as IModel;
 
             IModel replacement;
             if (string.IsNullOrEmpty(replacementPath))

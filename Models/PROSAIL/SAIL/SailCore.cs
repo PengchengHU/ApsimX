@@ -88,18 +88,21 @@ namespace Models.PROSAIL.Sail
             {
                 // If LAI is 0 or invalid, reflectance is just soil reflectance
                 // Transmittances are 1, absorptances are 0
-                for (int i = 0; i < nLambda; i++)
-                {
-                    rdot[i] = rsoil[i];
-                    rsot[i] = rsoil[i];
-                    rddt[i] = rsoil[i];
-                    rsdt[i] = rsoil[i];
-                    fCover[i] = 0.0; // No cover if LAI=0
-                    abs_dir[i] = 0.0;
-                    abs_hem[i] = 0.0;
-                    rsdstar[i] = rsoil[i]; // Albedo component is just soil
-                    rddstar[i] = rsoil[i]; // Albedo component is just soil
-                }
+                // Vectorized operations for better performance
+                var rsoilVector = Vector<double>.Build.DenseOfArray(rsoil);
+                var zeroVector = Vector<double>.Build.Dense(nLambda, 0.0);
+                
+                // Vectorized assignments
+                rsoilVector.CopyTo(rdot);
+                rsoilVector.CopyTo(rsot);
+                rsoilVector.CopyTo(rddt);
+                rsoilVector.CopyTo(rsdt);
+                rsoilVector.CopyTo(rsdstar);
+                rsoilVector.CopyTo(rddstar);
+                zeroVector.CopyTo(fCover);
+                zeroVector.CopyTo(abs_dir);
+                zeroVector.CopyTo(abs_hem);
+                
                 if (lai < 0)
                 {
                     Console.WriteLine("Warning: LAI is negative. Results computed assuming LAI = 0.");
@@ -213,33 +216,7 @@ namespace Models.PROSAIL.Sail
             double ddb = 0.5 * (1.0 + bf); // Diffuse geometry factor (backward)
             double ddf = 0.5 * (1.0 - bf); // Diffuse geometry factor (forward)
 
-            // --- Wavelength-dependent calculations ---
-            // Initialize wavelength-dependent SAIL coefficients
-            double[] sigb = new double[nLambda]; // Diffuse backscattering coeff [rho, tau]
-            double[] sigf = new double[nLambda]; // Diffuse forward scattering coeff [rho, tau]
-            double[] att = new double[nLambda];  // Attenuation coefficient [sigf]
-            double[] m = new double[nLambda];    // SAIL model exponent coefficient [att, sigb]
-            double[] sb = new double[nLambda];   // Solar backscattering coeff [rho, tau]
-            double[] sf = new double[nLambda];   // Solar forward scattering coeff [rho, tau]
-            double[] vb = new double[nLambda];   // View backscattering coeff [rho, tau]
-            double[] vf = new double[nLambda];   // View forward scattering coeff [rho, tau]
-            double[] w = new double[nLambda];    // Bidirectional scattering coeff [rho, tau]
-
-            //double[] tss = new double[nLambda];  // Directional transmittance solar (k, lai)
-            //double[] too = new double[nLambda];  // Directional transmittance observer (k, lai)
-            double[] rdd = new double[nLambda];  // Canopy bi-hemispherical reflectance (no soil)
-            double[] tdd = new double[nLambda];  // Canopy bi-hemispherical transmittance (no soil)
-            double[] rsd = new double[nLambda];  // Canopy directional-hemispherical reflectance (no soil)
-            double[] tsd = new double[nLambda];  // Canopy directional-hemispherical transmittance (no soil)
-            double[] rdo = new double[nLambda];  // Canopy hemispherical-directional reflectance (no soil)
-            double[] tdo = new double[nLambda];  // Canopy hemispherical-directional transmittance (no soil)
-            double[] rso = new double[nLambda];  // Canopy bidirectional reflectance factor (no soil)
-            double[] rsos = new double[nLambda]; // Single scattering contribution to rso
-            double[] rsod = new double[nLambda]; // Multiple scattering contribution to rso
-            double[] rsost = new double[nLambda];// Single scattering + soil interaction
-            double[] rsodt = new double[nLambda];// Multiple scattering + soil interaction
-
-            // Calculate scalar transmittances and hotspot parameters before the wavelength loop
+            // Calculate scalar transmittances and hotspot parameters before the wavelength loop - WAVELENGTH-INDEPENDENT
             // Direct transmittances through the canopy layer
             double tss = Math.Exp(-ks * lai); // exp(-ks*LAI), Directional transmittance solar (k, lai)
             double too = Math.Exp(-ko * lai); // exp(-ko*LAI), Directional transmittance observer (k, lai)
@@ -317,6 +294,31 @@ namespace Models.PROSAIL.Sail
             }
             //	End of hotspot calculation
 
+            // --- Wavelength-dependent calculations ---
+            // Initialize wavelength-dependent SAIL coefficients
+            double[] sigb = new double[nLambda]; // Diffuse backscattering coeff [rho, tau]
+            double[] sigf = new double[nLambda]; // Diffuse forward scattering coeff [rho, tau]
+            double[] att = new double[nLambda];  // Attenuation coefficient [sigf]
+            double[] m = new double[nLambda];    // SAIL model exponent coefficient [att, sigb]
+            double[] sb = new double[nLambda];   // Solar backscattering coeff [rho, tau]
+            double[] sf = new double[nLambda];   // Solar forward scattering coeff [rho, tau]
+            double[] vb = new double[nLambda];   // View backscattering coeff [rho, tau]
+            double[] vf = new double[nLambda];   // View forward scattering coeff [rho, tau]
+            double[] w = new double[nLambda];    // Bidirectional scattering coeff [rho, tau]
+
+            //double[] tss = new double[nLambda];  // Directional transmittance solar (k, lai)
+            //double[] too = new double[nLambda];  // Directional transmittance observer (k, lai)
+            double[] rdd = new double[nLambda];  // Canopy bi-hemispherical reflectance (no soil)
+            double[] tdd = new double[nLambda];  // Canopy bi-hemispherical transmittance (no soil)
+            double[] rsd = new double[nLambda];  // Canopy directional-hemispherical reflectance (no soil)
+            double[] tsd = new double[nLambda];  // Canopy directional-hemispherical transmittance (no soil)
+            double[] rdo = new double[nLambda];  // Canopy hemispherical-directional reflectance (no soil)
+            double[] tdo = new double[nLambda];  // Canopy hemispherical-directional transmittance (no soil)
+            double[] rso = new double[nLambda];  // Canopy bidirectional reflectance factor (no soil)
+            double[] rsos = new double[nLambda]; // Single scattering contribution to rso
+            double[] rsod = new double[nLambda]; // Multiple scattering contribution to rso
+            double[] rsost = new double[nLambda];// Single scattering + soil interaction
+            double[] rsodt = new double[nLambda];// Multiple scattering + soil interaction
 
             for (int i = 0; i < nLambda; i++)
             {
@@ -557,15 +559,19 @@ namespace Models.PROSAIL.Sail
             {
                 if (lai < 0) Console.WriteLine("Warning: LAI is negative. Results computed assuming LAI = 0.");
 
-                for (int i = 0; i < nLambda; i++)
-                {
-                    rdot[i] = rsot[i] = rddt[i] = rsdt[i] = rsoil[i];
-                    fCover[i] = 0.0;
-                    abs_dir[i] = 0.0; // No absorption if no canopy
-                    abs_hem[i] = 0.0;
-                    rsdstar[i] = rsoil[i]; // Albedo component is just soil
-                    rddstar[i] = rsoil[i];
-                }
+                var rsoilVector = Vector<double>.Build.DenseOfArray(rsoil);
+                var zeroVector = Vector<double>.Build.Dense(nLambda, 0.0);
+    
+                rsoilVector.CopyTo(rdot);
+                rsoilVector.CopyTo(rsot);
+                rsoilVector.CopyTo(rddt);
+                rsoilVector.CopyTo(rsdt);
+                rsoilVector.CopyTo(rsdstar);
+                rsoilVector.CopyTo(rddstar);
+                zeroVector.CopyTo(fCover);
+                zeroVector.CopyTo(abs_dir);
+                zeroVector.CopyTo(abs_hem);
+
                 return new CanopyOptics 
                 { 
                     Rdot = rdot, 

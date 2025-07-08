@@ -1,6 +1,4 @@
 ﻿using System;
-using System.Collections.Generic;
-using APSIM.Shared.Documentation;
 using Models.Core;
 using Models.Management;
 using Newtonsoft.Json;
@@ -80,18 +78,11 @@ namespace Models.PMF.Phen
             BiomassRemovalEventArgs breg = new BiomassRemovalEventArgs();
             breg.RemovalType = RemovalType;
             PhenologyDefoliate?.Invoke(this, breg);
+            PropOfDayToUse = 1.0;
             return true;
         }
 
         /// <summary>Resets the phase.</summary>
         public virtual void ResetPhase() { }
-
-        /// <summary>
-        /// Document the model.
-        /// </summary>
-        public override IEnumerable<ITag> Document()
-        {
-            yield return new Paragraph($"When the {Start} phase is reached, phenology is rewound to the {PhaseNameToGoto} phase.");
-        }
     }
 }

@@ -9,6 +9,7 @@ using System.Text;
 using System.Text.RegularExpressions;
 using System.Threading;
 using System.Threading.Tasks;
+using APSIM.Core;
 using APSIM.Shared.Containers;
 using APSIM.Shared.Interfaces;
 using APSIM.Shared.JobRunning;
@@ -16,7 +17,6 @@ using APSIM.Shared.Utilities;
 using Models.Core;
 using Models.Core.ApsimFile;
 using Models.Core.Run;
-using Models.Interfaces;
 using Models.Sensitivity;
 using Models.Storage;
 using Models.Utilities;
@@ -55,7 +55,7 @@ namespace Models.Optimisation
     [ViewName("UserInterface.Views.PropertyAndGridView")]
     [PresenterName("UserInterface.Presenters.PropertyAndGridPresenter")]
     [ValidParent(ParentType = typeof(Simulations))]
-    public class CroptimizR : Model, IGridModel, IRunnable, IReportsStatus
+    public class CroptimizR : Model, IRunnable, IReportsStatus
     {
         /// <summary>
         /// File name of the generated csv file containing croptimizR
@@ -79,6 +79,7 @@ namespace Models.Optimisation
         /// <remarks>
         /// Needs to be public so that it gets written to .apsimx file
         /// </remarks>
+        [Display]
         public List<Parameter> Parameters { get; set; } = new List<Parameter>();
 
         /// <summary>
@@ -109,7 +110,7 @@ namespace Models.Optimisation
         /// Random seed to be used. Set to null for random results.
         /// </summary>
         [Description("Random seed (optional)")]
-        [Tooltip("Optional random seed. Iff set, results will be the same for each execution. Leave empty for randomised results.")]
+        [Tooltip("Optional random seed. If set, results will be the same for each execution. Leave empty for randomised results.")]
         public int? RandomSeed { get; set; }
 
         /// <summary>
@@ -161,27 +162,6 @@ namespace Models.Optimisation
         /// </summary>
         [JsonIgnore]
         public string Status { get; private set; }
-
-        /// <summary>Tabular data. Called by GUI.</summary>
-        [JsonIgnore]
-        public List<GridTable> Tables
-        {
-            get
-            {
-
-                List<GridTableColumn> columns = new List<GridTableColumn>();
-
-                columns.Add(new GridTableColumn("Name", new VariableProperty(this, GetType().GetProperty("Parameters"))));
-                columns.Add(new GridTableColumn("Path", new VariableProperty(this, GetType().GetProperty("Parameters"))));
-                columns.Add(new GridTableColumn("LowerBound", new VariableProperty(this, GetType().GetProperty("Parameters"))));
-                columns.Add(new GridTableColumn("UpperBound", new VariableProperty(this, GetType().GetProperty("Parameters"))));
-
-                List<GridTable> tables = new List<GridTable>();
-                tables.Add(new GridTable("Table", columns, this));
-
-                return tables;
-            }
-        }
 
         /// <summary>
         /// Invoked whenever the R process writes to stdout.
@@ -289,8 +269,8 @@ namespace Models.Optimisation
             sims.Children.AddRange(Children.Select(c => Apsim.Clone(c)));
             sims.Children.RemoveAll(c => c is IDataStore);
 
-            IModel replacements = this.FindInScope<Folder>("Replacements");
-            if (replacements != null && !sims.Children.Any(c => c is Folder && c.Name == "Replacements"))
+            IModel replacements = Folder.FindReplacementsFolder(this);
+            if (replacements != null && !sims.Children.Any(c => Folder.IsModelReplacementsFolder(c)))
                 sims.Children.Add(Apsim.Clone(replacements));
 
             // Search for IDataStore, not DataStore - to allow for StorageViaSockets.
@@ -300,7 +280,7 @@ namespace Models.Optimisation
                 newDataStore.Children.AddRange(m.Children.Select(c => Apsim.Clone(c)));
 
             sims.Children.Add(newDataStore);
-            sims.ParentAllDescendants();
+            Node.Create(sims);
 
             sims.Write(apsimxFileName);
 
@@ -544,7 +524,7 @@ namespace Models.Optimisation
 
             // First, clone the simulations (we don't want to change the values
             // of the parameters in the original file).
-            Simulations clonedSims = FileFormat.ReadFromFile<Simulations>(fileName, e => throw e, false).NewModel as Simulations;
+            Simulations clonedSims = FileFormat.ReadFromFile<Simulations>(fileName).Model as Simulations;
 
             // Apply the optimal values to the cloned simulations.
             Overrides.Apply(clonedSims, optimalValues);

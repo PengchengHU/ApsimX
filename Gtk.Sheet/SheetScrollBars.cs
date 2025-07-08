@@ -13,16 +13,16 @@ namespace Gtk.Sheet
         private SheetWidget sheetWidget;
 
         /// <summary>The horizontal scroll bar</summary>
-        private HScrollbar horizontalScrollbar;
+        private Scrollbar horizontalScrollbar;
 
         /// <summary>The vertical scroll bar</summary>
-        private VScrollbar verticalScrollbar;
+        private Scrollbar verticalScrollbar;
 
         /// <summary>The vertical scroll bar</summary>
-        private VBox horizontalScrollbarBox;
+        private Box horizontalScrollbarBox;
 
         /// <summary>The horizontal scroll bar</summary>
-        private HBox verticalScrollbarBox;
+        private Box verticalScrollbarBox;
 
         /// <summary>Constructor.</summary>
         /// <param name="sheet">The sheet.</param>
@@ -56,24 +56,24 @@ namespace Gtk.Sheet
         /// <param name="e">The event arguments.</param>
         private void OnSheetInitialised(object sender, EventArgs e)
         {
-            SetScrollbarAdjustments(sheet.MaximumNumberHiddenColumns, sheet.MaximumNumberHiddenRows);
+            SetScrollbarAdjustments(sheet.ColumnCount, sheet.MaximumNumberHiddenRows);
         }
 
         /// <summary>A scroll bars to the sheet widget.</summary>
         private void Initialise()
         {
             var horizontalAdjustment = new Adjustment(1, 0, 100, 1, 1, 1);
-            horizontalScrollbar = new HScrollbar(horizontalAdjustment);
+            horizontalScrollbar = new Scrollbar(Orientation.Horizontal, horizontalAdjustment);
             horizontalScrollbar.Value = 0;
             horizontalScrollbar.ValueChanged += OnHorizontalScrollbarChanged;
 
             var verticalAdjustment = new Adjustment(1, 0, 100, 1, 1, 1);
-            verticalScrollbar = new VScrollbar(verticalAdjustment);
+            verticalScrollbar = new Scrollbar(Orientation.Vertical, verticalAdjustment);
             verticalScrollbar.Value = 0;
             verticalScrollbar.ValueChanged += OnVerticalScrollbarChanged;
 
-            verticalScrollbarBox = new HBox();
-            horizontalScrollbarBox = new VBox();
+            verticalScrollbarBox = new Box(Orientation.Horizontal, 0);
+            horizontalScrollbarBox = new Box(Orientation.Vertical, 0);
 
             verticalScrollbarBox.PackStart(sheetWidget, true, true, 0);
             verticalScrollbarBox.PackEnd(verticalScrollbar, false, true, 0);
@@ -86,7 +86,7 @@ namespace Gtk.Sheet
 
         public void SetScrollbarAdjustments(int columns, int rows)
         {
-            horizontalScrollbar.Adjustment.Upper = columns + 1;
+            horizontalScrollbar.Adjustment.Upper = columns;
             horizontalScrollbar.Adjustment.Lower = 0;
             verticalScrollbar.Adjustment.Upper = rows + 2;
             verticalScrollbar.Adjustment.Lower = 0;

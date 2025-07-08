@@ -1,4 +1,5 @@
-﻿using APSIM.Shared.Utilities;
+﻿using APSIM.Numerics;
+using APSIM.Shared.Utilities;
 using Models.Climate;
 using Models.Core;
 using Models.Functions;
@@ -23,14 +24,14 @@ namespace Models.PMF.SimplePlantModels
     [Serializable]
     [ViewName("UserInterface.Views.PropertyAndGridView")]
     [PresenterName("UserInterface.Presenters.PropertyAndGridPresenter")]
-    public class DEROPAPY : Model, IGridModel
+    public class DEROPAPY : Model
     {
         /// <summary>Location of file with crop specific coefficients</summary>
         [Description("File path for coefficient file")]
         [Display(Type = DisplayType.FileName)]
         public string CoefficientFile { get; set ; }
-        
-        
+
+
         /// <summary>
         /// Gets or sets the full file name (with path). The user interface uses this.
         /// </summary>
@@ -69,7 +70,7 @@ namespace Models.PMF.SimplePlantModels
         [Display(Type = DisplayType.CSVCrops)]
         public string CurrentCropName { get; set; }
 
-        ///<summary></summary> 
+        ///<summary></summary>
         [JsonIgnore] public string[] ParamName { get; set; }
 
         /// <summary>
@@ -77,16 +78,16 @@ namespace Models.PMF.SimplePlantModels
         /// </summary>
         [JsonIgnore] public string[] CropNames { get; set; }
 
-        ///<summary></summary> 
+        ///<summary></summary>
         [JsonIgnore] public Dictionary<string, string> CurrentCropParams { get; set; }
 
-        ///<summary>The days after the winter solstice when the crop must end and rewind to the start of its cycle for next season</summary> 
+        ///<summary>The days after the winter solstice when the crop must end and rewind to the start of its cycle for next season</summary>
         private int EndSeasonDAWS { get; set; }
 
-        ///<summary>bool to indicate if crop has already done a phenology rewind this season</summary> 
+        ///<summary>bool to indicate if crop has already done a phenology rewind this season</summary>
         private bool HasRewondThisSeason { get; set; }
 
-        ///<summary>bool to indicate if crop started growth this season</summary> 
+        ///<summary>bool to indicate if crop started growth this season</summary>
         private bool HasStartedGrowthhisSeason { get; set; } = false;
 
         /// <summary>The plant</summary>
@@ -129,14 +130,19 @@ namespace Models.PMF.SimplePlantModels
         /// <summary>The cultivar object representing the current instance of the SCRUM crop/// </summary>
         private Cultivar derochild = null;
 
+        private DataTable readData;
+
         ////// This secton contains the components that get values from the csv coefficient file to    !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
         ////// display in the grid view and set them back to the csv when they are changed in the grid !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 
         private DataTable readCSVandUpdateProperties()
         {
-            DataTable readData = new DataTable();
+            readData = new DataTable();
             readData = ApsimTextFile.ToTable(FullFileName);
-            
+
+            foreach (DataColumn column in readData.Columns)
+                column.ReadOnly = true;
+
             if (readData.Rows.Count == 0)
                 throw new Exception("Failed to read any rows of data from " + FullFileName);
             if ((CurrentCropName != null)&&(CurrentCropName != ""))
@@ -144,50 +150,18 @@ namespace Models.PMF.SimplePlantModels
                 CurrentCropParams = getCurrentParams(readData, CurrentCropName);
             }
             CropNames = readData.Columns.Cast<DataColumn>().Select(x => x.ColumnName).ToArray().Skip(3).ToArray();
-
             return readData;
         }
 
         /// <summary>Gets or sets the table of values.</summary>
-        [JsonIgnore]
-        public List<GridTable> Tables
+        [Display]
+        public DataTable Data
         {
             get
             {
-                List<GridTable> tables = new List<GridTable>
-                {
-                    new GridTable("", new List<GridTableColumn>(), this)
-                };
-                return tables;
+                readCSVandUpdateProperties();
+                return readData;
             }
-        }
-
-        /// <summary>
-        /// Reads in the csv data and sends it as a datatable to the grid
-        /// </summary>
-        public DataTable ConvertModelToDisplay(DataTable dt)
-        {
-            DataTable dt2 = new DataTable();
-            try
-            {
-                dt2 = readCSVandUpdateProperties();
-            }
-            catch
-            {
-                dt2 = new DataTable();
-            }
-            return dt2;
-        }
-
-        /// <summary>
-        /// Writes out changes from the grid to the csv file
-        /// </summary>
-        public DataTable ConvertDisplayToModel(DataTable dt)
-        {
-            //TextWriter writer = new StreamWriter(FullFileName, false);
-            //DataTableUtilities.DataTableToText(dt, startColumnIndex: 0, delimiter: ",", showHeadings: true,writer:writer);
-            //writer.Close();
-            return new DataTable();
         }
 
         /// <summary>
@@ -351,11 +325,11 @@ namespace Models.PMF.SimplePlantModels
 
 
         /// <summary>
-        /// Data structure that appends a parameter value to each address in the base deroParams dictionary 
+        /// Data structure that appends a parameter value to each address in the base deroParams dictionary
         /// then writes them into a commands property in a Cultivar object.
         /// </summary>
-        /// <returns>a Cultivar object with the overwrites set for the CropName selected using the parameters displayed 
-        /// in the grid view that come from the CoeffientFile selected 
+        /// <returns>a Cultivar object with the overwrites set for the CropName selected using the parameters displayed
+        /// in the grid view that come from the CoeffientFile selected
         /// </returns>
         public Cultivar coeffCalc()
         {
@@ -466,7 +440,7 @@ namespace Models.PMF.SimplePlantModels
             string cleaned = clean(vect);
             string[] strung = cleaned.Split(',');
             double[] doubles = new double[strung.Length];
-            for (int i = 0; i < strung.Length; i++) 
+            for (int i = 0; i < strung.Length; i++)
             {
                 doubles[i] = Double.Parse(strung[i]);
             }
@@ -510,7 +484,7 @@ namespace Models.PMF.SimplePlantModels
             {"Gsmax350", "[DEROPAPY].Leaf.Canopy.Gsmax350 = " },
             {"R50", "[DEROPAPY].Leaf.Canopy.R50 = " },
             {"RelSlowLAI",  "[DEROPAPY].Leaf.Canopy.ExpandedGreenArea.Expansion.Delta.Integral.GrowthPattern.XYPairs.X[2] = "},
-            {"LAIbase","[DEROPAPY].Leaf.Canopy.GreenAreaIndex.WinterBase.PrunThreshold.FixedValue = " },                                   
+            {"LAIbase","[DEROPAPY].Leaf.Canopy.GreenAreaIndex.WinterBase.PrunThreshold.FixedValue = " },
             {"LAIbaseInitial", "[DEROPAPY].Leaf.Canopy.GreenAreaIndex.WinterBase.GAICarryover.PreEventValue.FixedValue = "},
             {"LAIAnnualGrowth","[DEROPAPY].Leaf.Canopy.ExpandedGreenArea.Expansion.Delta.Integral.LAIAnnualGrowth.FixedValue = " },
             {"ExtCoeff","[DEROPAPY].Leaf.Canopy.GreenExtinctionCoefficient.PotentialExtinctionCoeff.FixedValue = " },

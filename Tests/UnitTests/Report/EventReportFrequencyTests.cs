@@ -1,12 +1,9 @@
-using APSIM.Shared.Utilities;
-using DocumentFormat.OpenXml.Bibliography;
+using APSIM.Core;
 using Models;
 using Models.Core;
 using Moq;
 using NUnit.Framework;
-using System;
 using System.Collections.Generic;
-using UnitTests.Weather;
 
 namespace UnitTests.Reporting
 {
@@ -59,6 +56,7 @@ namespace UnitTests.Reporting
         /// </summary>
         /// <param name="line">Input line - should be any valid reporting frequency using a model event.</param>
         [TestCase("[Clock].Today.Month == 1 && [Clock].Today.Day == 1")]
+        [TestCase("[Clock].DoReport && [Clock].Today.Year > 2000")]
         public void TestReportingExpression(string line)
         {
             Models.Report report = new Models.Report()
@@ -67,11 +65,11 @@ namespace UnitTests.Reporting
                 Children = new List<IModel>() { new Clock() }
             };
 
-            ScriptCompiler compiler = new ScriptCompiler();
+            Node.Create(report);
             //this is the order lines are parsed by Report.cs
             Assert.That(DateReportFrequency.TryParse(line, new Models.Report(), mockEvents.Object), Is.False);
             Assert.That(EventReportFrequency.TryParse(line, new Models.Report(), mockEvents.Object), Is.False);
-            Assert.That(ExpressionReportFrequency.TryParse(line, report, mockEvents.Object, compiler), Is.True);
+            Assert.That(ExpressionReportFrequency.TryParse(line, report.Node, mockEvents.Object), Is.True);
         }
     }
 }

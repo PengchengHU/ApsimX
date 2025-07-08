@@ -3,10 +3,10 @@ using System.Collections.Generic;
 using System.Data;
 using System.Linq;
 using System.Reflection;
-using APSIM.Shared.Documentation;
 using APSIM.Shared.Utilities;
 using Models.Factorial;
 using Newtonsoft.Json;
+using APSIM.Core;
 
 namespace Models.Core
 {
@@ -18,10 +18,13 @@ namespace Models.Core
     [ValidParent(typeof(Folder))]
     [ValidParent(typeof(Factor))]
     [ValidParent(typeof(CompositeFactor))]
-    public abstract class Model : IModel
+    public abstract class Model : IModel, INodeModel, ICreatable
     {
         [NonSerialized]
         private IModel modelParent;
+
+        [NonSerialized]
+        private Node node;
 
         private bool _enabled = true;
         private bool _isCreated = false;
@@ -38,6 +41,12 @@ namespace Models.Core
         }
 
         /// <summary>
+        /// Instance of owning node.
+        /// </summary>
+        [JsonIgnore]
+        public Node Node { get { return node; } set { node = value;  } }
+
+        /// <summary>
         /// Gets or sets the name of the model
         /// </summary>
         public string Name { get; set; }
@@ -46,7 +55,7 @@ namespace Models.Core
         public string ResourceName { get; set; }
 
         /// <summary>
-        /// Gets or sets a list of child models.   
+        /// Gets or sets a list of child models.
         /// </summary>
         public List<IModel> Children { get; set; }
 
@@ -450,14 +459,12 @@ namespace Models.Core
         /// </summary>
         public IEnumerable<IModel> FindAllInScope()
         {
-            Simulation sim = FindAncestor<Simulation>();
-            ScopingRules scope = sim?.Scope ?? new ScopingRules();
-            foreach (IModel result in scope.FindAll(this))
+            foreach (IModel result in Node.WalkScoped().Select(n => n.Model as IModel))
                 yield return result;
         }
 
         /// <summary>
-        /// Called when the model has been newly created in memory whether from 
+        /// Called when the model has been newly created in memory whether from
         /// cloning or deserialisation.
         /// </summary>
         public virtual void OnCreated()
@@ -475,8 +482,16 @@ namespace Models.Core
         }
 
         /// <summary>
+        /// Called when the model is about to be deserialised.
+        /// </summary>
+        public virtual void OnSerialising()
+        {
+
+        }
+
+        /// <summary>
         /// Called immediately before a simulation has its links resolved and is run.
-        /// It provides an opportunity for a simulation to restructure itself 
+        /// It provides an opportunity for a simulation to restructure itself
         /// e.g. add / remove models.
         /// </summary>
         public virtual void OnPreLink() { }
@@ -518,11 +533,11 @@ namespace Models.Core
                         return true;
                 }
             }
-            
+
             // If it doesn't have any valid parents, it should be able to be placed anywhere.
             if(hasValidParents)
                 return false;
-            else 
+            else
                 return true;
         }
 
@@ -551,7 +566,7 @@ namespace Models.Core
         {
             IEnumerable<IModel> matches = null;
 
-            // Remove a square bracketed model name and change our relativeTo model to 
+            // Remove a square bracketed model name and change our relativeTo model to
             // the referenced model.
             if (path.StartsWith("["))
             {
@@ -599,6 +614,63 @@ namespace Models.Core
             }
         }
 
+        /// <summary>
+        ///
+        /// </summary>
+        /// <returns></returns>
+        /// <exception cref="NotImplementedException"></exception>
+        public virtual IEnumerable<INodeModel> GetChildren()
+        {
+            return Children.Cast<INodeModel>();
+        }
+
+        /// <summary>Set the name of the model.</summary>
+        /// <param name="name">The new name</param>
+        public virtual void Rename(string name)
+        {
+            Name = name;
+        }
+
+        /// <summary>
+        ///
+        /// </summary>
+        /// <param name="parent"></param>
+        /// <exception cref="NotImplementedException"></exception>
+        public virtual void SetParent(INodeModel parent)
+        {
+            Parent = parent as IModel;
+        }
+
+        /// <summary>
+        /// Add a child model.
+        /// </summary>
+        /// <param name="childModel">The child model.</param>
+        public void AddChild(INodeModel childModel)
+        {
+            Children.Add(childModel as IModel);
+        }
+
+        /// <summary>
+        /// Insert a child model into the children list.
+        /// </summary>
+        /// <param name="index">The position to insert the child into.</param>
+        /// <param name="childModel">The model to insert.</param>
+        public void InsertChild(int index, INodeModel childModel)
+        {
+            Children.Insert(index, childModel as IModel);
+            childModel.SetParent(this);
+        }
+
+        /// <summary>
+        /// Remove a child.
+        /// </summary>
+        /// <param name="childModel">The child to remove.</param>
+        public void RemoveChild(INodeModel childModel)
+        {
+            Children.Remove(childModel as IModel);
+            childModel.SetParent(null);
+        }
+
         /// <summary>A Locator object for finding models and variables.</summary>
         [NonSerialized]
         private Locator locator;
@@ -616,80 +688,6 @@ namespace Models.Core
                 }
                 return locator;
             }
-        }
-
-        /// <summary>
-        /// Document the model, and any child models which should be documented.
-        /// </summary>
-        /// <remarks>
-        /// It is a mistake to call this method without first resolving links.
-        /// </remarks>
-        public virtual IEnumerable<ITag> Document()
-        {
-            yield return new Section(Name, GetModelDescription());
-        }
-
-        /// <summary>
-        /// Get a description of the model from the summary and remarks
-        /// xml documentation comments in the source code.
-        /// </summary>
-        /// <remarks>
-        /// Note that the returned tags are not inside a section.
-        /// </remarks>
-        protected IEnumerable<ITag> GetModelDescription()
-        {
-            yield return new Paragraph(CodeDocumentation.GetSummary(GetType()));
-            yield return new Paragraph(CodeDocumentation.GetRemarks(GetType()));
-        }
-
-        /// <summary>
-        /// Gets a list of Event Handles that are Invoked in the provided function
-        /// </summary>
-        /// <remarks>
-        /// Model source file must be included as embedded resource in project xml
-        /// </remarks>
-        protected IEnumerable<ITag> GetModelEventsInvoked(Type type, string functionName, string filter = "", bool filterOut = false)
-        {
-            List<string[]> eventNames = CodeDocumentation.GetEventsInvokedInOrder(type, functionName);
-
-            List<string[]> eventNamesFiltered = new List<string[]>();
-            if (filter.Length > 0)
-            {
-                foreach (string[] name in eventNames)
-                    if (name[0].Contains(filter) == !filterOut)
-                    { 
-                        eventNamesFiltered.Add(name); 
-                    }           
-            }
-            yield return new Paragraph($"Function {functionName} of Model {Name} contains the following Events in the given order.\n");
-
-            DataTable data = new DataTable();
-            data.Columns.Add("Event Handle", typeof(string));
-            data.Columns.Add("Summary", typeof(string));
-
-            for (int i = 1; i < eventNamesFiltered.Count; i++)
-            {
-                string[] parts = eventNamesFiltered[i];
-
-                DataRow row = data.NewRow();
-                data.Rows.Add(row);
-                row["Event Handle"] = parts[0];
-                row["Summary"] = parts[1];
-            }
-            yield return new Table(data);
-        }
-
-        /// <summary>
-        /// Document all child models of a given type.
-        /// </summary>
-        /// <param name="withHeadings">If true, each child to be documented will be given its own section/heading.</param>
-        /// <typeparam name="T">The type of models to be documented.</typeparam>
-        protected IEnumerable<ITag> DocumentChildren<T>(bool withHeadings = false) where T : IModel
-        {
-            if (withHeadings)
-                return FindAllChildren<T>().Select(m => new Section(m.Name, m.Document()));
-            else
-                return FindAllChildren<T>().SelectMany(m => m.Document());
         }
     }
 }

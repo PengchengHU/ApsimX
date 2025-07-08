@@ -59,11 +59,12 @@ namespace Gtk.Sheet
         /// <summary>Display an entry box for the user to edit the current selected cell data.</summary>
         public void Edit(char defaultChar = char.MinValue)
         {
-            
             EndEdit();
             
             sheet.CellSelector.GetSelection(out int selectedColumnIndex, out int selectedRowIndex);
-            if (sheet.DataProvider.GetCellState(selectedColumnIndex, selectedRowIndex) != SheetDataProviderCellState.ReadOnly)
+            int dataRowIndex = selectedRowIndex - sheet.NumberFrozenRows;
+
+            if (sheet.DataProvider.GetCellState(selectedColumnIndex, selectedRowIndex) != SheetCellState.ReadOnly)
             {
                 var cellBounds = sheet.CalculateBounds(selectedColumnIndex, selectedRowIndex);
                 
@@ -71,7 +72,7 @@ namespace Gtk.Sheet
                 entry.SetSizeRequest((int)cellBounds.Width - 3, (int)cellBounds.Height - 10);
                 entry.WidthChars = 5;
                 if (defaultChar == char.MinValue)
-                    entry.Text = sheet.DataProvider.GetCellContents(selectedColumnIndex, selectedRowIndex);
+                    entry.Text = sheet.DataProvider.GetCellContents(selectedColumnIndex, dataRowIndex);
                 else
                     entry.Text = defaultChar.ToString();
                 entry.KeyPressEvent += OnEntryKeyPress;
@@ -131,9 +132,19 @@ namespace Gtk.Sheet
                 if (saveEdit)
                 {
                     sheet.CellSelector.GetSelection(out int selectedColumnIndex, out int selectedRowIndex);
-                    sheet.DataProvider.SetCellContents(new int[]{selectedColumnIndex}, 
-                                                        new int[]{selectedRowIndex}, 
-                                                        new string[]{entry.Text});
+                    int rowIndex = selectedRowIndex - sheet.NumberFrozenRows;
+                    int columnIndex = selectedColumnIndex - sheet.NumberFrozenColumns;
+                    string value = sheet.DataProvider.GetCellContents(columnIndex, rowIndex);
+                    try
+                    {
+                        sheet.DataProvider.SetCellContent(columnIndex, rowIndex, entry.Text);
+                    }
+                    catch (Exception ex)
+                    {
+                        //error was thrown, restore original value
+                        sheet.DataProvider.SetCellContent(columnIndex, rowIndex, value);
+                        sheet.OnException(ex);
+                    }
                     sheet.CalculateBounds(selectedColumnIndex, selectedRowIndex);
                 }
 

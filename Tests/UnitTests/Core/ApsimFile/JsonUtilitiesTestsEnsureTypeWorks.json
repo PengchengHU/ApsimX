@@ -1,8 +1,0 @@
-{
-  "$type": "Models.Core.Simulations, Models",
-  "Children": [
-    {
-      "Name": "Wheat"
-    }
-  ]
-}

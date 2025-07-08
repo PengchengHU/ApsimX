@@ -1,7 +1,6 @@
 ﻿using System;
-using System.Collections.Generic;
 using System.IO;
-using APSIM.Shared.Documentation;
+using APSIM.Core;
 using APSIM.Shared.Utilities;
 using Models.Core;
 using Newtonsoft.Json;
@@ -84,23 +83,6 @@ namespace Models.Storage
 
         /// <summary>Get a writer to perform write operations on the datastore.</summary>
         public IStorageWriter Writer { get { return dbWriter; } }
-
-        /// <summary>
-        /// 
-        /// </summary>
-        [JsonIgnore]
-        public override IModel Parent
-        {
-            get
-            {
-                return base.Parent;
-            }
-            set
-            {
-                base.Parent = value;
-                OnCreated();
-            }
-        }
 
         /// <summary>Constructor</summary>
         public DataStore()
@@ -308,15 +290,6 @@ namespace Models.Storage
                 throw new NotImplementedException();
             }
             return "";
-        }
-
-        /// <summary>
-        /// Override the Document() function but do nothing.
-        /// This model does not show any documentation.
-        /// </summary>
-        public override IEnumerable<ITag> Document()
-        {
-            yield break;
         }
     }
 }

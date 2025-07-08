@@ -1,5 +1,6 @@
 ﻿namespace UnitTests.Soils
 {
+    using APSIM.Core;
     using Models.Core;
     using Models.Soils;
     using Models.Soils.Nutrients;
@@ -62,13 +63,13 @@
                     new Water
                     {
                         Thickness = new double[] { 500 },
-                        InitialValues = new double[] { 0.103 },
+                        InitialValues = new double[] { 0.261 },
                     }
                 }
             };
-            Utilities.InitialiseModel(soil);
+            var tree = Node.Create(soil);
 
-            soil.Standardise();
+            soil.Sanitise();
 
             var physical = soil.FindChild<Physical>();
             var soilOrganicMatter = soil.FindChild<Organic>();
@@ -132,7 +133,7 @@
                     new Water
                     {
                         Thickness = new double[] { 500 },
-                        InitialValues = new double[] { 0.103 }
+                        InitialValues = new double[] { 0.261 }
                     },
                     new LayerStructure
                     {
@@ -140,9 +141,9 @@
                     }
                 }
             };
-            Utilities.InitialiseModel(soil);
+            var tree = Node.Create(soil);
 
-            soil.Standardise();
+            soil.Sanitise();
 
             var physical = soil.FindChild<Physical>();
             var soilOrganicMatter = soil.FindChild<Organic>();
@@ -160,9 +161,9 @@
         public void InitialConditionsIsCreated()
         {
             Soil soil = CreateSimpleSoil();
-            Utilities.InitialiseModel(soil);
+            var tree = Node.Create(soil);
 
-            soil.Standardise();
+            soil.Sanitise();
 
             var chemical = soil.FindChild<Chemical>();
             var organic = soil.FindChild<Organic>();
@@ -184,7 +185,6 @@
         public void DontStandardiseDisabledSoils()
         {
             Soil soil = CreateSimpleSoil();
-            Utilities.InitialiseModel(soil);
             Physical phys = soil.FindChild<Physical>();
 
             // Remove a layer from BD - this will cause standardisation to fail.
@@ -199,8 +199,10 @@
             paddock.Children.Add(soil);
             soil.Parent = paddock;
 
+            var tree = Node.Create(soil);
+
             // Run the simulation - this shouldn't fail, because the soil is disabled.
-            var runner = new Models.Core.Run.Runner(sims);
+            var runner = new Models.Core.Run.Runner(tree.Model as IModel);
             List<Exception> errors = runner.Run();
             Assert.That(errors.Count, Is.EqualTo(0), "There should be no errors - the faulty soil is disabled");
         }
