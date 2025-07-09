@@ -9,6 +9,7 @@ using Models.PMF;
 using Models.PMF.Organs;
 using Models.Prosail;
 using Models.PROSAIL.PROSPECT;
+using Models.PROSAIL.SAIL;
 using System;
 using System.Collections.Generic;
 using System.Data;
@@ -169,6 +170,93 @@ namespace Models.PROSAIL
         [Description("psi - Relative azimuth angle between sun and observer (0-360)")]
         public string RelativeAzimuthAngle { get; set; } = "0.0";
 
+        /// <summary>
+        /// List of available sensors for the drop-down.
+        /// </summary>
+        [Separator("Sensor selection")]
+        [Description("Select a sensor to use its spectral response function (SRF)")]
+        public SensorTypes SensorType
+        {
+            get => sensorType;
+            set
+            {
+                sensorType = value;
+                SetSensorSRF();
+            }
+        }
+        private SensorTypes sensorType;
+
+        /// <summary>
+        /// Enum for supported sensors.
+        /// </summary>
+        public enum SensorTypes
+        {
+            /// <summary>Landsat_7</summary>
+            Landsat_7,
+            /// <summary>Landsat_8</summary>
+            Landsat_8,
+            /// <summary>Landsat_9</summary>
+            Landsat_9,
+            /// <summary>MODIS</summary>
+            MODIS,
+            /// <summary>Pleiades_1A</summary>
+            Pleiades_1A,
+            /// <summary>Pleiades_1B</summary>
+            Pleiades_1B,
+            /// <summary>Sentinel_2</summary>
+            Sentinel_2,
+            /// <summary>Sentinel_2A</summary>
+            Sentinel_2A,
+            /// <summary>Sentinel_2B</summary>
+            Sentinel_2B,
+            /// <summary>Sentinel_2C</summary>
+            Sentinel_2C,
+            /// <summary>SPOT_6_7</summary>
+            SPOT_6_7,
+            /// <summary>Venus</summary>
+            Venus
+        }
+
+        /// <summary>
+        /// Holds the loaded spectral response function for the selected sensor.
+        /// </summary>
+        public SpectralResponseFunction SensorSRF { get; private set; }
+
+        /// <summary>
+        /// Mapping from sensor enum to local SRF file path.
+        /// </summary>
+        private readonly Dictionary<SensorTypes, string> sensorFileMap = new()
+        {
+            {SensorTypes.Landsat_7, "Landsat_7" },
+            {SensorTypes.Landsat_8, "Landsat_8" },
+            {SensorTypes.Landsat_9, "Landsat_9" },
+            {SensorTypes.MODIS, "MODIS" },
+            {SensorTypes.Pleiades_1A, "Pleiades_1A" },
+            {SensorTypes.Pleiades_1B, "Pleiades_1B" },
+            {SensorTypes.Sentinel_2, "Sentinel_2" },
+            {SensorTypes.Sentinel_2A, "Sentinel_2A" },
+            {SensorTypes.Sentinel_2B, "Sentinel_2B" },
+            {SensorTypes.Sentinel_2C, "Sentinel_2C" },
+            {SensorTypes.SPOT_6_7, "SPOT_6_7" },
+            {SensorTypes.Venus, "Venus" }
+        };
+
+        /// <summary>
+        /// Loads the SRF for the currently selected sensor.
+        /// </summary>
+        private void SetSensorSRF()
+        {
+            if (sensorFileMap.TryGetValue(SensorType, out var filePath))
+            {
+                filePath = Path.Combine("Models", "PROSAIL", "SpectralResponseFunctions", $"{filePath}.json");
+                SensorSRF = LoadSpectralResponseFunction(filePath);
+            }
+            else
+            {
+                SensorSRF = null;
+                throw new ArgumentException($"Unknown sensor: {SensorType}");
+            }
+        }
 
         /// <summary>
         /// Defines the logging verbosity levels
@@ -959,7 +1047,7 @@ namespace Models.PROSAIL
                 WriteMessage(LogLevel.Info, message: $"ProsailModel: PROSAIL calculation completed, Wavelength[{results.Wavelength.Length}]");
 
                 // Compute BRF (Bidirectional Reflectance Factor) for each wavelength
-                double[] BRF = ComputeBRF(rdot: results.Rdot, rsot: results.Rsot, 
+                CanopyBRF BRF = ComputeBRF(wavelength: results.Wavelength, rdot: results.Rdot, rsot: results.Rsot, 
                     tts: Convert.ToDouble(CurrentParameterValues["SunZenithAngle"]),
                     atmosphericSpectralData: cachedAtmosphericSpectralData);
 
