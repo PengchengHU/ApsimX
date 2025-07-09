@@ -1634,24 +1634,19 @@ namespace Models.PROSAIL.SAIL
         // Helper class for JSON deserialization (handles jagged arrays)
         private class SpectralResponseFunctionJsonData
         {
-            public List<double[]> Spectral_Response { get; set; } // Jagged array for SRF
+            public List<double[]> Spectral_Response { get; set; }
             public double[] Central_WL { get; set; } // Central wavelengths of sensor bands
             public object[] Spectral_Bands { get; set; } // Names or identifiers for sensor bands
             public double[] Original_Bands { get; set; } // Original wavelengths for SRF
         }
 
-        /// <summary>
-        /// Utility to transpose a 2D array
-        /// </summary>
-        private static double[,] Transpose(double[,] matrix)
+        /// <summary>Hold the canopy state variables</summary>
+        public struct CanopyStateVariables
         {
-            int rows = matrix.GetLength(0);
-            int cols = matrix.GetLength(1);
-            double[,] result = new double[cols, rows];
-            for (int i = 0; i < rows; i++)
-                for (int j = 0; j < cols; j++)
-                    result[j, i] = matrix[i, j];
-            return result;
+            /// <summary>Fraction of absorbed photosyntehtically active radiation (fAPAR)</summary>
+            public double fAPAR;
+            /// <summary>Fraction of Vegetation Cover (fCover = 1 - gap fraction in view direction).</summary>
+            public double fcover;
         }
 
         #endregion
