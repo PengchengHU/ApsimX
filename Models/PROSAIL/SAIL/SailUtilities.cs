@@ -4,6 +4,7 @@ using System;
 using System.Collections.Generic;
 using System.IO;
 using System.Linq;
+using static CanopyOptics;
 using static Models.Prosail.ProsailCore;
 using static Models.PROSAIL.PROSPECT.ProspectCore;
 
@@ -118,21 +119,29 @@ namespace Models.PROSAIL.SAIL
         ///     using a canopy radiative transfer model, Agronomie.
         /// Es = direct irradiance, Ed = diffuse irradiance.
         /// </remarks>
+        /// <param name="wavelength">wavelength.</param>
         /// <param name="rdot">Hemispherical-directional reflectance factor (R_o) spectrum from SAIL. Array with one value per wavelength.</param>
         /// <param name="rsot">Bi-directional reflectance factor (R_so) spectrum from SAIL. Array with value per wavelength.</param>
         /// <param name="tts">Solar zenith angle (degrees). Single value used for all wavelengths.</param>
         /// <param name="atmosphericSpectralData">Atmospheric spectral data containing DirectLight (Es) and DiffuseLight (Ed) spectra.</param>
         /// <returns>Bidirectional reflectance factor (BRF) spectrum.</returns>
-        public static double[] ComputeBRF(double[] rdot, double[] rsot, double tts, AtmosphericSpectralData atmosphericSpectralData)
+        public static CanopyBRF ComputeBRF(double[] wavelength, double[] rdot, double[] rsot, 
+            double tts, AtmosphericSpectralData atmosphericSpectralData)
         {
             // Section: Direct / Diffuse Light Calculation
-            double[] Es = atmosphericSpectralData.DirectLight;    // Direct irradiance component
+            double[] Es = atmosphericSpectralData.DirectLight;   // Direct irradiance component
             double[] Ed = atmosphericSpectralData.DiffuseLight;  // Diffuse irradiance component
 
             // Input validation: Ensure all spectral arrays have the same length
-            if (rdot.Length != rsot.Length || rdot.Length != Es.Length || rdot.Length != Ed.Length)
+            if (wavelength.Length != rdot.Length || wavelength.Length != rsot.Length || 
+                wavelength.Length != Es.Length || wavelength.Length != Ed.Length)
             {
-                throw new ArgumentException("ComputeBRF: Input arrays (rdot, rsot, Es, Ed) must have the same length.");
+                throw new ArgumentException("ComputeBRF: Input arrays (wavelength, rdot, rsot, Es, Ed) must have the same length.");
+            }
+
+            if (!atmosphericSpectralData.HasMatchingWavelengths(wavelength))
+            {
+                throw new ArgumentException("ComputeBRF: Wavelengths do not match the atmospheric spectral data.");
             }
 
             // Convert angles to radians
@@ -173,7 +182,12 @@ namespace Models.PROSAIL.SAIL
                 // Ensure BRF result is within physical bounds [0, 1]
                 BRF[i] = Math.Max(0.0, Math.Min(1.0, BRF[i]));
             }
-            return BRF; // Return the calculated BRF spectrum
+
+            // Convert arrays to Vector<double> and create CanopyBRF using constructor
+            Vector<double> wavelengthVector = Vector<double>.Build.DenseOfArray(wavelength);
+            Vector<double> brfVector = Vector<double>.Build.DenseOfArray(BRF);
+
+            return new CanopyBRF(wavelengthVector, brfVector);
         }
 
         /// <summary>
@@ -1450,77 +1464,105 @@ namespace Models.PROSAIL.SAIL
 
 
         /// <summary>
-        /// Applies sensor spectral response function (SRF) to input spectral data, simulating sensor band integration.
+        /// Result of spectral resampling operation containing resampled reflectance data and metadata
         /// </summary>
-        /// <param name="wavelength">Input wavelengths (nm)</param>
-        /// <param name="reflectance">Input reflectance data (length = wvl.Length, or 2D: [nWvl, nSamples])</param>
-        /// <param name="srf">Sensor response function object</param>
-        /// <returns>Output reflectance at sensor band resolution (2D: [nBands, nSamples])</returns>
-        public static double[,] ResampleReflectanceToSensor(
-            double[] wavelength,
-            double[,] reflectance,
-            SensorResponseFunction srf)
+        public class SpectralResamplingResult
         {
-            int nbBandsOrigin = wavelength.Length;
-            int nbBandsSensor = srf.SpectralResponse.GetLength(0);
-            int nSamples = reflectance.GetLength(1);
+            /// <summary> 
+            /// Resampled reflectance data: List where each element is a double[] representing one sensor band.
+            /// Each double[] contains reflectance values for all samples in that band.
+            /// Structure: ResampledReflectance[bandIndex][sampleIndex] = reflectance value
+            /// </summary>
+            public List<double[]> ResampledReflectance { get; set; }
 
-            // If SRF is [nWvl, nBands], transpose to [nBands, nWvl]
-            if (srf.SpectralResponse.GetLength(1) == nbBandsOrigin)
+            /// <summary> 
+            /// Names/identifiers for each sensor band (rows in output).
+            /// Length equals number of sensor bands. Derived from SpectralBands or auto-generated.
+            /// </summary>
+            public string[] BandNames { get; set; }
+        }
+
+        /// <summary>
+        /// Resamples single reflectance spectrum to sensor spectral bands using spectral response functions
+        /// </summary>
+        /// <param name="wavelength">Input wavelengths in nanometers</param>
+        /// <param name="reflectance">Input reflectance spectrum</param>
+        /// <param name="srf">Spectral response function data</param>
+        /// <returns>Resampled reflectance data with metadata</returns>
+        public static SpectralResamplingResult ResampleReflectanceToSensor(
+            double[] wavelength,
+            double[] reflectance,
+            SpectralResponseFunction srf)
+        {
+            if (wavelength == null || reflectance == null || srf?.SpectralResponse == null)
+                throw new ArgumentException("Input parameters cannot be null");
+
+            if (wavelength.Length != reflectance.Length)
+                throw new ArgumentException("Wavelength and reflectance arrays must have the same length");
+
+            int nbBandsOrigin = wavelength.Length;
+            int nbBandsSensor = srf.SpectralResponse.Count;
+
+            // Handle transposition if needed
+            var spectralResponse = srf.SpectralResponse;
+            if (spectralResponse.Count == nbBandsOrigin && spectralResponse[0].Length == nbBandsSensor)
             {
-                srf.SpectralResponse = Transpose(srf.SpectralResponse);
+                spectralResponse = Enumerable.Range(0, nbBandsSensor)
+                    .Select(i => Enumerable.Range(0, nbBandsOrigin)
+                        .Select(j => srf.SpectralResponse[j][i]).ToArray())
+                    .ToList();
+                nbBandsSensor = spectralResponse.Count;
             }
 
-            double[,] outRefl = new double[nbBandsSensor, nSamples];
+            // Pre-compute wavelength lookup for performance
+            var wavelengthLookup = wavelength
+                .Select((wvl, idx) => new { wvl, idx })
+                .ToDictionary(x => x.wvl, x => x.idx);
+
+            var resampledReflectance = new List<double[]>(nbBandsSensor);
 
             for (int i = 0; i < nbBandsSensor; i++)
             {
-                // Find indices where SRF > 0 for this band
-                List<int> indexIN = new();
-                for (int j = 0; j < srf.SpectralResponse.GetLength(1); j++)
-                    if (srf.SpectralResponse[i, j] > 0) indexIN.Add(j);
+                var bandName = srf.SpectralBands?[i]?.ToString() ?? $"Band_{i + 1}";
 
-                // Wavelengths for which SRF is defined for this band
-                var usflWvl = indexIN.Select(idx => srf.OriginalBands[idx]).ToArray();
-
-                // Indices in input wavelengths matching SRF wavelengths
-                var indexOUT = indexIN
-                    .Select(idx => Array.IndexOf(wavelength, srf.OriginalBands[idx]))
-                    .Where(idx => idx >= 0)
+                // Find non-zero SRF indices and corresponding input wavelength indices
+                var validPairs = spectralResponse[i]
+                    .Select((srfValue, srfIdx) => new { srfValue, srfIdx })
+                    .Where(x => x.srfValue > 0 && x.srfIdx < srf.OriginalBands.Length)
+                    .Select(x => new {
+                        weight = x.srfValue,
+                        inputIdx = wavelengthLookup.GetValueOrDefault(srf.OriginalBands[x.srfIdx], -1)
+                    })
+                    .Where(x => x.inputIdx >= 0)
                     .ToArray();
 
-                // Band weights
-                var bandValues = indexIN.Select(idx => srf.SpectralResponse[i, idx]).ToArray();
-
-                if (indexIN.Count == indexOUT.Length && indexIN.Count > 0)
+                if (validPairs.Length > 0)
                 {
-                    double integrateChannel = bandValues.Sum();
-                    for (int s = 0; s < nSamples; s++)
-                    {
-                        double pond = 0;
-                        for (int k = 0; k < indexOUT.Length; k++)
-                            pond += bandValues[k] * reflectance[indexOUT[k], s];
-                        outRefl[i, s] = pond / integrateChannel;
-                    }
+                    double totalWeight = validPairs.Sum(x => x.weight);
+                    double weightedSum = validPairs.Sum(x => x.weight * reflectance[x.inputIdx]);
+                    resampledReflectance.Add(new double[] { weightedSum / totalWeight });
                 }
                 else
                 {
-                    // Set to zero if not compatible
-                    for (int s = 0; s < nSamples; s++)
-                        outRefl[i, s] = 0.0;
-                    // Optionally: log warning here
+                    Console.WriteLine($"Warning: No wavelength matches for {bandName} - values set to 0");
+                    resampledReflectance.Add(new double[] { 0.0 });
                 }
             }
-            return outRefl;
+
+            return new SpectralResamplingResult
+            {
+                ResampledReflectance = resampledReflectance,
+                BandNames = Enumerable.Range(0, nbBandsSensor).Select(i => srf.SpectralBands?[i]?.ToString() ?? $"Band_{i + 1}").ToArray()
+            };
         }
 
         /// <summary>
         /// Represents the sensor spectral response function (SRF) data structure.
         /// </summary>
-        public class SensorResponseFunction
+        public class SpectralResponseFunction
         {
             /// <summary> SRF matrix: [nBands, nWvl] (rows: sensor bands, columns: original bands) </summary>
-            public double[,] SpectralResponse { get; set; }
+            public List<double[]> SpectralResponse { get; set; }
 
             /// <summary> Central wavelength (nm) of each sensor band (length = nBands) </summary>
             public double[] CentralWL { get; set; }
@@ -1533,11 +1575,11 @@ namespace Models.PROSAIL.SAIL
         }
 
         /// <summary>
-        /// Loads a sensor response function (SRF) from a JSON file.
+        /// Loads a sensor response response function (SRF) from a JSON file.
         /// </summary>
         /// <param name="filePath">Path to the JSON file</param>
-        /// <returns>SensorResponseFunction object</returns>
-        public static SensorResponseFunction LoadSensorResponseFunction(string filePath)
+        /// <returns>SpectralResponseFunction object</returns>
+        public static SpectralResponseFunction LoadSpectralResponseFunction(string filePath)
         {
             if (!File.Exists(filePath))
                 throw new FileNotFoundException($"SRF JSON file not found: {filePath}");
@@ -1545,7 +1587,7 @@ namespace Models.PROSAIL.SAIL
             string json = File.ReadAllText(filePath);
 
             // Use an intermediate class for deserialization to handle jagged arrays
-            var srfRaw = JsonConvert.DeserializeObject<SensorResponseFunctionJsonData>(json);
+            var srfRaw = JsonConvert.DeserializeObject<SpectralResponseFunctionJsonData>(json);
 
             if (srfRaw == null)
                 throw new InvalidDataException("SRF JSON could not be deserialized.");
@@ -1553,7 +1595,7 @@ namespace Models.PROSAIL.SAIL
             if (srfRaw.Spectral_Response == null || srfRaw.Original_Bands == null || srfRaw.Central_WL == null)
                 throw new InvalidDataException("SRF JSON missing required fields (Spectral_Response, Original_Bands, Central_WL).");
 
-            int nBands = srfRaw.Spectral_Response.Length;
+            int nBands = srfRaw.Spectral_Response.Count;
             if (nBands == 0)
                 throw new InvalidDataException("SRF JSON: Spectral_Response array is empty.");
 
@@ -1576,14 +1618,13 @@ namespace Models.PROSAIL.SAIL
                 throw new InvalidDataException("SRF JSON: Spectral_Bands length does not match number of bands.");
 
             // Convert jagged array to 2D array
-            double[,] srfMatrix = new double[nBands, nWvl];
+            var srfList = new List<double[]>(nBands);
             for (int i = 0; i < nBands; i++)
-                for (int j = 0; j < nWvl; j++)
-                    srfMatrix[i, j] = srfRaw.Spectral_Response[i][j];
+                srfList.Add((double[])srfRaw.Spectral_Response[i].Clone());
 
-            return new SensorResponseFunction
+            return new SpectralResponseFunction
             {
-                SpectralResponse = srfMatrix,
+                SpectralResponse = srfList,
                 CentralWL = srfRaw.Central_WL,
                 SpectralBands = srfRaw.Spectral_Bands,
                 OriginalBands = srfRaw.Original_Bands
@@ -1591,9 +1632,9 @@ namespace Models.PROSAIL.SAIL
         }
 
         // Helper class for JSON deserialization (handles jagged arrays)
-        private class SensorResponseFunctionJsonData
+        private class SpectralResponseFunctionJsonData
         {
-            public double[][] Spectral_Response { get; set; } // Jagged array for SRF
+            public List<double[]> Spectral_Response { get; set; } // Jagged array for SRF
             public double[] Central_WL { get; set; } // Central wavelengths of sensor bands
             public object[] Spectral_Bands { get; set; } // Names or identifiers for sensor bands
             public double[] Original_Bands { get; set; } // Original wavelengths for SRF
