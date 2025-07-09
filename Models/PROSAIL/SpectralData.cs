@@ -59,6 +59,79 @@ public static class SpectralDataUtils
 
         return subsetFunction(source, indices);
     }
+
+    /// <summary>
+    /// Check if two spectral data objects have exactly matching wavelengths.
+    /// Returns true only if both objects have the same wavelengths in any order.
+    /// </summary>
+    /// <typeparam name="T1">Type of the first spectral data object</typeparam>
+    /// <typeparam name="T2">Type of the second spectral data object</typeparam>
+    /// <param name="source1">The first spectral data object</param>
+    /// <param name="source2">The second spectral data object</param>
+    /// <returns>True if both objects have exactly matching wavelengths, false otherwise</returns>
+    public static bool HasMatchingWavelengths<T1, T2>(this T1 source1, T2 source2)
+        where T1 : ISpectralData
+        where T2 : ISpectralData
+    {
+        // Get wavelength arrays
+        var wavelengths1 = source1.GetWavelengths();
+        var wavelengths2 = source2.GetWavelengths();
+
+        // Check for null or empty arrays
+        if (wavelengths1 == null || wavelengths2 == null ||
+            wavelengths1.Length == 0 || wavelengths2.Length == 0)
+            return false;
+
+        // Check lengths match
+        if (wavelengths1.Length != wavelengths2.Length)
+            return false;
+
+        // Get wavelength indices
+        var indices1 = source1.GetWavelengthToIndex();
+        var indices2 = source2.GetWavelengthToIndex();
+
+        if (indices1 == null || indices2 == null)
+            return false;
+
+        // Check each wavelength exists in both sets with matching indices
+        for (int i = 0; i < wavelengths1.Length; i++)
+        {
+            double wl = wavelengths1[i];
+            if (!indices2.ContainsKey(wl))
+                return false;
+
+            // For exact matching, verify the wavelength is at the same index
+            if (indices1[wl] != i || indices2[wl] != i)
+                return false;
+        }
+
+        return true;
+    }
+
+    /// <summary>
+    /// Checks if a spectral data object has exactly matching wavelengths (order and value) to a given array.
+    /// </summary>
+    /// <typeparam name="T">Type implementing ISpectralData</typeparam>
+    /// <param name="source">The spectral data object</param>
+    /// <param name="wavelengths">The array of wavelengths to compare</param>
+    /// <returns>True if both have the same wavelengths in the same order, false otherwise</returns>
+    public static bool HasMatchingWavelengths<T>(this T source, double[] wavelengths)
+        where T : ISpectralData
+    {
+        if (source == null || wavelengths == null)
+            return false;
+
+        var sourceWavelengths = source.GetWavelengths();
+        if (sourceWavelengths == null || sourceWavelengths.Length != wavelengths.Length)
+            return false;
+
+        for (int i = 0; i < wavelengths.Length; i++)
+        {
+            if (Math.Abs(sourceWavelengths[i] - wavelengths[i]) > 1e-6)
+                return false;
+        }
+        return true;
+    }
 }
 
 /// <summary>
@@ -789,6 +862,74 @@ public class CanopyOptics : ISpectralData
                 indices.Select(i => source.Abs_hem[i]).ToArray(),
                 indices.Select(i => source.Rsdstar[i]).ToArray(),
                 indices.Select(i => source.Rddstar[i]).ToArray()
+            );
+        });
+    }
+}
+
+/// <summary>
+/// Holds Bidirectional Reflectance Factor (wavelengths and BRF)
+/// </summary>
+public struct CanopyBRF : ISpectralData
+{
+    /// <summary>Wavelengths in nanometers (nm)</summary>
+    public Vector<double> Wavelength { get; set; }
+
+    /// <summary>Canopy BRF (unitless fraction, 0-1)</summary>
+    public Vector<double> BRF { get; set; }
+
+    /// <summary>Dictionary mapping wavelengths to their indices in the Wavelength array for optimized access</summary>
+    public Dictionary<double, int> WavelengthToIndex { get; set; }
+
+    /// <summary>
+    /// Initializes a new instance of CanopyBRF with automatic WavelengthToIndex creation
+    /// </summary>
+    /// <param name="wavelength">Wavelength vector (nm)</param>
+    /// <param name="brf">Reflectance vector (0-1)</param>
+    /// <exception cref="ArgumentException">Thrown when vectors have different lengths</exception>
+    public CanopyBRF(Vector<double> wavelength, Vector<double> brf)
+    {
+        if (wavelength?.Count != brf?.Count)
+            throw new ArgumentException("Wavelength and BRF vectors must have the same length");
+
+        Wavelength = wavelength;
+        BRF = brf;
+        WavelengthToIndex = wavelength?.Select((w, i) => new { Wavelength = w, Index = i })
+                                     .ToDictionary(x => x.Wavelength, x => x.Index) ?? new Dictionary<double, int>();
+    }
+
+    /// <summary>
+    /// Indicates whether this SoilOptics object contains valid data.
+    /// Returns false if Wavelength or BRF is null or empty.
+    /// </summary>
+    public readonly bool HasValue => Wavelength != null && BRF != null &&
+                                   WavelengthToIndex != null && Wavelength.Count > 0 &&
+                                   Wavelength.Count == BRF.Count;
+
+    /// <summary>
+    /// Gets wavelengths as double array (implements ISpectralData)
+    /// </summary>
+    /// <returns>Array of wavelengths in nm</returns>
+    public double[] GetWavelengths() => Wavelength?.ToArray() ?? Array.Empty<double>();
+
+    /// <summary>
+    /// Gets wavelength-to-index mapping (implements ISpectralData)
+    /// </summary>
+    /// <returns>Dictionary mapping wavelengths to indices</returns>
+    public Dictionary<double, int> GetWavelengthToIndex() => WavelengthToIndex;
+
+    /// <summary>
+    /// Creates a subset of CanopyBRF for specified wavelengths
+    /// </summary>
+    /// <param name="targetWavelengths">Array of wavelengths to extract (nm)</param>
+    /// <returns>New CanopyBRF with subset data</returns>
+    public CanopyBRF SubsetByWavelengths(double[] targetWavelengths)
+    {
+        return SpectralDataUtils.SubsetByWavelengths(this, targetWavelengths, (source, indices) =>
+        {
+            return new CanopyBRF(
+                Vector<double>.Build.DenseOfEnumerable(indices.Select(i => source.Wavelength[i])),
+                Vector<double>.Build.DenseOfEnumerable(indices.Select(i => source.BRF[i]))
             );
         });
     }
