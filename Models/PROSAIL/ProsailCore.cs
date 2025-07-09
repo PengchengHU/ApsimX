@@ -27,23 +27,6 @@ namespace Models.Prosail
         private static readonly string RelativeSoilOpticalDataPath = Path.Combine("Models", "PROSAIL", "PROSPECT", "SpecPROSPECT_FullRange.json");
         private static string DefaultSoilOpticalDataPath => PathUtilities.GetAbsolutePath(RelativeSoilOpticalDataPath, AppDomain.CurrentDomain.BaseDirectory);
 
-        //private static readonly string RelativeSoilOpticalDataPath = "..\\..\\..\\Models\\PROSAIL\\PROSPECT\\SpecPROSPECT_FullRange.json";
-        //private static string DefaultSoilOpticalDataPath => PathUtilities.GetAbsolutePath(RelativeSoilOpticalDataPath, AppDomain.CurrentDomain.BaseDirectory);
-
-/*
-        /// <summary>Contains reflectance data of wet and dry soil</summary>
-        public struct WetDrySoilReflectance
-        {
-            /// <summary>Wavelength array in nanometers (nm)</summary>
-            public Vector<double> Wavelength;
-            /// <summary>Reflectance of dry soil</summary>
-            public Vector<double> DrySoilReflectance;
-            /// <summary>Reflectance of dry soil</summary>
-            public Vector<double> WetSoilReflectance;
-            /// <summary> Index of wavelength</summary>
-            public Dictionary<double, int> WavelengthToIndex;
-        }
-*/
         /// <summary>
         /// Runs the PRO4SAIL simulation to compute canopy reflectance factors.
         /// </summary>
