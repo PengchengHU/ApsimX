@@ -382,6 +382,8 @@ namespace Models.PROSAIL
                 // Clear existing tables
                 dbConnection.ExecuteNonQuery("DROP TABLE IF EXISTS CanopyOpticalVariable;");
                 dbConnection.ExecuteNonQuery("DROP TABLE IF EXISTS CanopyStateVariable;");
+                dbConnection.ExecuteNonQuery("DROP TABLE IF EXISTS CanopyBRF;");
+                dbConnection.ExecuteNonQuery("DROP TABLE IF EXISTS resampledReflectance; ");
                 dbConnection.ExecuteNonQuery("DROP TABLE IF EXISTS Parameters;");
                 dbConnection.ExecuteNonQuery("DROP TABLE IF EXISTS Simulations;");
 
@@ -423,6 +425,7 @@ namespace Models.PROSAIL
                         ObserverZenithAngle REAL,
                         RelativeAzimuthAngle REAL,
                         SailVersion TEXT,
+                        SensorType TEXT,
                         PRIMARY KEY (SimulationName, Date),
                         FOREIGN KEY (SimulationName) REFERENCES Simulations(SimulationName)
                     )");
@@ -431,7 +434,7 @@ namespace Models.PROSAIL
                     CREATE TABLE IF NOT EXISTS CanopyOpticalVariable (
                         SimulationName TEXT,
                         Date TEXT,
-                        WavelengthNM REAL,
+                        Wavelength REAL,
                         Rdot REAL,  
                         Rsot REAL, 
                         Rddt REAL,
@@ -455,6 +458,28 @@ namespace Models.PROSAIL
                         FOREIGN KEY (SimulationName, Date) REFERENCES Parameters(SimulationName, Date)
                     )");
 
+                dbConnection.ExecuteNonQuery(@"
+                    CREATE TABLE IF NOT EXISTS CanopyBRF (
+                        SimulationName TEXT,
+                        Date TEXT,
+                        Wavelength REAL,
+                        BRF REAL, 
+                        PRIMARY KEY (SimulationName, Date, Wavelength),
+                        FOREIGN KEY (SimulationName, Date) REFERENCES Parameters(SimulationName, Date)
+                    )");
+
+                dbConnection.ExecuteNonQuery(@"
+                    CREATE TABLE IF NOT EXISTS ReflectanceResampledToSensor (
+                        SimulationName TEXT,
+                        Date TEXT,
+                        Wavelength REAL,
+                        BandName TEXT,
+                        Reflectance REAL, 
+                        PRIMARY KEY (SimulationName, Date, Wavelength),
+                        FOREIGN KEY (SimulationName, Date) REFERENCES Parameters(SimulationName, Date)
+                    )");
+
+
                 string sql = $@"
                     INSERT INTO Simulations (SimulationName, StartDate, EndDate, CreatedAt)
                     VALUES ('{simulationName}', '{Clock.StartDate:yyyy-MM-dd}', '{Clock.EndDate:yyyy-MM-dd}', '{DateTime.Now:yyyy-MM-dd HH:mm:ss}')";
@@ -477,7 +502,9 @@ namespace Models.PROSAIL
         /// <summary>
         /// Write PROSAIL results to the database
         /// </summary>
-        private void WriteToDatabase(DateTime date, CanopyOptics canopyOptics, CanopyStateVariables canopyStateVariables)
+        private void WriteToDatabase(DateTime date, CanopyOptics canopyOptics, 
+            CanopyStateVariables canopyStateVariables, CanopyBRF canopyBRF, 
+            SpectralResamplingResult spectralResamplingResult)
         {
             // Quick check on key properties
             if (dbConnection == null || canopyOptics?.Wavelength == null)
@@ -530,7 +557,8 @@ namespace Models.PROSAIL
             INSERT OR REPLACE INTO Parameters (
                 SimulationName, Date, N, CAB, CAR, EWT, LMA, ANT, BROWN, PROT, CBC, Alpha,
                 LAI, HotSpot, TypeLidf, LIDFa, LIDFb, FractionBrown, Dissociation, CrownCover, TreeShape,
-                WetDrySoilReflectanceJsonPath, Psoil, SunZenithAngle, ObserverZenithAngle, RelativeAzimuthAngle, SailVersion
+                WetDrySoilReflectanceJsonPath, Psoil, SunZenithAngle, ObserverZenithAngle, RelativeAzimuthAngle, SailVersion,
+                SensorType
             ) VALUES (
                 '{simulationName}', '{dateStr}', {CurrentParameterValues["N"]}, {CurrentParameterValues["CAB"]}, 
                 {CurrentParameterValues["CAR"]}, {CurrentParameterValues["EWT"]}, {CurrentParameterValues["LMA"]}, 
@@ -541,12 +569,12 @@ namespace Models.PROSAIL
                 {CurrentParameterValues["Dissociation"]}, {CurrentParameterValues["CrownCover"]}, {CurrentParameterValues["TreeShape"]},
                 '{WetDrySoilReflectanceJsonPath?.Replace("'", "''") ?? ""}', {CurrentParameterValues["Psoil"]},
                 {CurrentParameterValues["SunZenithAngle"]}, {CurrentParameterValues["ObserverZenithAngle"]}, 
-                {CurrentParameterValues["RelativeAzimuthAngle"]}, '{CurrentParameterValues["SailVersion"]}'
+                {CurrentParameterValues["RelativeAzimuthAngle"]}, '{CurrentParameterValues["SailVersion"]}', '{SensorType.ToString()}'
             )";
                 dbConnection.ExecuteNonQuery(paramSql);
 
                 // CanopyOpticalVariable INSERT
-                StringBuilder spectraSql = new StringBuilder("INSERT OR REPLACE INTO CanopyOpticalVariable (SimulationName, Date, WavelengthNM, Rdot, Rsot, Rddt, Rsdt, fCover, Abs_dir, Abs_hem, Rsdstar, Rddstar) VALUES ");
+                StringBuilder spectraSql = new StringBuilder("INSERT OR REPLACE INTO CanopyOpticalVariable (SimulationName, Date, Wavelength, Rdot, Rsot, Rddt, Rsdt, fCover, Abs_dir, Abs_hem, Rsdstar, Rddstar) VALUES ");
                 bool firstSpectra = true;
 
                 // Process all wavelengths
@@ -568,14 +596,59 @@ namespace Models.PROSAIL
                 }
 
                 // CanopyStateVariable INSERT
-                // After writing CanopyOpticalVariable, add this for CanopyStateVariable:
                 string stateSql = $@"
             INSERT OR REPLACE INTO CanopyStateVariable (
-                SimulationName, Date, fAPAR, fCover
+                SimulationName, Date, fAPAR, fCover, albedo
             ) VALUES (
-                '{simulationName}', '{dateStr}', {canopyStateVariables.fAPAR}, {canopyStateVariables.fcover}
+                '{simulationName}', '{dateStr}', {canopyStateVariables.fAPAR}, {canopyStateVariables.fcover}, {canopyStateVariables.albedo}
             )";
                 dbConnection.ExecuteNonQuery(stateSql);
+
+                // ResampledReflectance INSERT 
+                if (spectralResamplingResult != null && spectralResamplingResult.Reflectance != null)
+                {
+                    try
+                    {
+                        StringBuilder resampledSql = new StringBuilder("INSERT OR REPLACE INTO ReflectanceResampledToSensor (SimulationName, Date, Wavelength, BandName, Reflectance) VALUES ");
+                        bool firstRow = true;
+
+                        // Iterate through each band's resampled reflectance values
+                        for (int bandIndex = 0; bandIndex < spectralResamplingResult.Reflectance.Count; bandIndex++)
+                        {
+                            double[] bandReflectance = spectralResamplingResult.Reflectance[bandIndex];
+                            string bandName = spectralResamplingResult.BandNames[bandIndex];
+                            double wavelength = spectralResamplingResult.Wavelength[bandIndex];
+
+                            if (bandReflectance == null || bandReflectance.Length == 0)
+                            {
+                                WriteMessage(LogLevel.Warning, $"ProsailModel: No reflectance data for band '{bandName}' on {dateStr} when resampling reflectance to sensor.");
+                                continue; // Skip empty bands
+                            }
+
+                            // For each reflectance value in the band
+                            foreach (double reflectance in bandReflectance)
+                            {
+                                if (!firstRow)
+                                    resampledSql.Append(",");
+                                
+                                resampledSql.Append($"('{simulationName}', '{dateStr}', {wavelength}, {bandName}, {reflectance})");
+                                firstRow = false;
+                            }
+                        }
+
+                        if (!firstRow) // Only execute if we have data to insert
+                        {
+                            resampledSql.Append(";");
+                            dbConnection.ExecuteNonQuery(resampledSql.ToString());
+                            WriteMessage(LogLevel.Debug, $"ProsailModel: Successfully wrote resampled reflectance data to database for {dateStr}");
+                        }
+                    }
+                    catch (Exception ex)
+                    {
+                        WriteMessage(LogLevel.Error, $"ProsailModel: Failed to write resampled reflectance data: {ex.Message}");
+                        throw;
+                    }
+                }
 
                 dbConnection.ExecuteNonQuery("COMMIT;");
 
@@ -1077,25 +1150,44 @@ namespace Models.PROSAIL
                 WriteMessage(LogLevel.Info, message: $"ProsailModel: PROSAIL calculation completed, Wavelength[{canopyOpticalVariables.Wavelength.Length}]");
 
                 // Compute BRF (Bidirectional Reflectance Factor) for each wavelength
-                CanopyBRF BRF = ComputeBRF(wavelength: canopyOpticalVariables.Wavelength, rdot: canopyOpticalVariables.Rdot, rsot: canopyOpticalVariables.Rsot, 
+                CanopyBRF canopyBRF = ComputeBRF(wavelength: canopyOpticalVariables.Wavelength, 
+                    rdot: canopyOpticalVariables.Rdot, 
+                    rsot: canopyOpticalVariables.Rsot, 
                     tts: Convert.ToDouble(CurrentParameterValues["SunZenithAngle"]),
                     atmosphericSpectralData: cachedAtmosphericSpectralData);
 
                 // Compute fraction of absorbed photosyntehtically active radiation (fAPAR)
-                double fAPAR = ComputeFAPAR(abs_dir: canopyOpticalVariables.Abs_dir, abs_hem: canopyOpticalVariables.Abs_hem, 
+                double fAPAR = ComputeFAPAR(abs_dir: canopyOpticalVariables.Abs_dir,
+                    abs_hem: canopyOpticalVariables.Abs_hem, 
                     tts: Convert.ToDouble(CurrentParameterValues["SunZenithAngle"]), 
                     atmosphericSpectralData: cachedAtmosphericSpectralData);
+
+                // Compute broadband albedo
+                double albedo = ComputeAlbedo(rddstar: canopyOpticalVariables.Rddstar,
+                    rsdstar: canopyOpticalVariables.Rsdstar,
+                    tts: Convert.ToDouble(CurrentParameterValues["SunZenithAngle"]),
+                    atmosphericSpectralData: cachedAtmosphericSpectralData);
+
+                // Spectral resampling to sensor
+                SpectralResamplingResult resampledReflectance = ResampleReflectanceToSensor(wavelength: canopyBRF.Wavelength.ToArray(), 
+                    reflectance: canopyBRF.BRF.ToArray(),
+                    srf: SensorSRF);
 
                 var canopyStateVariables = new CanopyStateVariables
                 {
                     fAPAR = fAPAR,
-                    fcover = canopyOpticalVariables.FCover.Distinct().First()
+                    fcover = canopyOpticalVariables.FCover.Distinct().First(),
+                    albedo = albedo
                 };
 
                 // Save to database only if enabled
                 if (EnableSQLiteOutput)
                 {
-                    WriteToDatabase(Clock.Today, canopyOpticalVariables, canopyStateVariables);
+                    WriteToDatabase(date: Clock.Today, 
+                        canopyOptics: canopyOpticalVariables, 
+                        canopyStateVariables: canopyStateVariables, 
+                        canopyBRF: canopyBRF, 
+                        spectralResamplingResult: resampledReflectance);
                     WriteMessage(LogLevel.Info, $"ProsailModel: Wrote results to database for {Clock.Today:yyyy-MM-dd}.");
                 }
                 else
