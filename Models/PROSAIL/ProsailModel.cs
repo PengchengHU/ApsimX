@@ -444,7 +444,7 @@ namespace Models.PROSAIL
                         Abs_hem REAL,
                         Rsdstar REAL,
                         Rddstar REAL,
-                        PRIMARY KEY (SimulationName, Date, WavelengthNM),
+                        PRIMARY KEY (SimulationName, Date, Wavelength),
                         FOREIGN KEY (SimulationName, Date) REFERENCES Parameters(SimulationName, Date)
                     )");
 
@@ -454,6 +454,7 @@ namespace Models.PROSAIL
                         Date TEXT,
                         fAPAR REAL,  
                         fCover REAL,
+                        albedo REAL,
                         PRIMARY KEY (SimulationName, Date),
                         FOREIGN KEY (SimulationName, Date) REFERENCES Parameters(SimulationName, Date)
                     )");
@@ -591,7 +592,7 @@ namespace Models.PROSAIL
                 if (!firstSpectra)
                 {
                     spectraSql.Append(";");
-                    WriteMessage(LogLevel.Debug, $"ProsailModel: Executing CanopyOpticalVariable INSERT with {spectraSql.Length} characters.");
+                    WriteMessage(LogLevel.Debug, $"ProsailModel: Executing CanopyOpticalVariable INSERT.");
                     dbConnection.ExecuteNonQuery(spectraSql.ToString());
                 }
 
@@ -630,8 +631,10 @@ namespace Models.PROSAIL
                             {
                                 if (!firstRow)
                                     resampledSql.Append(",");
-                                
-                                resampledSql.Append($"('{simulationName}', '{dateStr}', {wavelength}, {bandName}, {reflectance})");
+
+                                // Escape the band name with single quotes and handle any quotes within the band name
+                                string escapedBandName = bandName.Replace("'", "''");
+                                resampledSql.Append($"('{simulationName}', '{dateStr}', {wavelength}, '{escapedBandName}', {reflectance})");
                                 firstRow = false;
                             }
                         }
@@ -647,6 +650,26 @@ namespace Models.PROSAIL
                     {
                         WriteMessage(LogLevel.Error, $"ProsailModel: Failed to write resampled reflectance data: {ex.Message}");
                         throw;
+                    }
+                }
+
+                // CanopyBRF INSERT
+                if (canopyBRF.Wavelength != null && canopyBRF.BRF != null)
+                {
+                    StringBuilder brfSql = new StringBuilder("INSERT OR REPLACE INTO CanopyBRF (SimulationName, Date, Wavelength, BRF) VALUES ");
+                    bool firstBRF = true;
+                    for (int i = 0; i < canopyBRF.Wavelength.Count; i++)
+                    {
+                        if (!firstBRF)
+                            brfSql.Append(",");
+                        brfSql.Append($"('{simulationName}', '{dateStr}', {canopyBRF.Wavelength[i]}, {canopyBRF.BRF[i]})");
+                        firstBRF = false;
+                    }
+                    if (!firstBRF)
+                    {
+                        brfSql.Append(";");
+                        dbConnection.ExecuteNonQuery(brfSql.ToString());
+                        WriteMessage(LogLevel.Debug, $"ProsailModel: Successfully wrote CanopyBRF data to database for {dateStr}");
                     }
                 }
 
