@@ -1524,15 +1524,15 @@ namespace Models.PROSAIL.SAIL
 
             for (int i = 0; i < nbBandsSensor; i++)
             {
-                var bandName = srf.SpectralBands?[i]?.ToString() ?? $"Band_{i + 1}";
+                var bandName = srf.SpectralBandName?[i]?.ToString() ?? $"Band_{i + 1}";
 
                 // Find non-zero SRF indices and corresponding input wavelength indices
                 var validPairs = spectralResponse[i]
                     .Select((srfValue, srfIdx) => new { srfValue, srfIdx })
-                    .Where(x => x.srfValue > 0 && x.srfIdx < srf.OriginalBands.Length)
+                    .Where(x => x.srfValue > 0 && x.srfIdx < srf.OriginalBandWavelength.Length)
                     .Select(x => new {
                         weight = x.srfValue,
-                        inputIdx = wavelengthLookup.GetValueOrDefault(srf.OriginalBands[x.srfIdx], -1)
+                        inputIdx = wavelengthLookup.GetValueOrDefault(srf.OriginalBandWavelength[x.srfIdx], -1)
                     })
                     .Where(x => x.inputIdx >= 0)
                     .ToArray();
@@ -1552,9 +1552,9 @@ namespace Models.PROSAIL.SAIL
 
             return new SpectralResamplingResult
             {
-                Wavelength = wavelength,
+                Wavelength = srf.CentralWavelength,
                 Reflectance = resampledReflectance,
-                BandNames = Enumerable.Range(0, nbBandsSensor).Select(i => srf.SpectralBands?[i]?.ToString() ?? $"Band_{i + 1}").ToArray()
+                BandNames = Enumerable.Range(0, nbBandsSensor).Select(i => srf.SpectralBandName?[i]?.ToString() ?? $"Band_{i + 1}").ToArray()
             };
         }
 
@@ -1567,13 +1567,13 @@ namespace Models.PROSAIL.SAIL
             public List<double[]> SpectralResponse { get; set; }
 
             /// <summary> Central wavelength (nm) of each sensor band (length = nBands) </summary>
-            public double[] CentralWL { get; set; }
+            public double[] CentralWavelength { get; set; }
 
-            /// <summary> Sensor band names or wavelengths (length = nBands) </summary>
-            public object[] SpectralBands { get; set; }
+            /// <summary> Sensor band names (length = nBands) </summary>
+            public object[] SpectralBandName { get; set; }
 
             /// <summary> Original bands (wavelengths, nm) for which SRF is defined (length = nWvl) </summary>
-            public double[] OriginalBands { get; set; }
+            public double[] OriginalBandWavelength { get; set; }
         }
 
         /// <summary>
@@ -1627,9 +1627,9 @@ namespace Models.PROSAIL.SAIL
             return new SpectralResponseFunction
             {
                 SpectralResponse = srfList,
-                CentralWL = srfRaw.Central_WL,
-                SpectralBands = srfRaw.Spectral_Bands,
-                OriginalBands = srfRaw.Original_Bands
+                CentralWavelength = srfRaw.Central_WL,
+                SpectralBandName = srfRaw.Spectral_Bands,
+                OriginalBandWavelength = srfRaw.Original_Bands
             };
         }
 
