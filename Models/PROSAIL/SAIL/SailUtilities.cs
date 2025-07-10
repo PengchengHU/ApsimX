@@ -163,7 +163,6 @@ namespace Models.PROSAIL.SAIL
             {
                 // Calculate effective direct and diffuse irradiance components reaching the canopy
                 double effectiveDirectIrradiance = (1.0 - skyl) * Es[i];
-                // Note: R code uses Ed here. Francois paper might imply skyl relates Es and Ed? Check original paper if critical.
                 double effectiveDiffuseIrradiance = skyl * Ed[i];
                 // Total irradiance for weighting
                 double totalIrradiance = effectiveDirectIrradiance + effectiveDiffuseIrradiance;
@@ -237,7 +236,6 @@ namespace Models.PROSAIL.SAIL
                 {
                     // Calculate effective irradiance components
                     double directIrradiance = (1.0 - skyl) * Es[i];
-                    // Note: R code uses Ed here. Francois paper might imply skyl relates Es and Ed? Check original paper if critical.
                     double diffuseIrradiance = skyl * Ed[i];
                     double incident = directIrradiance + diffuseIrradiance;
 
@@ -312,7 +310,6 @@ namespace Models.PROSAIL.SAIL
                 {
                     // Calculate effective irradiance components
                     double directIrradiance = (1.0 - skyl) * Es[i];
-                    // Note: R code uses Ed here. Francois paper might imply skyl relates Es and Ed? Check original paper if critical.
                     double diffuseIrradiance = skyl * Ed[i];
                     double incident = directIrradiance + diffuseIrradiance;
 
@@ -394,8 +391,7 @@ namespace Models.PROSAIL.SAIL
                 if (Math.Abs(sigbi) < 1e-12)
                 {
                     // If sigb is zero, implies conservative scattering (att=m or att=-m).
-                    // rinf should approach 1 if att=m, or -1 if att=-m?
-                    // SAIL theory suggests rinf -> 1 for conservative case.
+                    // R code uses infinite rinf, here I use 1 as SAIL theory suggests rinf -> 1 for conservative case, but need check!!!
                     rinf = 1.0;
                 }
                 else
@@ -470,23 +466,30 @@ namespace Models.PROSAIL.SAIL
 
                 // Multiple scattering contribution to bidirectional canopy reflectance
                 rsod[i] = (T1 + T2 - T3) / rsod_denom;
-
-                // Optional: Clamp intermediate results to physical bounds [0, 1] if needed, though SAIL theory allows intermediate values outside this.
-                // rdd[i] = Math.Max(0.0, Math.Min(1.0, rdd[i]));
-                // tdd[i] = Math.Max(0.0, Math.Min(1.0, tdd[i])); // etc. for rsd, tsd, rdo, tdo, rsod
             }
 
             // Return the struct containing all calculated arrays
             return new ScatteringResult { Tdd = tdd, Rdd = rdd, Tsd = tsd, Rsd = rsd, Tdo = tdo, Rdo = rdo, Rsod = rsod };
         }
 
-
         /// <summary>
         /// Computes scattering components for conservative or near-conservative scattering conditions (m no larger than 0.01).
         /// Internal helper function for SAIL models (specifically 4SAIL2). 
         /// Uses different formulae than NonConservativeScattering.
         /// </summary>
-        // (Parameters and return description identical to NonConservativeScattering)
+        /// <param name="m">SAIL model exponent coefficient array, sqrt((att+sigb)*(att-sigb)).</param>
+        /// <param name="lai">Leaf Area Index for the layer.</param>
+        /// <param name="att">Attenuation coefficient array (1-sigf).</param>
+        /// <param name="sigb">Diffuse backscattering coefficient array.</param>
+        /// <param name="ks">Extinction coefficient for solar flux (scalar).</param>
+        /// <param name="ko">Extinction coefficient for observed flux (scalar).</param>
+        /// <param name="sf">Solar forward scattering coefficient array.</param>
+        /// <param name="sb">Solar backscattering coefficient array.</param>
+        /// <param name="vf">View forward scattering coefficient array.</param>
+        /// <param name="vb">View backscattering coefficient array.</param>
+        /// <param name="tss">Directional transmittance (solar) for the layer (scalar).</param>
+        /// <param name="too">Directional transmittance (observer) for the layer (scalar).</param>
+        /// <returns>A ScatteringResult struct containing Tdd, Rdd, Tsd, Rsd, Tdo, Rdo, Rsod arrays.</returns>
         public static ScatteringResult ConservativeScattering(
            double[] m, double lai, double[] att, double[] sigb, double ks, double ko,
            double[] sf, double[] sb, double[] vf, double[] vb, double tss, double too)
@@ -546,7 +549,7 @@ namespace Models.PROSAIL.SAIL
                 if (Math.Abs(dns) < 1e-12) dns = dns >= 0 ? 1e-12 : -1e-12;
                 if (Math.Abs(dno) < 1e-12) dno = dno >= 0 ? 1e-12 : -1e-12;
 
-                // Intermediate coefficients cks, cko, dks, dko (Verhoef notation?)
+                // Intermediate coefficients cks, cko, dks, dko
                 double cks = (sbi * (ks - atti) - sfi * sigbi) / dns;
                 double cko = (vbi * (ko - atti) - vfi * sigbi) / dno;
                 double dks = (-sfi * (ks + atti) - sbi * sigbi) / dns;
@@ -705,7 +708,6 @@ namespace Models.PROSAIL.SAIL
                     normalizedFreq[i] = freq[i] / totalFreqSum;
                 }
             }
-            // If sum is zero, result remains array of zeros.
 
             // Return the LIDF values and corresponding angles
             return new FoliarDistributionResult { Lidf = normalizedFreq, Litab = litab };
@@ -749,7 +751,6 @@ namespace Models.PROSAIL.SAIL
                 freq[i] = Math.Max(0.0, freq[i]);
             }
 
-            // Optional: Normalize frequencies if they don't sum exactly to 1 due to precision.
             double sumFreq = freq.Sum();
             if (Math.Abs(sumFreq) > 1e-6 && Math.Abs(sumFreq - 1.0) > 1e-6) // Normalize if sum is not near 0 or 1
             {
@@ -857,7 +858,6 @@ namespace Models.PROSAIL.SAIL
             else // k is close to l: Use Taylor expansion to avoid singularity
             {
                 // R code uses this approximation: 0.5 * t * (exp(-k*t) + exp(-l*t)) * (1.0 - del * del / 12.0)
-                // This approximation is robust near the singularity.
                 double exp_lt = Math.Exp(-l * t);
                 double exp_kt = Math.Exp(-k * t);
                 Jout = 0.5 * t * (exp_kt + exp_lt) * (1.0 - del * del / 12.0);
@@ -967,7 +967,6 @@ namespace Models.PROSAIL.SAIL
             else
             {
                 // R formula: 0.5 * t * (1.0 - del * del / 12.0)
-                // This approximation matches Taylor expansion near m=0.
                 out_val = 0.5 * t * (1.0 - del * del / 12.0);
             }
             return out_val;
@@ -1129,7 +1128,7 @@ namespace Models.PROSAIL.SAIL
 
             // Check if wavelength values match exactly using SequenceEqual
             // Assumes wavelengths are in the same order.
-            // May need to sort before checking?
+            // May need to sort before checking, fix latter
             if (!lambdaLeafConstants.SequenceEqual(lambdaSoil) || !lambdaLeafConstants.SequenceEqual(lambdaAtm)) 
             {
                 // Log the first mismatch point for debugging
