@@ -248,7 +248,7 @@ namespace Models.PROSAIL
         {
             if (sensorFileMap.TryGetValue(SensorType, out var filePath))
             {
-                filePath = Path.Combine("Models", "PROSAIL", "SpectralResponseFunctions", $"{filePath}.json");
+                filePath = Path.Combine(AppContext.BaseDirectory, "PROSAIL", "InputProperties", "SpectralResponseFunctions", $"{filePath}.json");
                 SensorSRF = LoadSpectralResponseFunction(filePath);
             }
             else
@@ -280,12 +280,20 @@ namespace Models.PROSAIL
 
         #region Private Fields and Cached Data
         // Soil reflectance data
-        private static readonly string RelativeSpecSoilDataPath = "..\\..\\..\\Models\\PROSAIL\\SAIL\\SpecSOIL.json";
-        private static string DefaultSpecSoilDataPath => PathUtilities.GetAbsolutePath(RelativeSpecSoilDataPath, AppDomain.CurrentDomain.BaseDirectory);
+        private static string DefaultSpecSoilDataPath => Path.Combine(
+            AppContext.BaseDirectory,
+            "PROSAIL",
+            "InputProperties",
+            "SpectralData",
+            "SpecSOIL.json");
 
         // Atmospheric reflectance data
-        private static readonly string RelativeSpecAtmDataPath = "..\\..\\..\\Models\\PROSAIL\\SAIL\\SpecATM.json";
-        private static string DefaultSpecAtmDataPath => PathUtilities.GetAbsolutePath(RelativeSpecAtmDataPath, AppDomain.CurrentDomain.BaseDirectory);
+        private static string DefaultSpecAtmDataPath => Path.Combine(
+            AppContext.BaseDirectory,
+            "PROSAIL",
+            "InputProperties",
+            "SpectralData",
+            "SpecATM.json");
 
         /// <summary>Path to the SQLite database file (relative to simulation directory)</summary>
         private string ProsailSQLiteDatabasePath;
