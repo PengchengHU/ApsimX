@@ -48,9 +48,84 @@
     <None Remove="Importer\**" />
     <Compile Remove="Importer\**" />
     <EmbeddedResource Remove="Importer\**" />
+    <None Remove="PROSAIL\InputProperties\SpectralData\SpecATM.json" />
+    <None Remove="PROSAIL\InputProperties\SpectralData\SpecPROSPECT_FullRange.json" />
+    <None Remove="PROSAIL\InputProperties\SpectralData\SpecSOIL.json" />
+    <None Remove="PROSAIL\InputProperties\SpectralResponseFunctions\Landsat_7.json" />
+    <None Remove="PROSAIL\InputProperties\SpectralResponseFunctions\Landsat_8.json" />
+    <None Remove="PROSAIL\InputProperties\SpectralResponseFunctions\Landsat_9.json" />
+    <None Remove="PROSAIL\InputProperties\SpectralResponseFunctions\MODIS.json" />
+    <None Remove="PROSAIL\InputProperties\SpectralResponseFunctions\Pleiades_1A.json" />
+    <None Remove="PROSAIL\InputProperties\SpectralResponseFunctions\Pleiades_1B.json" />
+    <None Remove="PROSAIL\InputProperties\SpectralResponseFunctions\Sentinel_2.json" />
+    <None Remove="PROSAIL\InputProperties\SpectralResponseFunctions\Sentinel_2A.json" />
+    <None Remove="PROSAIL\InputProperties\SpectralResponseFunctions\Sentinel_2B.json" />
+    <None Remove="PROSAIL\InputProperties\SpectralResponseFunctions\Sentinel_2C.json" />
+    <None Remove="PROSAIL\InputProperties\SpectralResponseFunctions\SPOT_6_7.json" />
+    <None Remove="PROSAIL\InputProperties\SpectralResponseFunctions\Venus.json" />
 	<EmbeddedResource Include="Clock.cs" />
 
     <Content Include="..\DeploymentSupport\Windows\Bin64\sqlite3.dll">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </Content>
+
+    <Content Include="PROSAIL\InputProperties\SpectralData\SpecATM.json">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </Content>
+
+    <Content Include="PROSAIL\InputProperties\SpectralData\SpecPROSPECT_FullRange.json">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </Content>
+
+    <Content Include="PROSAIL\InputProperties\SpectralData\SpecSOIL.json">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </Content>
+
+    <Content Include="PROSAIL\InputProperties\SpectralResponseFunctions\Landsat_7.json">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </Content>
+
+    <Content Include="PROSAIL\InputProperties\SpectralResponseFunctions\Landsat_8.json">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </Content>
+
+    <Content Include="PROSAIL\InputProperties\SpectralResponseFunctions\Landsat_9.json">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </Content>
+
+    <Content Include="PROSAIL\InputProperties\SpectralResponseFunctions\MODIS.json">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </Content>
+
+    <Content Include="PROSAIL\InputProperties\SpectralResponseFunctions\Pleiades_1A.json">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </Content>
+
+    <Content Include="PROSAIL\InputProperties\SpectralResponseFunctions\Pleiades_1B.json">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </Content>
+
+    <Content Include="PROSAIL\InputProperties\SpectralResponseFunctions\Sentinel_2.json">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </Content>
+
+    <Content Include="PROSAIL\InputProperties\SpectralResponseFunctions\Sentinel_2A.json">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </Content>
+
+    <Content Include="PROSAIL\InputProperties\SpectralResponseFunctions\Sentinel_2B.json">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </Content>
+
+    <Content Include="PROSAIL\InputProperties\SpectralResponseFunctions\Sentinel_2C.json">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </Content>
+
+    <Content Include="PROSAIL\InputProperties\SpectralResponseFunctions\SPOT_6_7.json">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </Content>
+
+    <Content Include="PROSAIL\InputProperties\SpectralResponseFunctions\Venus.json">
       <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
     </Content>
 
