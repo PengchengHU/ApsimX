@@ -127,12 +127,12 @@ namespace UnitTests.PROSAIL
         }        
 
         // Helper to load atmospheric data
-        private static SpecAtmSensor CreateSampleAtm(string DefaultSpecATMDataPath)
+        private static AtmosphericSpectralData CreateSampleAtm(string DefaultSpecATMDataPath)
         {
             string json = File.ReadAllText(DefaultSpecATMDataPath);
             var ATMData = JsonConvert.DeserializeObject<SpecATMDataJason>(json);
 
-            return new SpecAtmSensor
+            return new AtmosphericSpectralData
             {
                 Wavelength = ATMData.Wavelength,
                 DirectLight = ATMData.Direct_Light,
@@ -408,14 +408,14 @@ namespace UnitTests.PROSAIL
             };
 
             // Act (C#)
-            double[] actual_brf = ComputeBRF(rdot_in, rsot_in, tts_in, atm_in);
+            CanopyBRF actual_brf = ComputeBRF(atm_in.Wavelength, rdot_in, rsot_in, tts_in, atm_in);
 
             // Act (R)
             var r_results = RunRImplementation("Compute_BRF", r_params);
             double[] expected_brf = ExtractDoubleArray(r_results["BRF"]);
 
             // Assert
-            CompareArrays(expected_brf, actual_brf, "Compute_BRF");
+            CompareArrays(expected_brf, actual_brf.BRF.ToArray(), "Compute_BRF");
         }
 
         [Test]
