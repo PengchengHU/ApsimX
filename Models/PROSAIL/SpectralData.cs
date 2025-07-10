@@ -934,28 +934,3 @@ public struct CanopyBRF : ISpectralData
         });
     }
 }
-
-
-// Example usage:
-/*
-public class ExampleUsage
-{
-    public static void DemonstrateWavelengthSubsetting()
-    {
-        // Example with LeafOptics
-        var wavelengths = new double[] { 400, 500, 600, 700, 800 };
-        var reflectance = new double[] { 0.1, 0.2, 0.3, 0.4, 0.5 };
-        var transmittance = new double[] { 0.05, 0.1, 0.15, 0.2, 0.25 };
-        
-        var leafOptics = new LeafOptics(wavelengths, reflectance, transmittance);
-        
-        // Subset to specific wavelengths
-        var targetWavelengths = new double[] { 500, 700 };
-        var subset = leafOptics.SubsetByWavelengths(targetWavelengths);
-        
-        // subset will contain only data for 500nm and 700nm wavelengths
-        Console.WriteLine($"Original wavelengths: {wavelengths.Length}");
-        Console.WriteLine($"Subset wavelengths: {subset.Wavelength.Length}");
-    }
-}
-*/
