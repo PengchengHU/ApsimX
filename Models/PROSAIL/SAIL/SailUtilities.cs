@@ -269,7 +269,6 @@ namespace Models.PROSAIL.SAIL
         /// Uses the direct/diffuse approach from Francois et al. (2002).
         /// Requires SAIL outputs Rsdstar (hemispherical reflectance for direct incidence)
         /// and Rddstar (hemispherical reflectance for diffuse incidence).
-        /// Based on J. Gomez-Dans python implementation approach.
         /// </remarks>
         /// <param name="rsdstar">Contribution of direct solar flux to albedo (from SailResult).</param>
         /// <param name="rddstar">Contribution of hemispherical diffuse flux to albedo (from SailResult).</param>
@@ -1467,12 +1466,15 @@ namespace Models.PROSAIL.SAIL
         /// </summary>
         public class SpectralResamplingResult
         {
+            /// <summary>Wavelength corresponding to the input reflectance </summary>
+            public double[] Wavelength { get; set; }
+
             /// <summary> 
             /// Resampled reflectance data: List where each element is a double[] representing one sensor band.
             /// Each double[] contains reflectance values for all samples in that band.
             /// Structure: ResampledReflectance[bandIndex][sampleIndex] = reflectance value
             /// </summary>
-            public List<double[]> ResampledReflectance { get; set; }
+            public List<double[]> Reflectance { get; set; }
 
             /// <summary> 
             /// Names/identifiers for each sensor band (rows in output).
@@ -1550,7 +1552,8 @@ namespace Models.PROSAIL.SAIL
 
             return new SpectralResamplingResult
             {
-                ResampledReflectance = resampledReflectance,
+                Wavelength = wavelength,
+                Reflectance = resampledReflectance,
                 BandNames = Enumerable.Range(0, nbBandsSensor).Select(i => srf.SpectralBands?[i]?.ToString() ?? $"Band_{i + 1}").ToArray()
             };
         }
@@ -1646,6 +1649,8 @@ namespace Models.PROSAIL.SAIL
             public double fAPAR;
             /// <summary>Fraction of Vegetation Cover (fCover = 1 - gap fraction in view direction).</summary>
             public double fcover;
+            /// <summary>Bbroadband albedo</summary>
+            public double albedo;
         }
 
         #endregion
