@@ -421,21 +421,14 @@ namespace Models.PROSAIL.Sail
                 // T_diffuse_through_soil = Tdd_canopy * (1 - Rsoil) * ??? (This isn't straightforward)
                 // Let's use the formula from R code based on energy balance: 1 - R - T
                 // T_system = T_direct_through_soil + T_diffuse_reflected_by_soil_transmitted_up_then_down...
-                // From R code: T_direct = (1-rsoil)*tss + (1-rsoil)*((tss*rsoil*rdd)+tsd)/dn * Tdd_soil_??? -> complex
-                // Let's recalculate based on J. Gomez-Dans approach cited in R code comments for absorbances
-                // abs = 1.0 - Reflectance_total - Transmittance_total_system
-                // Transmittance of the combined system (T_sys = transmission through canopy AND soil):
-                // Assume soil transmittance = 0 (opaque soil). T_sys = 0.
-                // Then Absorbed = 1 - Reflectance_total
-                abs_dir[i] = 1.0 - rsdt[i]; // Absorptance for direct solar flux (System)
-                abs_hem[i] = 1.0 - rddt[i]; // Absorptance for hemispherical diffuse flux (System)
-                                            // Note: These represent absorption by the combined canopy-soil system.
-                                            // R code has a commented-out alternative from J Gomez Dans which might be canopy-only absorptance.
+                // From R code: T_direct = (1-rsoil)*tss + (1-rsoil)*((tss*rsoil*rdd)+tsd)/dn * Tdd_soil_ ...
+                abs_dir[i] = 1.0 - rsdt[i] - ((1.0 - rsoil_i) * tss) - (1.0 - rsoil_i) * ((tss * rsoil_i * rdd[i]) + tsd[i]) / dn; // Absorptance for direct solar flux (System)
+                abs_hem[i] = 1.0 - rddt[i] - ((1.0 - rsoil_i) * tdd[i]) - (1.0 - rsoil_i) * (tdd[i] * rdd[i] * rsoil_i) / dn; // Absorptance for hemispherical diffuse flux (System)
 
                 // compute Albedo components (from J. Gomez Dans cited in R code)
                 // These represent the hemispherical reflectance factors for direct and diffuse incidence separately.
-                rsdstar[i] = rsd[i] + (tss + tsd[i]) * rsoil_i * tdd[i] / dn; // == rsdt[i] - seems redundant? No, Tsd vs Tdd. Okay.
-                rddstar[i] = rdd[i] + (tdd[i] * tdd[i] * rsoil_i) / dn;          // == rddt[i]? Check formula: rddt = rdd + tdd*rs*tdd/dn. Yes, seems rddstar = rddt.
+                rsdstar[i] = rsd[i] + (tss + tsd[i]) * rsoil_i * tdd[i] / dn;
+                rddstar[i] = rdd[i] + (tdd[i] * tdd[i] * rsoil_i) / dn; // seems rddstar = rddt.
 
                 // fCover: Fraction of green Vegetation Cover (= 1 - beam transmittance in the target-view path)
                 fCover[i] = 1.0 - too;
@@ -640,9 +633,9 @@ namespace Models.PROSAIL.Sail
             LeafOptics effectiveLeafGreen = new LeafOptics { Reflectance = (double[])leafGreen.Reflectance.Clone(), Transmittance = (double[])leafGreen.Transmittance.Clone() };
             LeafOptics effectiveLeafBrown = new LeafOptics { Reflectance = (double[])leafBrown.Reflectance.Clone(), Transmittance = (double[])leafBrown.Transmittance.Clone() };
 
-            // R code artificial adjustment for fraction_brown = 0 or 1 - seems designed to prevent issues later?
+            // R code artificial adjustment for fraction_brown = 0 or 1
             // This is slightly odd, as fraction_brown=0 should just mean lai1=lai, lai2=0.
-            // Let's replicate it for consistency, but be aware it might be unnecessary.
+            // Replicate it for consistency, but be aware it might be unnecessary.
             if (Math.Abs(fractionBrown) < 1e-9) // fraction_brown == 0
             {
                 fb = 0.5; // Artificial adjustment
@@ -679,7 +672,7 @@ namespace Models.PROSAIL.Sail
                     // If 1-fb is zero (i.e., fb=1), layer 1 doesn't exist or has zero LAI. Optics don't matter.
                     // However, R calculation proceeds. If diss=1, s=0, rho1=0/0 -> NaN. If diss<1, s>0.
                     // If fb=1 (after adjustment fb=0.5), denom1 = 0.5.
-                    // Let's assume the artificial fb adjustment prevents denom zero.
+                    // Assume the artificial fb adjustment prevents denom zero.
                     rho1[i] = ((1.0 - fb - s) * effectiveLeafGreen.Reflectance[i] + s * effectiveLeafBrown.Reflectance[i]) / denom1;
                     tau1[i] = ((1.0 - fb - s) * effectiveLeafGreen.Transmittance[i] + s * effectiveLeafBrown.Transmittance[i]) / denom1;
                 }
@@ -761,8 +754,8 @@ namespace Models.PROSAIL.Sail
                                     // Integrals: Int(exp(-k*x))dx / lai = (1-exp(-k*lai))/(k*lai)
                 double ks_lai1 = ks * lai1;
                 double ks_lai = ks * lai;
-                s1 = (Math.Abs(ks_lai1) < 1e-9) ? 1.0 : (1.0 - ck) / ks_lai1; // Integral over layer 1 / lai1 -> NO divide by lai needed per R code s1*lai term later
-                s1 /= lai; // R code multiplies by lai later, so divide here? Check usage: rsost <- (w1*s1+w2*s2)*lai. Yes, divide by lai.
+                s1 = (Math.Abs(ks_lai1) < 1e-9) ? 1.0 : (1.0 - ck) / ks_lai1;
+                s1 /= lai; 
                 s2 = (Math.Abs(ks_lai) < 1e-9) ? 0.0 : (ck - tss_total) / ks_lai; // Integral over layer 2 / lai
                 if (Math.Abs(lai) > 1e-9)
                 { // Avoid division by zero if lai is 0
@@ -794,9 +787,9 @@ namespace Models.PROSAIL.Sail
                     if (j < nsteps)
                     {
                         double prob_target = j * fint1;
-                        if (prob_target >= 1.0) x2_l1 = 1.0; // Clip needed? Should map to layer1_frac_end
+                        if (prob_target >= 1.0) x2_l1 = 1.0;
                         else x2_l1 = -Math.Log(1.0 - prob_target) / alf;
-                        x2_l1 = Math.Min(x2_l1, layer1_frac_end); // Ensure we don't exceed layer 1 fraction
+                        x2_l1 = Math.Min(x2_l1, layer1_frac_end); // Ensure don't exceed layer 1 fraction
                     }
                     else
                     {
@@ -815,7 +808,7 @@ namespace Models.PROSAIL.Sail
                     y1_l1 = y2_l1;
                     f1_l1 = f2_l1;
                 }
-                s1 = sumint1; // Integral for layer 1 (relative to total LAI?) -> Yes, relative to total LAI in x variable
+                s1 = sumint1; // Integral for layer 1 (relative to total LAI)
 
                 // Integrate Layer 2 (path fraction 1-fb_orig to 1.0)
                 double x1_l2 = layer1_frac_end, y1_l2 = y1_l1, sumint2 = 0; // Start where layer 1 ended
@@ -853,9 +846,6 @@ namespace Models.PROSAIL.Sail
                 }
                 s2 = sumint2; // Integral for layer 2
                 tsstoo = f1_l2; // Final joint probability after both layers
-
-                // Scale s1, s2 by LAI? R code doesn't explicitly show division by LAI here but multiplies later.
-                // Let's assume sumint1 and sumint2 are the integrals scaled by dx (path fraction), so multiplication by LAI later is correct.
             }
 
             // Calculate Scattering for Bottom Layer (Layer 2 - Brown)
@@ -914,8 +904,6 @@ namespace Models.PROSAIL.Sail
                 double[] sb_ncs = ncsIndices_L2.Select(idx => sb_L2[idx]).ToArray();
                 double[] vf_ncs = ncsIndices_L2.Select(idx => vf_L2[idx]).ToArray();
                 double[] vb_ncs = ncsIndices_L2.Select(idx => vb_L2[idx]).ToArray();
-                // Need tss/too for only these wavelengths? No, tss/too are scalars for the layer
-                // R code passes scalar tss/too which are exp(-k*lai2) - ok
 
                 ScatteringResult resNCS = NonConservativeScattering(
                     m_ncs, lai2, att_ncs, sigb_ncs, ks, ko, sf_ncs, sb_ncs, vf_ncs, vb_ncs,
@@ -1082,8 +1070,8 @@ namespace Models.PROSAIL.Sail
 
                 // Term for transmission down L1, reflection up from L2, transmission up L1
                 double tup = (tss_L1[i] * rsdb[i] + tsd_L1[i] * rddb[i]) / rn;
-                // Term for transmission down L1, reflection up L2, reflection down L1, transmission down L2... ?? No, Tdn = transmitted solar that gets through bottom layer L2
-                double tdn = (tsd_L1[i] + tss_L1[i] * rsdb[i] * rdd_L1[i]) / rn; // This is T_sd_total in Verhoef's notation? No... check papers. R code calls it tdn.
+                // Term for Tdn = transmitted solar that gets through bottom layer L2
+                double tdn = (tsd_L1[i] + tss_L1[i] * rsdb[i] * rdd_L1[i]) / rn; 
 
                 rsdt_comb[i] = rsd_L1[i] + tup * tdd_L1[i]; // R_sd = R_sd_L1 + T_ss_L1*R_sd_L2*T_dd_L1/rn + T_sd_L1*R_dd_L2*T_dd_L1/rn
                 rdot_comb[i] = rdo_L1[i] + tdd_L1[i] * (rddb[i] * tdo_L1[i] + rdob[i] * too_L1[i]) / rn;
@@ -1156,7 +1144,7 @@ namespace Models.PROSAIL.Sail
 
                 // Term for transmission down clumped veg, reflection up soil, transmission up clumped veg
                 double tup_soil = (tssc[i] * rsdsoil[i] + tsdc[i] * rddsoil[i]) / rn_soil;
-                // Term for transmission down clumped veg, reflection up soil, reflection down veg, transmission down soil... ?? Tdn = transmitted solar that gets through veg then soil system
+                // Term for Tdn = transmitted solar that gets through veg then soil system
                 double tdn_soil = (tsdc[i] + tssc[i] * rsdsoil[i] * rddcb[i]) / rn_soil; // Tsd originating below veg layer
 
                 // Final Reflectances including soil
@@ -1175,10 +1163,9 @@ namespace Models.PROSAIL.Sail
                 fCover[i] = 1.0 - tooc[i];
 
                 // --- Albedo Components (Rsd*, Rdd*) ---
-                // R code calculates these using variables seemingly from the layer combination step,
+                // R code calculates these using variables from the layer combination step,
                 // *before* clumping and final soil interaction for other reflectances. This seems inconsistent.
-                // Translating R code directly:
-                // Uses: rsd_L1, tss_L1, tsd_L1, tdd_L1, rdd_L1, rddb (L2 refl), rsoil (input), rn (L1-L2 interaction)
+                // Translating R code directly by using: rsd_L1, tss_L1, tsd_L1, tdd_L1, rdd_L1, rddb (L2 refl), rsoil (input), rn (L1-L2 interaction)
                 double rn_alb = 1.0 - rdd_L1[i] * rddb[i]; // Interaction term from layer combination step
                 if (Math.Abs(rn_alb) < 1e-12) rn_alb = 1e-12;
 
@@ -1189,8 +1176,6 @@ namespace Models.PROSAIL.Sail
                 // Replicating R code's apparent logic:
                 rsdstar[i] = rsd_L1[i] + (tss_L1[i] + tsd_L1[i]) * rsoil[i] * tdd_L1[i] / rn_alb;
                 rddstar[i] = rdd_L1[i] + (tdd_L1[i] * tdd_L1[i] * rsoil[i]) / rn_alb;
-                // It's possible these were intended to be calculated differently or earlier in the R code.
-                // For a more consistent definition, albedo components might be expected to relate directly to final rsdt/rddt.
             } // End wavelength loop
 
 
