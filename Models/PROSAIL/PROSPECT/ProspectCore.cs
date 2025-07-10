@@ -68,8 +68,12 @@ namespace Models.PROSAIL.PROSPECT
         }
 
         // Relative path from APSIM bin directory to Models\PROSAIL\PROSPECT
-        private static readonly string RelativeLeafOpticalDataPath = "..\\..\\..\\Models\\PROSAIL\\PROSPECT\\SpecPROSPECT_FullRange.json";
-        private static string DefaultLeafOpticalDataPath => PathUtilities.GetAbsolutePath(RelativeLeafOpticalDataPath, AppDomain.CurrentDomain.BaseDirectory);
+        private static string DefaultLeafOpticalDataPath => Path.Combine(
+            AppContext.BaseDirectory,
+            "PROSAIL",
+            "InputProperties",
+            "SpectralData",
+            "SpecPROSPECT_FullRange.json");
 
         /// <summary>
         /// Gets cached leaf optical constants, loading them if necessary.
