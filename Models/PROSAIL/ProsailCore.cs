@@ -23,10 +23,6 @@ namespace Models.Prosail
     /// </remarks>
     public class ProsailCore
     {
-        // Relative path from APSIM bin directory to Models\PROSAIL\PROSPECT
-        private static readonly string RelativeSoilOpticalDataPath = Path.Combine("Models", "PROSAIL", "PROSPECT", "SpecPROSPECT_FullRange.json");
-        private static string DefaultSoilOpticalDataPath => PathUtilities.GetAbsolutePath(RelativeSoilOpticalDataPath, AppDomain.CurrentDomain.BaseDirectory);
-
         /// <summary>
         /// Runs the PRO4SAIL simulation to compute canopy reflectance factors.
         /// </summary>
