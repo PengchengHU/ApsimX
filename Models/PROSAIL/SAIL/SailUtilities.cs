@@ -197,8 +197,8 @@ namespace Models.PROSAIL.SAIL
         /// Integrates absorbed radiation over the PAR range (typically 400-700 nm).
         /// Requires canopy absorptance values (Abs_dir, Abs_hem) from SAIL output.
         /// </remarks>
-        /// <param name="abs_dir">Canopy absorptance spectrum for direct solar flux (from SailResult).</param>
-        /// <param name="abs_hem">Canopy absorptance spectrum for hemispherical diffuse flux (from SailResult).</param>
+        /// <param name="abs_dir">Canopy absorptance spectrum for direct solar flux.</param>
+        /// <param name="abs_hem">Canopy absorptance spectrum for hemispherical diffuse flux.</param>
         /// <param name="tts">Solar zenith angle (degrees).</param>
         /// <param name="atmosphericSpectralData">Atmospheric data (DirectLight, DiffuseLight, Wavelength).</param>
         /// <param name="parRangeMin">Minimum wavelength (nm) for PAR integration (default 400).</param>
@@ -218,7 +218,7 @@ namespace Models.PROSAIL.SAIL
                 throw new ArgumentException("ComputeFAPAR: Input arrays must have the same length.");
             }
 
-            // Calculate skyl factor as in Compute_BRF
+            // Calculate skyl factor (as in Compute_BRF)
             double rd = DEGREES_TO_RADIANS;
             double solarElevationRad = (90.0 - tts) * rd;
             double sinSolarElevation = Math.Sin(solarElevationRad);
@@ -270,8 +270,8 @@ namespace Models.PROSAIL.SAIL
         /// Requires SAIL outputs Rsdstar (hemispherical reflectance for direct incidence)
         /// and Rddstar (hemispherical reflectance for diffuse incidence).
         /// </remarks>
-        /// <param name="rsdstar">Contribution of direct solar flux to albedo (from SailResult).</param>
-        /// <param name="rddstar">Contribution of hemispherical diffuse flux to albedo (from SailResult).</param>
+        /// <param name="rsdstar">Contribution of direct solar flux to albedo.</param>
+        /// <param name="rddstar">Contribution of hemispherical diffuse flux to albedo.</param>
         /// <param name="tts">Solar zenith angle (degrees).</param>
         /// <param name="atmosphericSpectralData">Atmospheric spectral data (DirectLight, DiffuseLight, Wavelength).</param>
         /// <param name="albedoRangeMin">Minimum wavelength (nm) for albedo integration (default 400).</param>

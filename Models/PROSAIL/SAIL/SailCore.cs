@@ -69,7 +69,7 @@ namespace Models.PROSAIL.Sail
             double[] rsot = new double[nLambda];
             double[] rddt = new double[nLambda];
             double[] rsdt = new double[nLambda];
-            double[] fCover = new double[nLambda]; // Will be calculated based on 'too'
+            double[] fCover = new double[nLambda];
             double[] abs_dir = new double[nLambda];
             double[] abs_hem = new double[nLambda];
             double[] rsdstar = new double[nLambda];
@@ -80,7 +80,6 @@ namespace Models.PROSAIL.Sail
             {
                 // If LAI is 0 or invalid, reflectance is just soil reflectance
                 // Transmittances are 1, absorptances are 0
-                // Vectorized operations for better performance
                 var rsoilVector = MathNet.Numerics.LinearAlgebra.Vector<double>.Build.DenseOfArray(rsoil);
                 var zeroVector = MathNet.Numerics.LinearAlgebra.Vector<double>.Build.Dense(nLambda, 0.0);
 
@@ -116,7 +115,7 @@ namespace Models.PROSAIL.Sail
             }
 
             //	Geometric quantities
-            double rd = DEGREES_TO_RADIANS; // Radians conversion factor
+            double rd = DEGREES_TO_RADIANS;
             double ttsRad = tts * rd;
             double ttoRad = tto * rd;
             double psiRad = psi * rd;
@@ -125,9 +124,8 @@ namespace Models.PROSAIL.Sail
             double ctscto = cts * cto;      // cos(tts)*cos(tto)
             double tants = Math.Tan(ttsRad); // tan(tts)
             double tanto = Math.Tan(ttoRad); // tan(tto)
-            double cospsi = Math.Cos(psiRad); // cos(psi)
-                                              // Geometric distance factor between sun and observer directions
-            double dso = Math.Sqrt(tants * tants + tanto * tanto - 2.0 * tants * tanto * cospsi);
+            double cospsi = Math.Cos(psiRad); // cos(psi)                                            
+            double dso = Math.Sqrt(tants * tants + tanto * tanto - 2.0 * tants * tanto * cospsi);  // Geometric distance factor between sun and observer directions
 
             //	Generate leaf angle distribution
             FoliarDistributionResult foliarDistrib;
@@ -163,15 +161,14 @@ namespace Models.PROSAIL.Sail
                 double ttl = litab[i];      // leaf inclination discrete values (degrees)
                 double ttlRad = ttl * rd;
                 double ctl = Math.Cos(ttlRad); // cos(ttl)
-                                               //	SAIL volume scattering phase function gives interception and portions
-                                               //	to be multiplied by rho and tau
+                // SAIL volume scattering phase function gives interception and portions to be multiplied by rho and tau
                 VolscattResult resVolscatt = Volscatt(tts, tto, psi, ttl); // Uses angles in degrees
                 double chi_s = resVolscatt.Chi_s; // Solar interception factor G(tts, ttl)
                 double chi_o = resVolscatt.Chi_o; // Observer interception factor G(tto, ttl)
                 double frho = resVolscatt.Frho;   // Phase function component (rho)
                 double ftau = resVolscatt.Ftau;   // Phase function component (tau)
 
-                // ********************************************************************************
+                // ***********************************************************************************************************************
                 //* SUITS SYSTEM COEFFICIENTS (angle dependent part)
                 //*
                 //* ks : Extinction coefficient for direct solar flux = Sum( G(tts,ttl) * LIDF(ttl) ) / cos(tts)
@@ -179,7 +176,7 @@ namespace Models.PROSAIL.Sail
                 //* bf : Bi-directional angle factor = Sum( cos(ttl)^2 * LIDF(ttl) )
                 //* sob: Bi-directional scattering coefficient (rho part) = Sum ( frho(tts,tto,psi,ttl) * pi / (cts*cto) * LIDF(ttl) )
                 //* sof: Bi-directional scattering coefficient (tau part) = Sum ( ftau(tts,tto,psi,ttl) * pi / (cts*cto) * LIDF(ttl) )
-                // *********************************************************************************
+                // ***********************************************************************************************************************
 
                 //	Extinction coefficients (contributions)
                 double ksli = chi_s / cts; // G_sun / cos(tts)
@@ -208,37 +205,33 @@ namespace Models.PROSAIL.Sail
             double ddb = 0.5 * (1.0 + bf); // Diffuse geometry factor (backward)
             double ddf = 0.5 * (1.0 - bf); // Diffuse geometry factor (forward)
 
-            // Calculate scalar transmittances and hotspot parameters before the wavelength loop - WAVELENGTH-INDEPENDENT
             // Direct transmittances through the canopy layer
             double tss = Math.Exp(-ks * lai); // exp(-ks*LAI), Directional transmittance solar (k, lai)
             double too = Math.Exp(-ko * lai); // exp(-ko*LAI), Directional transmittance observer (k, lai)
 
-            //	Treatment of the hotspot-effect
+            // Treatment of the hotspot-effect
             double alf = 1e6; // Default large value (no hotspot)
-                              //	Apply correction 2/(K+k) suggested by F.-M. Breon
             if (q > 0) // q = hotspot parameter
             {
                 double ks_plus_ko = ks + ko;
                 if (Math.Abs(ks_plus_ko) < 1e-9) ks_plus_ko = 1e-9; // Avoid division by zero
                 alf = (dso / q) * 2.0 / ks_plus_ko; // Hotspot intensity parameter
             }
-            // inserted H. Bach 1/3/04 - Limit alpha
+            // Limit alpha
             if (alf > 200.0) alf = 200.0;
 
             double tsstoo; // Joint probability gap fraction (solar and view)
             double sumint; // Integral for single scattering hotspot correction
 
-            if (Math.Abs(alf) < 1e-9) // If alpha is zero (or very close) -> Pure hotspot - no shadow
+            if (Math.Abs(alf) < 1e-9) // If alpha is zero (or very close), pure hotspot and no shadow
             {
                 tsstoo = tss; // Joint = Solar transmittance if paths coincide
                 sumint = (Math.Abs(ks * lai) < 1e-9) ? 1.0 : (1.0 - tss) / (ks * lai); // Integral limit
             }
-            else // Outside the hotspot -> Calculate overlap integral
+            else // Outside the hotspot, then calculate overlap integral
             {
                 double fhot = lai * Math.Sqrt(ko * ks); // Hotspot function amplitude
-                                                        //	Integrate by exponential Simpson method in 20 steps
-                                                        //	the steps are arranged according to equal partitioning
-                                                        //	of the slope of the joint probability function
+                //	Integrate by exponential Simpson method in 20 steps, the steps are arranged according to equal partitioning of the slope of the joint probability function
                 double x1 = 0, y1 = 0, sumint_acc = 0;
                 double f1 = 1.0; // exp(y1) where y1=0
                 double fint = (1.0 - Math.Exp(-alf)) * 0.05; // Step size in probability space
@@ -265,8 +258,6 @@ namespace Models.PROSAIL.Sail
 
                     // Simpson's rule component (trapezoidal approx here, matches R code)
                     // Integral of P(x) dx from x1 to x2
-                    // R code uses (f2-f1)*(x2-x1)/(y2-y1) which is approx (f1+f2)/2 * (x2-x1) if y is linear in x
-                    // Let's use trapezoidal rule for simplicity and matching R code's likely intent
                     if (Math.Abs(y2 - y1) > 1e-9) // Avoid division by zero if y values are the same
                     {
                         sumint_acc += (f2 - f1) * (x2 - x1) / (y2 - y1); // R code's formula
@@ -298,8 +289,6 @@ namespace Models.PROSAIL.Sail
             double[] vf = new double[nLambda];   // View forward scattering coeff [rho, tau]
             double[] w = new double[nLambda];    // Bidirectional scattering coeff [rho, tau]
 
-            //double[] tss = new double[nLambda];  // Directional transmittance solar (k, lai)
-            //double[] too = new double[nLambda];  // Directional transmittance observer (k, lai)
             double[] rdd = new double[nLambda];  // Canopy bi-hemispherical reflectance (no soil)
             double[] tdd = new double[nLambda];  // Canopy bi-hemispherical transmittance (no soil)
             double[] rsd = new double[nLambda];  // Canopy directional-hemispherical reflectance (no soil)
@@ -339,7 +328,7 @@ namespace Models.PROSAIL.Sail
                 double e1 = Math.Exp(-mi * lai); // exp(-m*LAI)
                 double e2 = e1 * e1;           // exp(-2*m*LAI)
                 double rinf = (Math.Abs(sigbi) > 1e-9) ? (atti - mi) / sigbi : (atti > mi ? double.PositiveInfinity : double.NegativeInfinity); // Reflectance of infinitely thick canopy
-                                                                                                                                                // Handle potential instability if sigb is near zero (conservative scattering)
+                // Handle potential instability if sigb is near zero (conservative scattering)
                 if (Math.Abs(sigbi) < 1e-9) rinf = 1.0; // Approximate for conservative scattering
 
                 double rinf2 = rinf * rinf; // rinf^2
@@ -368,7 +357,7 @@ namespace Models.PROSAIL.Sail
                 tdo[i] = (Pv - re * Qv) / denom;      // Hemispherical-directional Transmittance (view)
 
                 // Calculate multiple scattering component (rsod)
-                double z = Jfunc3(ks, ko, lai); // J3(ks, ko, lai) - Note J3 is same as J2 in R code
+                double z = Jfunc3(ks, ko, lai); // J3(ks, ko, lai)
                 double g1_denom = ko + mi;
                 double g2_denom = ks + mi;
                 if (Math.Abs(g1_denom) < 1e-12) g1_denom = 1e-12; // Avoid division by zero
@@ -406,6 +395,7 @@ namespace Models.PROSAIL.Sail
                 rsdt[i] = rsd[i] + (tsd[i] + tss) * rsoil_i * tdd[i] / dn;
                 // rdot: hemispherical-directional reflectance factor in viewing direction (Canopy + Soil)
                 rdot[i] = rdo[i] + tdd[i] * rsoil_i * (tdo[i] + too) / dn;
+
                 // rsot: bi-directional reflectance factor (Canopy + Soil)
                 // Multiple scattering part + soil interaction
                 rsodt[i] = rsod[i] + ((tss + tsd[i]) * tdo[i] + (tsd[i] + tss * rsoil_i * rdd[i]) * too) * rsoil_i / dn;
@@ -418,7 +408,7 @@ namespace Models.PROSAIL.Sail
                 // Fraction absorbed by (Canopy+Soil) = 1 - Total Reflected - Total Transmitted from bottom
                 // Transmittance from bottom of system = T_direct_through_soil + T_diffuse_through_soil
                 // T_direct_through_soil = Tss_canopy * (1 - Rsoil)
-                // T_diffuse_through_soil = Tdd_canopy * (1 - Rsoil) * ??? (This isn't straightforward)
+                // T_diffuse_through_soil = Tdd_canopy * (1 - Rsoil) * ??? 
                 // Let's use the formula from R code based on energy balance: 1 - R - T
                 // T_system = T_direct_through_soil + T_diffuse_reflected_by_soil_transmitted_up_then_down...
                 // From R code: T_direct = (1-rsoil)*tss + (1-rsoil)*((tss*rsoil*rdd)+tsd)/dn * Tdd_soil_ ...
@@ -428,7 +418,7 @@ namespace Models.PROSAIL.Sail
                 // compute Albedo components (from J. Gomez Dans cited in R code)
                 // These represent the hemispherical reflectance factors for direct and diffuse incidence separately.
                 rsdstar[i] = rsd[i] + (tss + tsd[i]) * rsoil_i * tdd[i] / dn;
-                rddstar[i] = rdd[i] + (tdd[i] * tdd[i] * rsoil_i) / dn; // seems rddstar = rddt.
+                rddstar[i] = rdd[i] + (tdd[i] * tdd[i] * rsoil_i) / dn;
 
                 // fCover: Fraction of green Vegetation Cover (= 1 - beam transmittance in the target-view path)
                 fCover[i] = 1.0 - too;
@@ -475,7 +465,7 @@ namespace Models.PROSAIL.Sail
                                   double q, double tts, double tto, double psi, SoilOptics soilOptics,
                                   double fractionBrown, double diss, double cv, double zeta)
         {
-            // --- Input Validation ---
+            // Input Validation
             if (!leafGreen.HasValue) 
             {
                 throw new ArgumentNullException(nameof(leafGreen));
@@ -522,7 +512,7 @@ namespace Models.PROSAIL.Sail
 
             // Initialization
             double[] rsoil = soilOptics.Reflectance.ToArray(); // Soil reflectance (Lambertian assumption)
-                                                         // Non-Lambertian soil (placeholders, same as Lambertian in this R code version)
+            /* Non-Lambertian soil (placeholders, same as Lambertian in this R code version) */
             double[] rddsoil = rsoil;
             double[] rdosoil = rsoil;
             double[] rsdsoil = rsoil;
@@ -633,9 +623,8 @@ namespace Models.PROSAIL.Sail
             LeafOptics effectiveLeafGreen = new LeafOptics { Reflectance = (double[])leafGreen.Reflectance.Clone(), Transmittance = (double[])leafGreen.Transmittance.Clone() };
             LeafOptics effectiveLeafBrown = new LeafOptics { Reflectance = (double[])leafBrown.Reflectance.Clone(), Transmittance = (double[])leafBrown.Transmittance.Clone() };
 
-            // R code artificial adjustment for fraction_brown = 0 or 1
-            // This is slightly odd, as fraction_brown=0 should just mean lai1=lai, lai2=0.
-            // Replicate it for consistency, but be aware it might be unnecessary.
+            // R code artificial adjustment for fraction_brown = 0 or 1, but might be unnecessary.
+            // as fraction_brown=0 should just mean lai1=lai, lai2=0. Replicate it for consistency.
             if (Math.Abs(fractionBrown) < 1e-9) // fraction_brown == 0
             {
                 fb = 0.5; // Artificial adjustment
@@ -644,7 +633,7 @@ namespace Models.PROSAIL.Sail
             }
             else if (Math.Abs(fractionBrown - 1.0) < 1e-9) // fraction_brown == 1
             {
-                fb = 0.5; // Artificial adjustment
+                fb = 0.5; 
                 effectiveLeafGreen.Reflectance = (double[])effectiveLeafBrown.Reflectance.Clone();
                 effectiveLeafGreen.Transmittance = (double[])effectiveLeafBrown.Transmittance.Clone();
             }
@@ -669,7 +658,7 @@ namespace Models.PROSAIL.Sail
                 // Top layer (more green)
                 if (denom1_is_zero)
                 {
-                    // If 1-fb is zero (i.e., fb=1), layer 1 doesn't exist or has zero LAI. Optics don't matter.
+                    // If 1-fb is zero (i.e., fb=1), layer 1 doesn't exist or has zero LAI, so optics don't matter.
                     // However, R calculation proceeds. If diss=1, s=0, rho1=0/0 -> NaN. If diss<1, s>0.
                     // If fb=1 (after adjustment fb=0.5), denom1 = 0.5.
                     // Assume the artificial fb adjustment prevents denom zero.
@@ -728,12 +717,12 @@ namespace Models.PROSAIL.Sail
             // Layer LAIs
             // Use the ORIGINAL fractionBrown here, not the adjusted 'fb'
             double lai1 = (1.0 - fractionBrown) * lai; // Top layer LAI (Green)
-            double lai2 = fractionBrown * lai;      // Bottom layer LAI (Brown)
+            double lai2 = fractionBrown * lai; // Bottom layer LAI (Brown)
 
 
             // Hotspot Calculation (Two Layers)
             double tss_total = Math.Exp(-ks * lai); // Total direct transmittance (solar)
-            double ck = Math.Exp(-ks * lai1);     // Direct transmittance through top layer (solar)
+            double ck = Math.Exp(-ks * lai1); // Direct transmittance through top layer (solar)
 
             double alf = 1e6; // Default large value (no hotspot)
             if (q > 0)
@@ -1106,7 +1095,7 @@ namespace Models.PROSAIL.Sail
             double[] tssc = new double[nLambda];  // Clumped Beam Trans (Sun)
             double[] tooc = new double[nLambda];  // Clumped Beam Trans (Obs)
             double[] rsoc = new double[nLambda];  // Clumped BiDir Refl (Crown part)
-            double[] tssooc = new double[nLambda];// Clumped Joint Trans (Sun-Obs)
+            double[] tssooc = new double[nLambda]; // Clumped Joint Trans (Sun-Obs)
 
             for (int i = 0; i < nLambda; i++)
             {
@@ -1122,7 +1111,7 @@ namespace Models.PROSAIL.Sail
 
                 // New weight function Fcdc for crown contribution (W. Verhoef, 22-05-08)
                 rsoc[i] = Fcdc * rsot_comb[i]; // Bidirectional crown contribution
-                                               // Combined joint transmittance including gaps
+                // Combined joint transmittance including gaps
                 tssooc[i] = Fcd * tsstoo + Fcs * toot_comb[i] + Fod * tsst_comb[i] + Fos; // Gap components (Fcs*Too, Fod*Tss, Fos*1) + Crown component (Fcd*Tsstoo)
             }
 
@@ -1133,7 +1122,7 @@ namespace Models.PROSAIL.Sail
             for (int i = 0; i < nLambda; i++)
             {
                 alfas_veg[i] = 1.0 - tssc[i] - tsdc[i] - rsdc[i]; // 1 - Tss - Tsd - Rsd (direct)
-                alfad_veg[i] = 1.0 - tddc[i] - rddct[i];         // 1 - Tdd - Rdd (diffuse, top view)
+                alfad_veg[i] = 1.0 - tddc[i] - rddct[i]; // 1 - Tdd - Rdd (diffuse, top view)
             }
 
             // Add the Soil Background
@@ -1147,32 +1136,35 @@ namespace Models.PROSAIL.Sail
                 // Term for Tdn = transmitted solar that gets through veg then soil system
                 double tdn_soil = (tsdc[i] + tssc[i] * rsdsoil[i] * rddcb[i]) / rn_soil; // Tsd originating below veg layer
 
+                // Bi-directional reflectance factor Components
                 // Final Reflectances including soil
                 rddt[i] = rddct[i] + tddc[i] * rddsoil[i] * tddc[i] / rn_soil; // Final Rdd (Top view)
                 rsdt[i] = rsdc[i] + tup_soil * tddc[i];                        // Final Rsd
                 rdot[i] = rdoc[i] + tddc[i] * (rddsoil[i] * tdoc[i] + rdosoil[i] * tooc[i]) / rn_soil; // Final Rdo
                 rsot[i] = rsoc[i] + tssooc[i] * rsosoil[i] + tdn_soil * rdosoil[i] * tooc[i] + tup_soil * tdoc[i]; // Final Rso
 
+                // fAPAR components
                 // Effect of soil background on canopy absorptances (W. Verhoef, 02-03-04)
                 // These 'abs_dir' / 'abs_hem' correspond to 'alfast' / 'alfadt' in R code
-                // They represent the total absorbed flux fraction *by the vegetation layer* within the canopy-soil system.
+                // They represent the total absorbed flux fraction by the vegetation layer within the canopy-soil system.
                 abs_dir[i] = alfas_veg[i] + tup_soil * alfad_veg[i]; // Direct absorption by veg
                 abs_hem[i] = alfad_veg[i] * (1.0 + tddc[i] * rddsoil[i] / rn_soil); // Diffuse absorption by veg
 
                 // Final fCover based on clumped observer transmittance
+                // WARNING: This is not the same as fCover in R code, which uses `too`
                 fCover[i] = 1.0 - tooc[i];
 
-                // --- Albedo Components (Rsd*, Rdd*) ---
-                // R code calculates these using variables from the layer combination step,
-                // *before* clumping and final soil interaction for other reflectances. This seems inconsistent.
-                // Translating R code directly by using: rsd_L1, tss_L1, tsd_L1, tdd_L1, rdd_L1, rddb (L2 refl), rsoil (input), rn (L1-L2 interaction)
+                // Albedo Components (Rsd*, Rdd*)
+                /* WARNING: R code calculates these using variables from the layer combination step, i.e., 
+                 * BEFORE clumping and final soil interaction for other reflectances applied to these variables. 
+                 * This might be not correct???? 
+                 * Translating R code directly by using: rsd_L1, tss_L1, tsd_L1, tdd_L1, rdd_L1, rddb (L2 refl), rsoil (input), rn (L1-L2 interaction) */
                 double rn_alb = 1.0 - rdd_L1[i] * rddb[i]; // Interaction term from layer combination step
                 if (Math.Abs(rn_alb) < 1e-12) rn_alb = 1e-12;
 
-                // WARNING: These calculations seem inconsistent with the final rsdt/rddt which include clumping (Cv, Cs, Co).
-                // They use the un-clumped layer 1 and layer 2 properties.
-                // Also, using rsoil (input) directly instead of rsdsoil/rddsoil used above.
-                // And using rn_alb (from layer combination) instead of rn_soil (final soil interaction).
+                /* WARNING: These calculations seem inconsistent with the final rsdt/rddt which include clumping (Cv, Cs, Co).
+                 * The R code uses (1) the un-clumped layer 1 and layer 2 properties, (2) rsoil (input) directly instead of rsdsoil/rddsoil used above,
+                 * and (3) rn_alb (from layer combination) instead of rn_soil (final soil interaction). */
                 // Replicating R code's apparent logic:
                 rsdstar[i] = rsd_L1[i] + (tss_L1[i] + tsd_L1[i]) * rsoil[i] * tdd_L1[i] / rn_alb;
                 rddstar[i] = rdd_L1[i] + (tdd_L1[i] * tdd_L1[i] * rsoil[i]) / rn_alb;
