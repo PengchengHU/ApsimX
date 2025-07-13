@@ -1164,7 +1164,11 @@ namespace Models.PROSAIL.Sail
 
                 /* WARNING: These calculations seem inconsistent with the final rsdt/rddt which include clumping (Cv, Cs, Co).
                  * The R code uses (1) the un-clumped layer 1 and layer 2 properties, (2) rsoil (input) directly instead of rsdsoil/rddsoil used above,
-                 * and (3) rn_alb (from layer combination) instead of rn_soil (final soil interaction). */
+                 * and (3) rn_alb (from layer combination) instead of rn_soil (final soil interaction). 
+                 * Corrected calculation: Albedo components should be equal to the final 
+                 * hemispherical reflectance factors, which already include all clumping and soil effects.
+                rsdstar[i] = rsdt[i];
+                rddstar[i] = rddt[i]; */
                 // Replicating R code's apparent logic:
                 rsdstar[i] = rsd_L1[i] + (tss_L1[i] + tsd_L1[i]) * rsoil[i] * tdd_L1[i] / rn_alb;
                 rddstar[i] = rdd_L1[i] + (tdd_L1[i] * tdd_L1[i] * rsoil[i]) / rn_alb;
