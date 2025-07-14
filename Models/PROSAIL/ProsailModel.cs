@@ -99,7 +99,7 @@ namespace Models.PROSAIL
         public string Alpha { get; set; } = "40.0";
 
         /// <summary> Spectral range to simulate (start-end in nm)</summary>
-        [Description("Spectral range to simulate in nm supports ranges (e.g., '400-500'), lists (e.g., '400, 500, 600'), and mixed formats (e.g., '400, 500-600, 700')")]
+        [Description("Spectral range to simulate in nm supports ranges (e.g., '400-500'),\nlists (e.g., '400, 500, 600'), \nand mixed formats (e.g., '400, 500-600, 700')")]
         public string InputWavelengthRange { get; set; } = "400-2500";
 
 
