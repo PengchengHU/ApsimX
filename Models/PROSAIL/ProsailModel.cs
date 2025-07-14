@@ -918,7 +918,7 @@ namespace Models.PROSAIL
 
                     if (numericValue < param.Value.min || numericValue > param.Value.max)
                     {
-                        string msg = $"Parameter '{param.Key}' value {numericValue} is out of range [{param.Value.min}, {param.Value.max}] ({param.Value.description}) on {Clock?.Today:yyyy-MM-dd}. Check this paper: https://doi.org/10.3390/rs10010085\"";
+                        string msg = $"Parameter '{param.Key}' value {numericValue} may be out of range [{param.Value.min}, {param.Value.max}] ({param.Value.description}) on {Clock?.Today:yyyy-MM-dd}. Check this paper: https://doi.org/10.3390/rs10010085\"";
                         WriteMessage(LogLevel.Warning, msg);
                         //throw new InvalidOperationException(msg);
                     }
