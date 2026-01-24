@@ -1,6 +1,6 @@
 {
   "$type": "Models.Core.Simulations, Models",
-  "Version": 206,
+  "Version": 207,
   "Name": "Simulations",
   "ResourceName": null,
   "Children": [
@@ -1163,13 +1163,16 @@
                 {
                   "$type": "Models.PMF.Cultivar, Models",
                   "Command": [
-                    "[Phenology].CAMP.FLNparams.MinLN = 7",
+                    "[Phenology].CAMP.FLNparams.MinLN = 9 // 7",
                     "[Phenology].CAMP.FLNparams.PpLN = 6",
                     "[Phenology].CAMP.FLNparams.VrnLN = 0",
-                    "[Phenology].CAMP.FLNparams.VxPLN = 0",
-                    "[Phenology].Phyllochron.BasePhyllochron.FixedValue = 85",
+                    "[Phenology].CAMP.FLNparams.VxPLN = 1 // 0",
+                    "[Phenology].Phyllochron.BasePhyllochron.FixedValue = 80 // 85",
                     "[Phenology].PhyllochronPpSensitivity.FixedValue = 2",
-                    "[Phenology].CAMP.EnvData.VrnTreatTemp = 5.8"
+                    "[Phenology].CAMP.EnvData.VrnTreatTemp = 5.8",
+                    "",
+                    "[Phenology].HeadEmergenceLongDayBase.FixedValue = 250",
+                    "[Phenology].HeadEmergencePpSensitivity.FixedValue = 3"
                   ],
                   "Name": "Triumph",
                   "ResourceName": null,
@@ -1520,15 +1523,25 @@
                 {
                   "$type": "Models.PMF.Cultivar, Models",
                   "Command": [
-                    "[Phenology].CAMP.FLNparams.MinLN = 8 ",
+                    "[Phenology].CAMP.FLNparams.MinLN = 8",
                     "[Phenology].CAMP.FLNparams.PpLN = 5 ",
-                    "[Phenology].CAMP.FLNparams.VrnLN = 0",
+                    "[Phenology].CAMP.FLNparams.VrnLN = 1",
                     "[Phenology].CAMP.FLNparams.VxPLN = 0",
-                    "[Phenology].Phyllochron.BasePhyllochron.FixedValue = 85",
-                    "[Phenology].PhyllochronPpSensitivity.FixedValue = 2",
+                    "[Phenology].Phyllochron.BasePhyllochron.FixedValue = 83 // 85",
+                    "[Phenology].PhyllochronPpSensitivity.FixedValue = 1 // 2",
                     "[Phenology].CAMP.EnvData.VrnTreatTemp = 5.8",
-                    "[Phenology].HeadEmergenceLongDayBase.FixedValue = 50 ",
+                    "[Phenology].HeadEmergenceLongDayBase.FixedValue = 80 // 50 ",
                     "[Phenology].HeadEmergencePpSensitivity.FixedValue = 1",
+                    "",
+                    "//[Phenology].CAMP.FLNparams.MinLN = 9 // 8",
+                    "//[Phenology].CAMP.FLNparams.PpLN = 6 // 5 ",
+                    "//[Phenology].CAMP.FLNparams.VrnLN = 1 // 0",
+                    "//[Phenology].CAMP.FLNparams.VxPLN = 0",
+                    "//[Phenology].Phyllochron.BasePhyllochron.FixedValue = 100 // 100 // 85",
+                    "//[Phenology].PhyllochronPpSensitivity.FixedValue = 0.5 // 1 // 2",
+                    "//[Phenology].CAMP.EnvData.VrnTreatTemp = 5.8",
+                    "//[Phenology].HeadEmergenceLongDayBase.FixedValue = 200 // 50 ",
+                    "//[Phenology].HeadEmergencePpSensitivity.FixedValue = 2 // 1",
                     "",
                     "//[Phenology].CAMP.FLNparams.MinLN = 9",
                     "//[Phenology].CAMP.FLNparams.PpLN = 6",
@@ -2979,54 +2992,6 @@
               "DataType": "",
               "HasErrorColumn": false,
               "Filename": "Obs_APSIMX_NPIField2020_Barley.xlsx"
-            },
-            {
-              "$type": "Models.PreSimulationTools.ObservedInput+ColumnInfo, Models",
-              "Name": "Barley.AboveGround.NConc",
-              "IsApsimVariable": "Not Found",
-              "DataType": "",
-              "HasErrorColumn": false,
-              "Filename": ""
-            },
-            {
-              "$type": "Models.PreSimulationTools.ObservedInput+ColumnInfo, Models",
-              "Name": "Barley.Ear.N",
-              "IsApsimVariable": "Not Found",
-              "DataType": "",
-              "HasErrorColumn": false,
-              "Filename": ""
-            },
-            {
-              "$type": "Models.PreSimulationTools.ObservedInput+ColumnInfo, Models",
-              "Name": "Barley.Leaf.Live.N",
-              "IsApsimVariable": "Not Found",
-              "DataType": "",
-              "HasErrorColumn": false,
-              "Filename": ""
-            },
-            {
-              "$type": "Models.PreSimulationTools.ObservedInput+ColumnInfo, Models",
-              "Name": "Barley.Stem.N",
-              "IsApsimVariable": "Not Found",
-              "DataType": "",
-              "HasErrorColumn": false,
-              "Filename": ""
-            },
-            {
-              "$type": "Models.PreSimulationTools.ObservedInput+ColumnInfo, Models",
-              "Name": "Barley.Leaf.Wt",
-              "IsApsimVariable": "Not Found",
-              "DataType": "",
-              "HasErrorColumn": false,
-              "Filename": ""
-            },
-            {
-              "$type": "Models.PreSimulationTools.ObservedInput+ColumnInfo, Models",
-              "Name": "Barley.Leaf.SpecificAreaCanopy",
-              "IsApsimVariable": "Not Found",
-              "DataType": "",
-              "HasErrorColumn": false,
-              "Filename": ""
             }
           ],
           "DerivedData": [
@@ -3165,13 +3130,7 @@
             "FlagLeafDate",
             "Species",
             "Habit",
-            "StandardName",
-            "Barley.AboveGround.NConc",
-            "Barley.Ear.N",
-            "Barley.Leaf.Live.N",
-            "Barley.Stem.N",
-            "Barley.Leaf.Wt",
-            "Barley.Leaf.SpecificAreaCanopy"
+            "StandardName"
           ],
           "Name": "ObservedInput",
           "ResourceName": null,
@@ -3745,7 +3704,7 @@
                   "IncludeSeriesNameInLegend": false,
                   "Cumulative": false,
                   "CumulativeX": false,
-                  "Filter": "",
+                  "Filter": "[Predicted.Barley.SowingData.Cultivar] =\"Dash\"",
                   "Name": "Predicted",
                   "ResourceName": null,
                   "Children": [
@@ -3825,7 +3784,7 @@
                   "IncludeSeriesNameInLegend": false,
                   "Cumulative": false,
                   "CumulativeX": false,
-                  "Filter": "",
+                  "Filter": "[Predicted.Barley.SowingData.Cultivar] =\"Dash\"",
                   "Name": "Predicted",
                   "ResourceName": null,
                   "Children": [
@@ -6194,7 +6153,7 @@
                           "YAxis": 0,
                           "ColourArgb": -16777216,
                           "FactorToVaryColours": "Irr",
-                          "FactorToVaryMarkers": "Cult",
+                          "FactorToVaryMarkers": null,
                           "FactorToVaryLines": "Nit",
                           "Marker": 11,
                           "MarkerSize": 0,
@@ -6203,8 +6162,8 @@
                           "TableName": "DailyReport",
                           "XFieldName": "Clock.Today",
                           "YFieldName": "Barley.Leaf.Live.Wt",
-                          "X2FieldName": "",
-                          "Y2FieldName": "",
+                          "X2FieldName": null,
+                          "Y2FieldName": null,
                           "ShowInLegend": true,
                           "IncludeSeriesNameInLegend": false,
                           "Cumulative": false,
@@ -11455,7 +11414,7 @@
                             {
                               "$type": "Models.Factorial.CompositeFactor, Models",
                               "Specifications": [
-                                "[Sowing].Script.SowingDate = 2011-07-13",
+                                "[Sowing].Script.SowingDate = 2011-08-13",
                                 "[FertiliserEvents]"
                               ],
                               "Paths": null,
@@ -27354,8 +27313,8 @@
                           "TableName": "DailyReport",
                           "XFieldName": "Clock.Today",
                           "YFieldName": "Barley.Leaf.Dead.Wt",
-                          "X2FieldName": "",
-                          "Y2FieldName": "",
+                          "X2FieldName": null,
+                          "Y2FieldName": null,
                           "ShowInLegend": true,
                           "IncludeSeriesNameInLegend": false,
                           "Cumulative": false,
@@ -28609,7 +28568,7 @@
                       "IncludeSeriesNameInLegend": false,
                       "Cumulative": false,
                       "CumulativeX": false,
-                      "Filter": "[Predicted.Barley.SowingData.Cultivar] =\"County\"",
+                      "Filter": "[Predicted.Barley.SowingData.Cultivar] =\"Dash\"",
                       "Name": "Predicted",
                       "ResourceName": null,
                       "Children": [
@@ -28726,11 +28685,11 @@
                       "YFieldName": "Predicted.Barley.Phenology.FlagLeafDAS",
                       "X2FieldName": null,
                       "Y2FieldName": null,
-                      "ShowInLegend": false,
+                      "ShowInLegend": true,
                       "IncludeSeriesNameInLegend": false,
                       "Cumulative": false,
                       "CumulativeX": false,
-                      "Filter": "[Predicted.Barley.SowingData.Cultivar] =\"County\"",
+                      "Filter": "[Predicted.Barley.SowingData.Cultivar] =\"Dash\"",
                       "Name": "Predicted",
                       "ResourceName": null,
                       "Children": [
@@ -28810,7 +28769,7 @@
                       "IncludeSeriesNameInLegend": true,
                       "Cumulative": false,
                       "CumulativeX": false,
-                      "Filter": "[Predicted.Barley.SowingData.Cultivar] =\"County\"",
+                      "Filter": "[Predicted.Barley.SowingData.Cultivar] =\"Dash\"",
                       "Name": "Predicted",
                       "ResourceName": null,
                       "Children": [
