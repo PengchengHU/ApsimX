@@ -1082,7 +1082,7 @@
                     "[Phenology].CAMP.FLNparams.PpLN = 6",
                     "[Phenology].CAMP.FLNparams.VrnLN = 0",
                     "[Phenology].CAMP.FLNparams.VxPLN = 0",
-                    "[Phenology].Phyllochron.BasePhyllochron.FixedValue = 85",
+                    "[Phenology].Phyllochron.BasePhyllochron.FixedValue = 95 // 85",
                     "[Phenology].PhyllochronPpSensitivity.FixedValue = 2",
                     "[Phenology].CAMP.EnvData.VrnTreatTemp = 5.8"
                   ],
@@ -3294,7 +3294,7 @@
                   "IncludeSeriesNameInLegend": false,
                   "Cumulative": false,
                   "CumulativeX": false,
-                  "Filter": "",
+                  "Filter": "[Predicted.Barley.SowingData.Cultivar] =\"Quench\"",
                   "Name": "Predicted",
                   "ResourceName": null,
                   "Children": [
@@ -3614,7 +3614,7 @@
                   "IncludeSeriesNameInLegend": false,
                   "Cumulative": false,
                   "CumulativeX": false,
-                  "Filter": "",
+                  "Filter": "[Predicted.Barley.SowingData.Cultivar] =\"Quench\"",
                   "Name": "Predicted",
                   "ResourceName": null,
                   "Children": [
@@ -3694,7 +3694,7 @@
                   "IncludeSeriesNameInLegend": false,
                   "Cumulative": false,
                   "CumulativeX": false,
-                  "Filter": "[Predicted.Barley.SowingData.Cultivar] =\"Omaka\"",
+                  "Filter": "[Predicted.Barley.SowingData.Cultivar] =\"Quench\"",
                   "Name": "Predicted",
                   "ResourceName": null,
                   "Children": [
@@ -3774,7 +3774,7 @@
                   "IncludeSeriesNameInLegend": false,
                   "Cumulative": false,
                   "CumulativeX": false,
-                  "Filter": "[Predicted.Barley.SowingData.Cultivar] =\"Omaka\"",
+                  "Filter": "[Predicted.Barley.SowingData.Cultivar] =\"Quench\"",
                   "Name": "Predicted",
                   "ResourceName": null,
                   "Children": [
@@ -9901,7 +9901,7 @@
                           "CrossesAtZero": false,
                           "LabelOnOneLine": false,
                           "Minimum": null,
-                          "Maximum": 300.0,
+                          "Maximum": 400.0,
                           "Interval": null
                         }
                       ],
@@ -9929,8 +9929,8 @@
                           "TableName": "DailyReport",
                           "XFieldName": "Clock.Today",
                           "YFieldName": "Barley.Leaf.Live.Wt",
-                          "X2FieldName": "",
-                          "Y2FieldName": "",
+                          "X2FieldName": null,
+                          "Y2FieldName": null,
                           "ShowInLegend": true,
                           "IncludeSeriesNameInLegend": false,
                           "Cumulative": false,
@@ -9938,7 +9938,18 @@
                           "Filter": null,
                           "Name": "Predicted",
                           "ResourceName": null,
-                          "Children": [],
+                          "Children": [
+                            {
+                              "$type": "Models.EventNamesOnGraph, Models",
+                              "ColumnName": "Barley.Phenology.CurrentStageName",
+                              "SimulationName": "MCPD10_11CultQuench",
+                              "Name": "EventNamesOnGraph",
+                              "ResourceName": null,
+                              "Children": [],
+                              "Enabled": true,
+                              "ReadOnly": false
+                            }
+                          ],
                           "Enabled": true,
                           "ReadOnly": false
                         },
@@ -22535,7 +22546,7 @@
                           "CrossesAtZero": false,
                           "LabelOnOneLine": false,
                           "Minimum": null,
-                          "Maximum": 300.0,
+                          "Maximum": 500.0,
                           "Interval": null
                         }
                       ],
@@ -28558,7 +28569,7 @@
                       "IncludeSeriesNameInLegend": false,
                       "Cumulative": false,
                       "CumulativeX": false,
-                      "Filter": "[Predicted.Barley.SowingData.Cultivar] =\"Omaka\"",
+                      "Filter": "[Predicted.Barley.SowingData.Cultivar] =\"Bumpa\"",
                       "Name": "Predicted",
                       "ResourceName": null,
                       "Children": [
@@ -28679,7 +28690,7 @@
                       "IncludeSeriesNameInLegend": false,
                       "Cumulative": false,
                       "CumulativeX": false,
-                      "Filter": "[Predicted.Barley.SowingData.Cultivar] =\"Doyen\"",
+                      "Filter": "[Predicted.Barley.SowingData.Cultivar] =\"Bumpa\"",
                       "Name": "Predicted",
                       "ResourceName": null,
                       "Children": [
@@ -28759,7 +28770,7 @@
                       "IncludeSeriesNameInLegend": true,
                       "Cumulative": false,
                       "CumulativeX": false,
-                      "Filter": "[Predicted.Barley.SowingData.Cultivar] =\"Doyen\"",
+                      "Filter": "[Predicted.Barley.SowingData.Cultivar] =\"Bumpa\"",
                       "Name": "Predicted",
                       "ResourceName": null,
                       "Children": [
