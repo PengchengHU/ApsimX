@@ -1554,11 +1554,11 @@
                     "[Phenology].CAMP.FLNparams.PpLN = 5 ",
                     "[Phenology].CAMP.FLNparams.VrnLN = 0",
                     "[Phenology].CAMP.FLNparams.VxPLN = 0",
-                    "[Phenology].Phyllochron.BasePhyllochron.FixedValue = 80 // 85 ",
-                    "[Phenology].PhyllochronPpSensitivity.FixedValue = 2 // 2.2 ",
+                    "[Phenology].Phyllochron.BasePhyllochron.FixedValue = 85 // 90 // 80 // 85 ",
+                    "[Phenology].PhyllochronPpSensitivity.FixedValue = 2.2 // 0.5 // 2 // 2.2 ",
                     "[Phenology].CAMP.EnvData.VrnTreatTemp = 5.8",
                     "[Phenology].HeadEmergenceLongDayBase.FixedValue = 50 ",
-                    "[Phenology].HeadEmergencePpSensitivity.FixedValue = 2 // 1",
+                    "[Phenology].HeadEmergencePpSensitivity.FixedValue = 1 // 2 // 1",
                     "",
                     "//[Phenology].CAMP.FLNparams.MinLN = 9",
                     "//[Phenology].CAMP.FLNparams.PpLN = 6",
@@ -3294,7 +3294,7 @@
                   "IncludeSeriesNameInLegend": false,
                   "Cumulative": false,
                   "CumulativeX": false,
-                  "Filter": "[Predicted.Barley.SowingData.Cultivar] =\"Dash\"",
+                  "Filter": "[Predicted.Barley.SowingData.Cultivar] =\"Omaka\"",
                   "Name": "Predicted",
                   "ResourceName": null,
                   "Children": [
@@ -3614,7 +3614,7 @@
                   "IncludeSeriesNameInLegend": false,
                   "Cumulative": false,
                   "CumulativeX": false,
-                  "Filter": "[Predicted.Barley.SowingData.Cultivar] =\"Dash\"",
+                  "Filter": "[Predicted.Barley.SowingData.Cultivar] =\"Omaka\"",
                   "Name": "Predicted",
                   "ResourceName": null,
                   "Children": [
@@ -3694,7 +3694,7 @@
                   "IncludeSeriesNameInLegend": false,
                   "Cumulative": false,
                   "CumulativeX": false,
-                  "Filter": "[Predicted.Barley.SowingData.Cultivar] =\"Dash\"",
+                  "Filter": "[Predicted.Barley.SowingData.Cultivar] =\"Omaka\"",
                   "Name": "Predicted",
                   "ResourceName": null,
                   "Children": [
@@ -3774,7 +3774,7 @@
                   "IncludeSeriesNameInLegend": false,
                   "Cumulative": false,
                   "CumulativeX": false,
-                  "Filter": "[Predicted.Barley.SowingData.Cultivar] =\"Dash\"",
+                  "Filter": "[Predicted.Barley.SowingData.Cultivar] =\"Omaka\"",
                   "Name": "Predicted",
                   "ResourceName": null,
                   "Children": [
@@ -9942,7 +9942,7 @@
                             {
                               "$type": "Models.EventNamesOnGraph, Models",
                               "ColumnName": "Barley.Phenology.CurrentStageName",
-                              "SimulationName": "MCPD10_11CultDash",
+                              "SimulationName": "MCPD10_11CultOmaka",
                               "Name": "EventNamesOnGraph",
                               "ResourceName": null,
                               "Children": [],
@@ -28569,7 +28569,7 @@
                       "IncludeSeriesNameInLegend": false,
                       "Cumulative": false,
                       "CumulativeX": false,
-                      "Filter": "[Predicted.Barley.SowingData.Cultivar] =\"Dash\"",
+                      "Filter": "[Predicted.Barley.SowingData.Cultivar] =\"Omaka\"",
                       "Name": "Predicted",
                       "ResourceName": null,
                       "Children": [
@@ -28690,7 +28690,7 @@
                       "IncludeSeriesNameInLegend": false,
                       "Cumulative": false,
                       "CumulativeX": false,
-                      "Filter": "[Predicted.Barley.SowingData.Cultivar] =\"Dash\"",
+                      "Filter": "[Predicted.Barley.SowingData.Cultivar] =\"Omaka\"",
                       "Name": "Predicted",
                       "ResourceName": null,
                       "Children": [
@@ -28770,7 +28770,7 @@
                       "IncludeSeriesNameInLegend": true,
                       "Cumulative": false,
                       "CumulativeX": false,
-                      "Filter": "[Predicted.Barley.SowingData.Cultivar] =\"Dash\"",
+                      "Filter": "[Predicted.Barley.SowingData.Cultivar] =\"Omaka\"",
                       "Name": "Predicted",
                       "ResourceName": null,
                       "Children": [
