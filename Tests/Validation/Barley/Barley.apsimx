@@ -1525,12 +1525,12 @@
                   "Command": [
                     "[Phenology].CAMP.FLNparams.MinLN = 8",
                     "[Phenology].CAMP.FLNparams.PpLN = 5 ",
-                    "[Phenology].CAMP.FLNparams.VrnLN = 1",
+                    "[Phenology].CAMP.FLNparams.VrnLN = 0",
                     "[Phenology].CAMP.FLNparams.VxPLN = 0",
-                    "[Phenology].Phyllochron.BasePhyllochron.FixedValue = 83 // 85",
-                    "[Phenology].PhyllochronPpSensitivity.FixedValue = 1 // 2",
+                    "[Phenology].Phyllochron.BasePhyllochron.FixedValue = 85 // 90 // 85",
+                    "[Phenology].PhyllochronPpSensitivity.FixedValue = 2 // 1.5 // 2",
                     "[Phenology].CAMP.EnvData.VrnTreatTemp = 5.8",
-                    "[Phenology].HeadEmergenceLongDayBase.FixedValue = 80 // 50 ",
+                    "[Phenology].HeadEmergenceLongDayBase.FixedValue = 50 ",
                     "[Phenology].HeadEmergencePpSensitivity.FixedValue = 1",
                     "",
                     "//[Phenology].CAMP.FLNparams.MinLN = 9",
@@ -3294,7 +3294,7 @@
                   "IncludeSeriesNameInLegend": false,
                   "Cumulative": false,
                   "CumulativeX": false,
-                  "Filter": "[Predicted.Barley.SowingData.Cultivar] =\"Quench\"",
+                  "Filter": "[Predicted.Barley.SowingData.Cultivar] =\"Dash\"",
                   "Name": "Predicted",
                   "ResourceName": null,
                   "Children": [
@@ -3614,7 +3614,7 @@
                   "IncludeSeriesNameInLegend": false,
                   "Cumulative": false,
                   "CumulativeX": false,
-                  "Filter": "[Predicted.Barley.SowingData.Cultivar] =\"Quench\"",
+                  "Filter": "[Predicted.Barley.SowingData.Cultivar] =\"Dash\"",
                   "Name": "Predicted",
                   "ResourceName": null,
                   "Children": [
@@ -3694,7 +3694,7 @@
                   "IncludeSeriesNameInLegend": false,
                   "Cumulative": false,
                   "CumulativeX": false,
-                  "Filter": "[Predicted.Barley.SowingData.Cultivar] =\"Quench\"",
+                  "Filter": "[Predicted.Barley.SowingData.Cultivar] =\"Dash\"",
                   "Name": "Predicted",
                   "ResourceName": null,
                   "Children": [
@@ -3774,7 +3774,7 @@
                   "IncludeSeriesNameInLegend": false,
                   "Cumulative": false,
                   "CumulativeX": false,
-                  "Filter": "[Predicted.Barley.SowingData.Cultivar] =\"Quench\"",
+                  "Filter": "[Predicted.Barley.SowingData.Cultivar] =\"Dash\"",
                   "Name": "Predicted",
                   "ResourceName": null,
                   "Children": [
@@ -6165,7 +6165,7 @@
                             {
                               "$type": "Models.EventNamesOnGraph, Models",
                               "ColumnName": "Barley.Phenology.CurrentStageName",
-                              "SimulationName": null,
+                              "SimulationName": "MCPD09_10CultDashNit150IrrFull",
                               "Name": "EventNamesOnGraph",
                               "ResourceName": null,
                               "Children": [],
@@ -9942,7 +9942,7 @@
                             {
                               "$type": "Models.EventNamesOnGraph, Models",
                               "ColumnName": "Barley.Phenology.CurrentStageName",
-                              "SimulationName": "MCPD10_11CultQuench",
+                              "SimulationName": "MCPD10_11CultDash",
                               "Name": "EventNamesOnGraph",
                               "ResourceName": null,
                               "Children": [],
@@ -11380,7 +11380,7 @@
               "Children": [
                 {
                   "$type": "Models.Memo, Models",
-                  "Text": "\r\nFollowing on from MCPD10_11, this experiment was conducted in A Block near Lincoln, New Zealand to test the effects of sowing time on apparent water use efficiency of three varieties of Barley.  The results are un-published to date.\r\n\r\nTreatments were simply 3 commercially available varieties of barley ('Booma','Dash' and 'Omaka') sown on three different sowing dates (13 Aug, 9 Sep and 15 Nov).  \r\n\r\nBiomass accumulation, Leaf appearance, leaf size, radiation interception and soil water content were measured at regular frequencies throughout the experiment.",
+                  "Text": "\r\nFollowing on from MCPD10_11, this experiment was conducted in A Block near Lincoln, New Zealand to test the effects of sowing time on apparent water use efficiency of three varieties of Barley.  The results are un-published to date.\r\n\r\nTreatments were simply 3 commercially available varieties of barley ('Booma','Dash' and 'Omaka') sown on three different sowing dates (13 Jul, 9 Sep and 15 Nov).  \r\n\r\nBiomass accumulation, Leaf appearance, leaf size, radiation interception and soil water content were measured at regular frequencies throughout the experiment.",
                   "Name": "Experimental details",
                   "ResourceName": null,
                   "Children": [],
@@ -11415,7 +11415,7 @@
                             {
                               "$type": "Models.Factorial.CompositeFactor, Models",
                               "Specifications": [
-                                "[Sowing].Script.SowingDate = 2011-08-13",
+                                "[Sowing].Script.SowingDate = 2011-07-13",
                                 "[FertiliserEvents]"
                               ],
                               "Paths": null,
@@ -28569,7 +28569,7 @@
                       "IncludeSeriesNameInLegend": false,
                       "Cumulative": false,
                       "CumulativeX": false,
-                      "Filter": "[Predicted.Barley.SowingData.Cultivar] =\"Bumpa\"",
+                      "Filter": "[Predicted.Barley.SowingData.Cultivar] =\"Dash\"",
                       "Name": "Predicted",
                       "ResourceName": null,
                       "Children": [
@@ -28690,7 +28690,7 @@
                       "IncludeSeriesNameInLegend": false,
                       "Cumulative": false,
                       "CumulativeX": false,
-                      "Filter": "[Predicted.Barley.SowingData.Cultivar] =\"Bumpa\"",
+                      "Filter": "[Predicted.Barley.SowingData.Cultivar] =\"Dash\"",
                       "Name": "Predicted",
                       "ResourceName": null,
                       "Children": [
@@ -28770,7 +28770,7 @@
                       "IncludeSeriesNameInLegend": true,
                       "Cumulative": false,
                       "CumulativeX": false,
-                      "Filter": "[Predicted.Barley.SowingData.Cultivar] =\"Bumpa\"",
+                      "Filter": "[Predicted.Barley.SowingData.Cultivar] =\"Dash\"",
                       "Name": "Predicted",
                       "ResourceName": null,
                       "Children": [
