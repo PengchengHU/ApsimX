@@ -993,11 +993,11 @@
                 {
                   "$type": "Models.PMF.Cultivar, Models",
                   "Command": [
-                    "[Phenology].CAMP.FLNparams.MinLN = 9",
+                    "[Phenology].CAMP.FLNparams.MinLN = 8 // 9",
                     "[Phenology].CAMP.FLNparams.PpLN = 6",
                     "[Phenology].CAMP.FLNparams.VrnLN = 0",
                     "[Phenology].CAMP.FLNparams.VxPLN = 0",
-                    "[Phenology].Phyllochron.BasePhyllochron.FixedValue = 85",
+                    "[Phenology].Phyllochron.BasePhyllochron.FixedValue = 95 // 85",
                     "[Phenology].PhyllochronPpSensitivity.FixedValue = 2",
                     "[Phenology].CAMP.EnvData.VrnTreatTemp = 5.8"
                   ],
@@ -3294,7 +3294,7 @@
                   "IncludeSeriesNameInLegend": false,
                   "Cumulative": false,
                   "CumulativeX": false,
-                  "Filter": "[Predicted.Barley.SowingData.Cultivar] =\"Omaka\"",
+                  "Filter": "[Predicted.Barley.SowingData.Cultivar] =\"Booma\"",
                   "Name": "Predicted",
                   "ResourceName": null,
                   "Children": [
@@ -3614,7 +3614,7 @@
                   "IncludeSeriesNameInLegend": false,
                   "Cumulative": false,
                   "CumulativeX": false,
-                  "Filter": "[Predicted.Barley.SowingData.Cultivar] =\"Omaka\"",
+                  "Filter": "[Predicted.Barley.SowingData.Cultivar] =\"Booma\"",
                   "Name": "Predicted",
                   "ResourceName": null,
                   "Children": [
@@ -3694,7 +3694,7 @@
                   "IncludeSeriesNameInLegend": false,
                   "Cumulative": false,
                   "CumulativeX": false,
-                  "Filter": "[Predicted.Barley.SowingData.Cultivar] =\"Omaka\"",
+                  "Filter": "[Predicted.Barley.SowingData.Cultivar] =\"Booma\"",
                   "Name": "Predicted",
                   "ResourceName": null,
                   "Children": [
@@ -3774,7 +3774,7 @@
                   "IncludeSeriesNameInLegend": false,
                   "Cumulative": false,
                   "CumulativeX": false,
-                  "Filter": "[Predicted.Barley.SowingData.Cultivar] =\"Omaka\"",
+                  "Filter": "[Predicted.Barley.SowingData.Cultivar] =\"Booma\"",
                   "Name": "Predicted",
                   "ResourceName": null,
                   "Children": [
@@ -6158,14 +6158,14 @@
                           "IncludeSeriesNameInLegend": false,
                           "Cumulative": false,
                           "CumulativeX": false,
-                          "Filter": null,
+                          "Filter": "",
                           "Name": "Predicted",
                           "ResourceName": null,
                           "Children": [
                             {
                               "$type": "Models.EventNamesOnGraph, Models",
                               "ColumnName": "Barley.Phenology.CurrentStageName",
-                              "SimulationName": "MCPD09_10CultDashNit150IrrFull",
+                              "SimulationName": "MCPD09_10CultBoomaNit150IrrFull",
                               "Name": "EventNamesOnGraph",
                               "ResourceName": null,
                               "Children": [],
@@ -9942,7 +9942,7 @@
                             {
                               "$type": "Models.EventNamesOnGraph, Models",
                               "ColumnName": "Barley.Phenology.CurrentStageName",
-                              "SimulationName": "MCPD10_11CultOmaka",
+                              "SimulationName": "MCPD10_11CultBooma",
                               "Name": "EventNamesOnGraph",
                               "ResourceName": null,
                               "Children": [],
