@@ -7,10 +7,12 @@ using System.Data;
 using MathNet.Numerics.LinearAlgebra;
 using Models.Core;
 using Models.Functions;
+using APSIM.Core;
 using APSIM.Shared.Utilities;
 using Models.PMF;
 using System.Threading;
 using static Models.PROSAIL.PROSPECT.ProspectCore;
+
 
 namespace Models.PROSAIL.PROSPECT
 {
@@ -22,7 +24,7 @@ namespace Models.PROSAIL.PROSPECT
     [ViewName("UserInterface.Views.PropertyView")]
     [PresenterName("UserInterface.Presenters.PropertyPresenter")]
     [ValidParent(ParentType = typeof(Plant))]
-    public class ProspectModel : Model
+    public class ProspectModel : Model, IStructureDependency
     {
         /// <summary> Link to the clock for daily outputs </summary>
         [Link]
@@ -39,6 +41,9 @@ namespace Models.PROSAIL.PROSPECT
         /// <summary> Link to the parent Plant model to check IsAlive</summary>
         [Link(IsOptional = true)]
         private Plant ParentPlant = null;
+
+        /// <summary>Structure instance supplied by APSIM.core.</summary>
+        public IStructure Structure { private get; set; }
 
         /// <summary>Integration</summary>
         [Separator("Expressions to link APSIM variables and PROSPECT inputs")]
@@ -521,7 +526,7 @@ namespace Models.PROSAIL.PROSPECT
                     return result;
                 }
 
-                object value = ExpressionFunction.Evaluate(expression, this);
+                object value = ExpressionFunction.Evaluate(expression, this, Structure);
                 if (value == null)
                 {
                     WriteMessage(LogLevel.Error, $"ProspectModel: Expression '{expression}' evaluated to null on {Clock?.Today:yyyy-MM-dd}.");

@@ -7,6 +7,7 @@ using Models.Functions;
 using Models.Interfaces;
 using Models.PMF;
 using Models.PMF.Organs;
+using APSIM.Core;
 using Models.Prosail;
 using Models.PROSAIL.PROSPECT;
 using Models.PROSAIL.SAIL;
@@ -31,7 +32,7 @@ namespace Models.PROSAIL
     [ViewName("UserInterface.Views.PropertyView")]
     [PresenterName("UserInterface.Presenters.PropertyPresenter")]
     [ValidParent(ParentType = typeof(Plant))]
-    public class ProsailModel : Model
+    public class ProsailModel : Model, IStructureDependency
     {
         #region Links to other APSIM Components
         /// <summary>Link to the clock for daily outputs</summary>
@@ -49,6 +50,9 @@ namespace Models.PROSAIL
         /// <summary>Link to the parent Plant model to check IsAlive</summary>
         [Link(IsOptional = true)]
         private Plant ParentPlant = null;
+
+        /// <summary>Structure instance supplied by APSIM.core.</summary>
+        public IStructure Structure { private get; set; }
 
         /// <summary>Link to the soil water model to soil water content of the top layer</summary>
         [Link] private ISoilWater waterBalance = null;
@@ -794,7 +798,7 @@ namespace Models.PROSAIL
                     return result;
                 }
 
-                object value = ExpressionFunction.Evaluate(expression, this);
+                object value = ExpressionFunction.Evaluate(expression, this, Structure);
                 if (value == null)
                 {
                     WriteMessage(LogLevel.Error, $"Parameter expression '{expression}' evaluated to null on {Clock?.Today:yyyy-MM-dd}.");
