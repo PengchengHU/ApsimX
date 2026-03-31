@@ -1,19 +1,16 @@
-﻿namespace APSIM.Core.Tests
+﻿using APSIM.Shared.Utilities;
+using Models;
+using Models.Core;
+using NUnit.Framework;
+using System;
+using System.Collections.Generic;
+using System.IO;
+using System.Reflection;
+using Models.Soils;
+using APSIM.Core;
+
+namespace UnitTests.APSIM.Core.Tests
 {
-    using APSIM.Shared.Utilities;
-    using Models;
-    using Models.Core;
-    using Models.Core.Interfaces;
-    using Models.Core.ApsimFile;
-    using NUnit.Framework;
-    using System;
-    using System.Collections.Generic;
-    using System.IO;
-    using System.Reflection;
-    using System.Linq;
-    using APSIM.Shared.Extensions.Collections;
-    using Models.Soils;
-    using APSIM.Core;
 
     /// <summary>
     /// Test the writer's load/save .apsimx capability
@@ -167,6 +164,29 @@
 
             var soil = FileFormat.ReadFromFile<Soil>(fileName).Model as Soil;
             Assert.That(soil.Name, Is.EqualTo("APSoil"));
+        }
+
+
+        [Serializable]
+        class MockModelWithLink : Model
+        {
+            [Link] public ISummary summary = null;
+        }
+
+        /// <summary>Test that a [Link] fields are not serialised.</summary>
+        [Test]
+        public void FileFormat_EnsureLinksArentWritten()
+        {
+            // Create some models.
+            var model = new MockModelWithLink()
+            {
+                summary = new UnitTests.MockSummary()
+            };
+            var node = Node.Create(model);
+
+            string json = node.ToJSONString();
+
+            Assert.That(json, Does.Not.Contain("summary"));
         }
     }
 }

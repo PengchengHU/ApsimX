@@ -1,17 +1,15 @@
-﻿namespace UserInterface.Presenters
+﻿using APSIM.Core;
+using UserInterface.Commands;
+using UserInterface.Interfaces;
+using Models.Core;
+using System;
+using System.Collections.Generic;
+using System.Linq;
+using System.Reflection;
+using UserInterface.Views;
+
+namespace UserInterface.Presenters
 {
-    using APSIM.Core;
-    using APSIM.Shared.Utilities;
-    using ApsimNG.Properties;
-    using global::UserInterface.Commands;
-    using Interfaces;
-    using Models.Core;
-    using Models.Core.ApsimFile;
-    using System;
-    using System.Collections.Generic;
-    using System.Linq;
-    using System.Reflection;
-    using Views;
 
     /// <summary>This presenter lets the user add a model.</summary>
     public class AddModelPresenter : IPresenter
@@ -187,6 +185,7 @@
                         }
                         else
                         {
+                            Node.Create(child as INodeModel);
                             child.ResourceName = selectedModelType.ResourceString;
                             bool isUnderReplacements = false;
                             if (Folder.IsModelReplacementsFolder(model))
@@ -194,7 +193,7 @@
 
                             // Make all children that area about to be added from resource hidden and readonly.
                             bool isHidden = !isUnderReplacements;
-                            foreach (Model descendant in child.FindAllDescendants())
+                            foreach (Model descendant in child.Node.FindChildren<IModel>(recurse: true))
                             {
                                 descendant.IsHidden = isHidden;
                                 descendant.ReadOnly = isHidden;

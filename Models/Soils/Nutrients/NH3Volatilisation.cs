@@ -13,7 +13,7 @@ namespace Models.Soils.Nutrients
     [Serializable]
     [PresenterName("UserInterface.Presenters.PropertyPresenter")]
     [ViewName("UserInterface.Views.PropertyView")]
-    [ValidParent(ParentType = typeof(Nutrient))]
+    [ValidParent(ParentType = typeof(Soil))]
     public class NH3Volatilisation : Model
     {
 
@@ -96,7 +96,7 @@ namespace Models.Soils.Nutrients
         /// <summary>The factor for gas exchange</summary>
         [Separator("Gas exchange parameters")]
         [Description("Factor for soil/atmosphere gas exchange (AFPV/mm):")]
-        public double k_AFPV { get; set; } = 300;
+        public double k_AFPV { get; set; } = 75.0;
 
         /// <summary>The additional limits for volatilisation</summary>
         [Separator("Additional limits for volatilisation")]

@@ -1,10 +1,11 @@
-﻿namespace Utility
+﻿using System;
+using System.Collections.Generic;
+using System.Linq;
+using APSIM.Shared.Utilities;
+using APSIM.Core;
+
+namespace APSIMNG.Utility
 {
-    using System;
-    using System.Collections.Generic;
-    using System.Linq;
-    using APSIM.Shared.Utilities;
-    using APSIM.Core;
 
     /// <summary>
     /// Graph utility functions.
@@ -21,7 +22,6 @@
                 Models.Graph graph = FileFormat.ReadFromString<Models.Graph>(graphXmL).Model as Models.Graph;
                 if (errors != null && errors.Any())
                     throw errors.First();
-                graph.ParentAllDescendants();
                 return graph;
             }
             return null;

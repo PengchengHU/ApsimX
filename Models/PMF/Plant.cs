@@ -14,16 +14,26 @@ using APSIM.Core;
 namespace Models.PMF
 {
     /// <summary>
-    /// The model has been developed using the Plant Modelling Framework (PMF) of [brown_plant_2014]. This
-    /// new framework provides a library of plant organ and process submodels that can be coupled, at runtime, to construct a
+    /// The model has been developed using the Plant Modelling Framework (PMF) of [#brown_plant_2014]. This
+    /// framework provides a library of plant organ and process submodels that can be coupled, at runtime, to construct a
     /// model in much the same way that models can be coupled to construct a simulation.This means that dynamic composition
     /// of lower level process and organ classes(e.g.photosynthesis, leaf) into larger constructions(e.g.maize, wheat,
     /// sorghum) can be achieved by the model developer without additional coding.
     /// </summary>
     [ValidParent(ParentType = typeof(Zone))]
     [Serializable]
-    public class Plant : Model, IPlant, IPlantDamage, IScopedModel
+    public class Plant : Model, IPlant, IPlantDamage, IScopedModel, IStructureDependency
     {
+        /// <summary>Structure instance supplied by APSIM.core.</summary>
+        [field: NonSerialized]
+        public IStructure Structure { private get; set; }
+
+        /// <summary> The parent simulation </summary>
+        [JsonIgnore]
+        [Link(Type = LinkType.Ancestor)]
+        private Simulation simulation = null;
+
+
         /// <summary>The summary</summary>
         [Link]
         private ISummary summary = null;
@@ -52,7 +62,7 @@ namespace Models.PMF
 
         /// <summary>The structure</summary>
         [Link(IsOptional = true)]
-        public IStructure structure = null;
+        public Models.PMF.Struct.Structure structure = null;
 
         /// <summary>The leaf</summary>
         [Link(IsOptional = true)]
@@ -89,7 +99,7 @@ namespace Models.PMF
         {
             get
             {
-                return new SortedSet<string>(FindAllDescendants<Cultivar>().SelectMany(c => c.GetNames())).ToArray();
+                return new SortedSet<string>(Structure.FindChildren<Cultivar>(relativeTo: this, recurse: true).SelectMany(c => c.GetNames())).ToArray();
             }
         }
 
@@ -111,7 +121,7 @@ namespace Models.PMF
             set
             {
                 double InitialPopn = plantPopulation;
-                if (IsAlive && value <= 0.01)
+                if (IsAlive && value <= 0.001)
                     EndCrop();  // the plant is dying due to population decline
                 else
                 {
@@ -172,7 +182,7 @@ namespace Models.PMF
             get
             {
                 double cover = 0;
-                foreach (ICanopy canopy in this.FindAllDescendants<ICanopy>())
+                foreach (ICanopy canopy in Structure.FindChildren<ICanopy>(recurse: true))
                     cover = 1 - (1.0 - cover) * (1.0 - canopy.CoverGreen);
                 return cover;
             }
@@ -187,7 +197,7 @@ namespace Models.PMF
             get
             {
                 double cover = 0;
-                foreach (ICanopy canopy in this.FindAllDescendants<ICanopy>())
+                foreach (ICanopy canopy in Structure.FindChildren<ICanopy>(recurse: true))
                     cover = 1 - (1.0 - cover) * (1.0 - canopy.CoverTotal);
                 return cover;
             }
@@ -213,6 +223,10 @@ namespace Models.PMF
                 return 0;
             }
         }
+
+        /// <summary>List of zones with conditions to specify if roots grow there or not</summary>
+        [JsonIgnore]
+        public Dictionary<string, bool> ZonesToGrowRootsIn = null;
 
         /// <summary>The sw uptake</summary>
         public IReadOnlyList<double> WaterUptake => Root == null ? null : Root.SWUptakeLayered;
@@ -245,6 +259,10 @@ namespace Models.PMF
             IEnumerable<string> duplicates = CultivarNames.GroupBy(x => x).Where(g => g.Count() > 1).Select(x => x.Key);
             if (duplicates.Count() > 0)
                 throw new Exception("Duplicate Names in " + this.Name + " has duplicate cultivar names " + string.Join(",", duplicates));
+            List<Zone> zones = Structure.FindAll<Zone>(relativeTo: simulation).ToList();
+            ZonesToGrowRootsIn = new Dictionary<string, bool>();
+            foreach (Zone z in zones)
+                ZonesToGrowRootsIn[z.Name] = true;
         }
 
         /// <summary>Called when [phase changed].</summary>
@@ -308,7 +326,7 @@ namespace Models.PMF
             if (SowingData.TilleringMethod < -1 || SowingData.TilleringMethod > 1)
                 throw new Exception("Invalid TilleringMethod set in sowingData.");
 
-           // if (SowingData.TilleringMethod != 0 && SowingData.FTN > 0.0)
+            // if (SowingData.TilleringMethod != 0 && SowingData.FTN > 0.0)
             //    throw new Exception("Cannot set a FertileTillerNumber when TilleringMethod is not set to FixedTillering.");
 
             if (rowConfig == 0)
@@ -347,7 +365,7 @@ namespace Models.PMF
                 this.Population = SowingData.Population = seeds;
 
             // Find cultivar and apply cultivar overrides.
-            cultivarDefinition = FindAllDescendants<Cultivar>().FirstOrDefault(c => c.IsKnownAs(SowingData.Cultivar));
+            cultivarDefinition = Structure.FindChildren<Cultivar>(recurse: true).FirstOrDefault(c => c.IsKnownAs(SowingData.Cultivar));
             if (cultivarDefinition == null)
                 throw new ApsimXException(this, $"Cannot find a cultivar definition for '{SowingData.Cultivar}'");
 
@@ -361,7 +379,7 @@ namespace Models.PMF
             if (PlantSowing != null)
                 PlantSowing.Invoke(this, SowingData);
 
-            summary.WriteMessage(this, string.Format("A crop of " + PlantType + " (cultivar = " + cultivar + ") was sown today at a population of " + Population + " plants/m2 with " + budNumber + " buds per plant at a row spacing of " + rowSpacing + " mm and a depth of " + depth + " mm"), MessageType.Information);
+            summary.WriteMessage(this, string.Format("A crop of " + Name + " (cultivar = " + cultivar + ") was sown today at a population of " + Population + " plants/m2 with " + budNumber + " buds per plant at a row spacing of " + rowSpacing + " mm and a depth of " + depth + " mm"), MessageType.Information);
         }
 
         /// <summary>Harvest the crop.</summary>
@@ -370,7 +388,7 @@ namespace Models.PMF
             //Phenology.SetToEndStage();
             Harvesting?.Invoke(this, EventArgs.Empty);
 
-            PostHarvesting?.Invoke(this, new HarvestingParameters() {RemoveBiomass = removeBiomassFromOrgans});
+            PostHarvesting?.Invoke(this, new HarvestingParameters() { RemoveBiomass = removeBiomassFromOrgans });
         }
 
         /// <summary>End the crop.</summary>
@@ -417,6 +435,15 @@ namespace Models.PMF
                     structure.ProportionPlantMortality = 1 - (newPlantPopulation / InitialPopn);
                 }
             }
+        }
+
+        /// <summary>
+        /// Add a cultivar.
+        /// </summary>
+        /// <param name="cultivar">The cultivar to add</param>
+        public void AddCultivar(Cultivar cultivar)
+        {
+            Structure.AddChild(cultivar);
         }
     }
 }

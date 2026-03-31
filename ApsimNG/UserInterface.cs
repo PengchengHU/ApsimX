@@ -1,14 +1,12 @@
 ﻿using APSIM.Shared.Utilities;
-using ApsimNG.Utility;
 using System;
 using System.IO;
-using System.Reflection.Metadata;
 using System.Text;
 using System.Threading;
 using System.Threading.Tasks;
 using UserInterface.Presenters;
 using UserInterface.Views;
-using Utility;
+using APSIMNG.Utility;
 
 namespace UserInterface
 {
@@ -26,7 +24,7 @@ namespace UserInterface
         {
             try
             {
-                bool isOnlyInstance = SingleInstanceCheck(args);
+                bool isHostingInstance = SingleInstanceCheck(args);
                 LoadTheme();
 
                 Task.Run(() => Intellisense.CodeCompletionService.Init());
@@ -45,7 +43,7 @@ namespace UserInterface
 
                 PipeManager pipeManager = null;
 
-                if (isOnlyInstance)
+                if (isHostingInstance)
                 {
                     pipeManager = new PipeManager(appPipeName);
                     pipeManager.StartServer();
@@ -54,8 +52,11 @@ namespace UserInterface
 
                 if (args.Length == 0 || Path.GetExtension(args[0]) != ".cs")
                     Gtk.Application.Run();
-                if (isOnlyInstance)
+                if (isHostingInstance)
+                {
                     pipeManager.StopServer();
+                    appMutex.ReleaseMutex();
+                }
             }
             catch (Exception err)
             {
@@ -84,14 +85,13 @@ namespace UserInterface
 
         private static bool SingleInstanceCheck(string[] args)
         {
-            // TO DO (possibly): Add configuration setting so user can control whether
-            // or not to open in an existing instance. e.g., 
-            // if (!Configuration.Settings.UseSingleWindow)
-            //     return false;
+            if (!Configuration.Settings.UseExistingInstance)
+                return false;
 
-            bool isOnlyInstance;
-            appMutex = new Mutex(true, appMutexName, out isOnlyInstance);
-            if (!isOnlyInstance)
+            bool mutexCreated;
+            appMutex = new Mutex(true, appMutexName, out mutexCreated);
+            bool isFirstInstance = mutexCreated || appMutex.WaitOne(0);
+            if (!isFirstInstance)
             {
                 string filesToOpen = " ";
                 if (args != null && args.Length > 0)
@@ -109,7 +109,7 @@ namespace UserInterface
                         Environment.Exit(0);
                 }
             }
-            return isOnlyInstance;
+            return isFirstInstance;
         }
     }
 }

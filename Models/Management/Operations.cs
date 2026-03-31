@@ -4,6 +4,7 @@ using System.Globalization;
 using System.Linq;
 using System.Reflection;
 using System.Text.RegularExpressions;
+using APSIM.Core;
 using APSIM.Numerics;
 using APSIM.Shared.Utilities;
 using Models.Core;
@@ -17,6 +18,10 @@ namespace Models
     [Serializable]
     public class Operation
     {
+        private DateTime? ActionDate { get; set; }
+
+        private bool HasYear => ActionDate?.Year != DateTime.MinValue.Year;
+
         /// <summary>
         /// Default constructor.
         /// </summary>
@@ -42,7 +47,27 @@ namespace Models
         public bool Enabled { get; set; }
 
         /// <summary>Gets or sets the date.</summary>
-        public string Date { get; set; }
+        public string Date
+        {
+            get
+            {
+                if (ActionDate is DateTime dt)
+                {
+                    if (HasYear)
+                        return DateUtilities.GetDateAsString(dt);
+                    else
+                        return DateUtilities.GetDateAsDayMonthString(dt);
+                }
+                return null;
+            }
+            set
+            {
+                if (value == null)
+                    ActionDate = null;
+                else
+                    ActionDate = DateUtilities.GetDate(value, DateTime.MinValue.Year);
+            }
+        }
 
         /// <summary>Gets or sets the action.</summary>
         /// <value>The action.</value>
@@ -61,6 +86,23 @@ namespace Models
                 return Action.Substring(0, posPeriod);
 
             return "";
+        }
+
+        /// <summary>
+        /// Check whether or not this operation should trigger on the given date.
+        /// </summary>
+        /// <param name="date">The date to check.</param>
+        /// <returns>True if the op should be performed at this time.</returns>
+        public bool TriggersOnDate(DateTime date)
+        {
+            if (ActionDate is DateTime dt)
+            {
+                if (HasYear)
+                    return date == dt;
+                else
+                    return date.Month == dt.Month && date.Day == dt.Day;
+            }
+            return false;
         }
 
         /// <summary>
@@ -141,14 +183,19 @@ namespace Models
     [ValidParent(ParentType = typeof(Simulation))]
     [ValidParent(ParentType = typeof(Factorial.CompositeFactor))]
     [ValidParent(ParentType = typeof(Factorial.Factor))]
-    public class Operations : Model
+    public class Operations : Model, IStructureDependency
     {
+        /// <summary>Structure instance supplied by APSIM.core.</summary>
+        [field: NonSerialized]
+        public IStructure Structure { private get; set; }
+
         /// <summary>The clock</summary>
         [Link] IClock Clock = null;
 
         /// <summary>Gets or sets the schedule.</summary>
         /// <value>The schedule.</value>
         public List<Operation> OperationsList { get; set; }
+
 
         /// <summary>
         /// Invoked at start of simulation.
@@ -236,14 +283,12 @@ namespace Models
             if (OperationsList == null)
                 OperationsList = new List<Operation>();
 
-            DateTime operationDate;
             foreach (Operation operation in OperationsList.Where(o => o.Enabled))
             {
                 if (operation.Date == null || operation.Action == null)
                     throw new Exception($"Error: Operation line '{operation.Line}' cannot be parsed.");
 
-                operationDate = DateUtilities.GetDate(operation.Date, Clock.Today.Year);
-                if (operationDate == Clock.Today)
+                if (operation.TriggersOnDate(Clock.Today))
                 {
                     string st = operation.Action;
 
@@ -257,7 +302,7 @@ namespace Models
                         string variableName = st;
                         string value = StringUtilities.SplitOffAfterDelimiter(ref variableName, "=").Trim();
                         variableName = variableName.Trim();
-                        var ivariable = this.FindByPath(variableName);
+                        var ivariable = Structure.GetObject(variableName);
                         if (ivariable.Writable)
                             ivariable.Value = value;
                         else
@@ -274,7 +319,7 @@ namespace Models
                         string modelName = st.Substring(0, posPeriod);
                         string methodName = st.Substring(posPeriod + 1).Replace(";", "").Trim();
 
-                        Model model = this.FindByPath(modelName)?.Value as Model;
+                        Model model = Structure.GetObject(modelName)?.Value as Model;
                         if (model == null)
                             throw new ApsimXException(this, "Cannot find model: " + modelName);
 
@@ -302,6 +347,12 @@ namespace Models
                                         throw err.InnerException;
                                     }
                                     break;
+                                }
+                                else if (parameterValues == null)
+                                {
+                                    throw new ApsimXException(this, 
+                                        "There is an issue with the arguments provided a method in the operation location at \'" + this.FullPath + 
+                                        "\'. The method with argument issue(s) is : " + modelName + "." + methodName + "().\nIf you are using named arguments, please ensure the argument names are correct.");
                                 }
                             }
                         }

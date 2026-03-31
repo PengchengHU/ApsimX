@@ -6,8 +6,8 @@ using System.Reflection;
 using System.Threading.Tasks;
 using APSIM.Core;
 using APSIM.Shared.Utilities;
-using Models.Core.ApsimFile;
 using Models.Core.Interfaces;
+using Models.Factorial;
 using Models.Storage;
 using Newtonsoft.Json;
 
@@ -19,8 +19,12 @@ namespace Models.Core
     [Serializable]
     [ViewName("UserInterface.Views.MarkdownView")]
     [PresenterName("UserInterface.Presenters.GenericPresenter")]
-    public class Simulations : Model, ISimulationEngine, IScopedModel
+    public class Simulations : Model, ISimulationEngine, IScopedModel, IStructureDependency
     {
+        /// <summary>Structure instance supplied by APSIM.core.</summary>
+        [field: NonSerialized]
+        public IStructure Structure { private get; set; }
+
         [NonSerialized]
         private Links links;
 
@@ -50,13 +54,6 @@ namespace Models.Core
         public IEvent GetEventService(IModel model)
         {
             return new Events(model);
-        }
-
-        /// <summary>Returns an instance of an locator service</summary>
-        /// <param name="model">The model the service is for</param>
-        public ILocator GetLocatorService(IModel model)
-        {
-            return new Locator(model);
         }
 
         /// <summary>Constructor</summary>
@@ -109,7 +106,7 @@ namespace Models.Core
             List<string> filesReferenced = new List<string>();
             filesReferenced.Add(FileName);
             filesReferenced.AddRange(FindAllReferencedFiles());
-            DataStore storage = this.FindInScope<DataStore>();
+            DataStore storage = Structure.Find<DataStore>();
             if (storage != null)
             {
                 storage.Writer.AddCheckpoint(checkpointName, filesReferenced);
@@ -175,7 +172,7 @@ namespace Models.Core
         /// <summary>Look through all models. For each simulation found set the filename.</summary>
         private void SetFileNameInAllSimulations()
         {
-            foreach (Model child in this.FindAllDescendants().ToList())
+            foreach (Model child in Structure.FindChildren<IModel>(recurse: true).ToList())
             {
                 if (child is Simulation)
                 {
@@ -206,7 +203,7 @@ namespace Models.Core
         public List<object> GetServices()
         {
             List<object> services = new List<object>();
-            var storage = this.FindInScope<IDataStore>();
+            var storage = Structure.Find<IDataStore>();
             if (storage != null)
                 services.Add(storage);
             return services;
@@ -226,11 +223,6 @@ namespace Models.Core
         /// </summary>
         public void ClearSimulationReferences()
         {
-            // Clears the locator caches for our Simulations.
-            // These caches may result in cyclic references and memory leaks if not cleared
-            foreach (Model simulation in this.FindAllDescendants().ToList())
-                if (simulation is Simulation)
-                    (simulation as Simulation).ClearCaches();
             // Explicitly clear the child lists
             ClearChildLists();
         }
@@ -239,7 +231,7 @@ namespace Models.Core
         public IEnumerable<string> FindAllReferencedFiles(bool isAbsolute = true)
         {
             SortedSet<string> fileNames = new SortedSet<string>();
-            foreach (IReferenceExternalFiles model in this.FindAllDescendants<IReferenceExternalFiles>().Where(m => m.Enabled))
+            foreach (IReferenceExternalFiles model in Structure.FindChildren<IReferenceExternalFiles>(recurse: true).Where(m => m.Enabled))
                 foreach (string fileName in model.GetReferencedFileNames())
                     if (isAbsolute == true)
                     {
@@ -250,6 +242,29 @@ namespace Models.Core
                         fileNames.Add(fileName);
                     }
             return fileNames;
+        }
+
+        /// <summary>
+        /// Get all Simulation and Factorial names from the given file.
+        /// </summary>
+        /// <param name="onlyEnabled"></param>
+        /// <returns></returns>
+        public List<string> GetAllSimulationAndFactorialNameList(bool onlyEnabled = false)
+        {
+            List<string> sims;
+            if (onlyEnabled)
+            {
+                sims = Node.FindChildren<Simulation>().Where(sim => sim.Enabled).Select(sim => sim.Name).ToList();
+                List<string> allExperimentCombinations = Node.FindChildren<Experiment>(recurse: true).SelectMany(experiment => experiment.GetSimulationDescriptions(false).Select(sim => sim.Name)).ToList();
+                sims.AddRange(allExperimentCombinations);
+            }
+            else
+            {
+                sims = Node.FindChildren<Simulation>().Select(sim => sim.Name).ToList();
+                List<string> allExperimentCombinations = Node.FindChildren<Experiment>(recurse: true).SelectMany(experiment => experiment.GetSimulationDescriptions().Select(sim => sim.Name)).ToList();
+                sims.AddRange(allExperimentCombinations);
+            }
+            return sims;
         }
     }
 }
