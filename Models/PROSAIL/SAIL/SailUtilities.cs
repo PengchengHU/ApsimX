@@ -738,6 +738,7 @@ namespace Models.PROSAIL.SAIL
             {
                 freq_cum[i] = Dcum(a, b, angle_bounds[i]); // Calculate cumulative frequency up to angle t
             }
+            freq_cum[nBins - 1] = 1.0; // match R's hardcode to ensure total cumulative frequency is 1 at 90 degrees
 
             // Calculate the frequency (LIDF value) for each bin by differencing cumulative frequencies
             double[] freq = new double[nBins]; // Initialize frequency array
