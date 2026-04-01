@@ -889,17 +889,17 @@ namespace Models.PROSAIL.SAIL
             if (Math.Abs(sum_kl) < 1e-9)
             {
                 // Use L'Hopital's rule limit: t*exp(-(sum_kl)*t) -> t
-                //Jout = t;
-                Console.WriteLine($"Warning: k + l ≈ 0 ({sum_kl:E3}). Return NaN");
-                return double.NaN;
+                Jout = t;
+                // Console.WriteLine($"Warning: k + l ≈ 0 ({sum_kl:E3}). Return NaN");
+                // return double.NaN;
             }
             // Handle small exponent case using Taylor expansion exp(-x) ≈ 1 - x
             else if (Math.Abs(sum_kl * t) < 1e-6)
             {
                 // (1 - (1 - sum_kl*t)) / sum_kl = sum_kl*t / sum_kl = t
-                //Jout = t;
-                Console.WriteLine($"Warning: sum_kl * tl ≈ 0 ({sum_kl * t:E3}). Return NaN");
-                return double.NaN;
+                Jout = t * (1.0 - 0.5 * sum_kl * t);
+                // Console.WriteLine($"Warning: sum_kl * tl ≈ 0 ({sum_kl * t:E3}). Return NaN");
+                // return double.NaN;
             }
             else // Standard calculation
             {
