@@ -800,21 +800,24 @@ namespace Models.PROSAIL.Sail
                 s1 = sumint1; // Integral for layer 1 (relative to total LAI)
 
                 // Integrate Layer 2 (path fraction 1-fb_orig to 1.0)
-                double x1_l2 = layer1_frac_end, y1_l2 = y1_l1, sumint2 = 0; // Start where layer 1 ended
+                // Carry over state exactly where layer 1 left off, matching R's loop structure.
+                double x1_l2 = x1_l1, y1_l2 = y1_l1, sumint2 = 0;
                 double f1_l2 = f1_l1;
-                double prob_start_l2 = prob_end_l1; // 1.0 - Math.Exp(-alf * x1_l2);
-                double prob_end_l2 = 1.0 - Math.Exp(-alf * 1.0); // End at total path fraction 1
-                double fint2 = (prob_end_l2 - prob_start_l2) * (1.0 / nsteps); // Step size in probability space for layer 2
+                // R uses ca = exp(alf*(fb-1)) = exp(-alf*(1-fb)) as the probability origin for
+                // layer 2, and steps fint = (ca - exp(-alf)) / 20 downward from ca toward exp(-alf).
+                // The inversion is then x2 = -log(ca - istep*fint) / alf.
+                double ca = Math.Exp(-alf * layer1_frac_end); // = exp(-alf*(1-fb))
+                double fint2 = (ca - Math.Exp(-alf)) / nsteps;
 
                 for (int j = 1; j <= nsteps; j++)
                 {
                     double x2_l2;
                     if (j < nsteps)
                     {
-                        double prob_target = prob_start_l2 + j * fint2;
-                        if (prob_target >= 1.0) x2_l2 = 1.0; // Clip if needed
-                        else x2_l2 = -Math.Log(1.0 - prob_target) / alf;
-                        x2_l2 = Math.Max(x1_l2, Math.Min(x2_l2, 1.0)); // Ensure bounds
+                        // R: x2 <- -log(ca - istep*fint) / alf
+                        double logArg = ca - j * fint2;
+                        if (logArg <= 0.0) logArg = 1e-300; // guard against log(<=0) near final step
+                        x2_l2 = -Math.Log(logArg) / alf;
                     }
                     else
                     {
@@ -1154,7 +1157,7 @@ namespace Models.PROSAIL.Sail
                 // WARNING: This is not the same as fCover in R code, which uses `too`
                 // fCover[i] = 1.0 - tooc[i];
 
-                // Final fCover based on the green layer
+                // Final fCover based on the green layer, unclumped
                 fCover[i] = 1.0 - too_L1[i];
 
                 // Albedo Components (Rsd*, Rdd*)
