@@ -385,18 +385,7 @@ namespace Models.PROSAIL.SAIL
                 double vbi = vb[i];
 
                 // Calculate rinf (reflectance of infinitely thick layer)
-                double rinf;
-                // Handle potential division by zero or near-zero if sigbi is small
-                if (Math.Abs(sigbi) < 1e-12)
-                {
-                    // If sigb is zero, implies conservative scattering (att=m or att=-m).
-                    // R code uses infinite rinf, here I use 1 as SAIL theory suggests rinf -> 1 for conservative case, but need check!!!
-                    rinf = 1.0;
-                }
-                else
-                {
-                    rinf = (atti - mi) / sigbi;
-                }
+                double rinf = (atti - mi) / sigbi;
 
                 // Intermediate exponential terms related to LAI
                 double e1 = Math.Exp(-mi * lai); // exp(-m*LAI)

@@ -327,9 +327,7 @@ namespace Models.PROSAIL.Sail
 
                 double e1 = Math.Exp(-mi * lai); // exp(-m*LAI)
                 double e2 = e1 * e1;           // exp(-2*m*LAI)
-                double rinf = (Math.Abs(sigbi) > 1e-9) ? (atti - mi) / sigbi : (atti > mi ? double.PositiveInfinity : double.NegativeInfinity); // Reflectance of infinitely thick canopy
-                // Handle potential instability if sigb is near zero (conservative scattering)
-                if (Math.Abs(sigbi) < 1e-9) rinf = 1.0; // Approximate for conservative scattering
+                double rinf = (atti - mi) / sigbi; // Reflectance of infinitely thick canopy
 
                 double rinf2 = rinf * rinf; // rinf^2
                 double re = rinf * e1;       // rinf * exp(-m*LAI)
