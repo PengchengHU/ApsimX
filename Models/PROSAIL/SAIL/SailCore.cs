@@ -1150,9 +1150,12 @@ namespace Models.PROSAIL.Sail
                 abs_dir[i] = alfas_veg[i] + tup_soil * alfad_veg[i]; // Direct absorption by veg
                 abs_hem[i] = alfad_veg[i] * (1.0 + tddc[i] * rddsoil[i] / rn_soil); // Diffuse absorption by veg
 
-                // Final fCover based on clumped observer transmittance
+                // Final fCover based on full clumped combined-layre transmittance full clumped combined-layer transmittance
                 // WARNING: This is not the same as fCover in R code, which uses `too`
-                fCover[i] = 1.0 - tooc[i];
+                // fCover[i] = 1.0 - tooc[i];
+
+                // Final fCover based on the green layer
+                fCover[i] = 1.0 - too_L1[i];
 
                 // Albedo Components (Rsd*, Rdd*)
                 /* WARNING: R code calculates these using variables from the layer combination step, i.e., 
