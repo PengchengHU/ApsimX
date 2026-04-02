@@ -107,11 +107,28 @@ namespace Models.PROSAIL
         public string InputWavelengthRange { get; set; } = "400-2500";
 
 
+        /// <summary>Enum for supported SAIL model versions.</summary>
+        public enum SailVersionTypes
+        {
+            /// <summary>4SAIL - single layer canopy model</summary>
+            FourSAIL,
+            /// <summary>4SAIL2 - two layer canopy model (green + brown)</summary>
+            FourSAIL2
+        }
+
         /// <summary>SAIL: Canopy optics </summary>
         [Separator("Canopy Properties (SAIL)")]
-        // <summary>Expression to evaluate for the simulation name</summary>
-        [Description("Sail version ('4SAIL' or '4SAIL2')")]
-        public string SailVersion { get; set; } = "4SAIL";
+        // <summary>SAIL model version selection</summary>
+        [Description("SAIL model version (4SAIL: single layer, 4SAIL2: green + brown layers)")]
+        public SailVersionTypes SailVersion
+        {
+            get => sailVersion;
+            set => sailVersion = value;
+        }
+        private SailVersionTypes sailVersion = SailVersionTypes.FourSAIL;
+
+        /// <summary>Returns the SAIL version string used internally by the model core.</summary>
+        private string SailVersionString => SailVersion == SailVersionTypes.FourSAIL2 ? "4SAIL2" : "4SAIL";
 
         /// <summary>The expression for Leaf Area Index (LAI)</summary>
         [Description("LAI - Leaf Area Index (m²/m²)")]
@@ -574,7 +591,7 @@ namespace Models.PROSAIL
                 {CurrentParameterValues["Dissociation"]}, {CurrentParameterValues["CrownCover"]}, {CurrentParameterValues["TreeShape"]},
                 '{WetDrySoilReflectanceJsonPath?.Replace("'", "''") ?? ""}', {CurrentParameterValues["Psoil"]},
                 {CurrentParameterValues["SunZenithAngle"]}, {CurrentParameterValues["ObserverZenithAngle"]}, 
-                {CurrentParameterValues["RelativeAzimuthAngle"]}, '{CurrentParameterValues["SailVersion"]}', '{SensorType.ToString()}'
+                {CurrentParameterValues["RelativeAzimuthAngle"]}, '{SailVersionString}', '{SensorType.ToString()}'
             )";
                 dbConnection.ExecuteNonQuery(paramSql);
 
@@ -867,7 +884,6 @@ namespace Models.PROSAIL
             CurrentParameterValues["SunZenithAngle"] = EvaluateExpression(SunZenithAngle);
             CurrentParameterValues["ObserverZenithAngle"] = EvaluateExpression(ObserverZenithAngle);
             CurrentParameterValues["RelativeAzimuthAngle"] = EvaluateExpression(RelativeAzimuthAngle);
-            CurrentParameterValues["SailVersion"] = SailVersion;
         }
 
         /// <summary>
@@ -952,24 +968,6 @@ namespace Models.PROSAIL
                 WriteMessage(LogLevel.Error, msg);
                 throw new InvalidOperationException(msg);
             }
-
-            // SailVersion as string
-            if (CurrentParameterValues.TryGetValue("SailVersion", out object sailVersionObj))
-            {
-                string sailVersion = sailVersionObj as string;
-                if (sailVersion != "4SAIL" && sailVersion != "4SAIL2")
-                {
-                    string msg = $"Parameter 'SailVersion' value '{sailVersion}' is invalid (must be '4SAIL' or '4SAIL2') on {Clock?.Today:yyyy-MM-dd}.";
-                    WriteMessage(LogLevel.Error, msg);
-                    throw new InvalidOperationException(msg);
-                }
-            }
-            else
-            {
-                string msg = $"Parameter 'SailVersion' is missing from CurrentParameterValues on {Clock?.Today:yyyy-MM-dd}.";
-                WriteMessage(LogLevel.Error, msg);
-                throw new InvalidOperationException(msg);
-            }
         }
 
         /// <summary>
@@ -987,7 +985,7 @@ namespace Models.PROSAIL
 
             // Retrieve parameters
             int TypeLidfValue = Convert.ToInt32(CurrentParameterValues["TypeLidf"]);
-            string SailVersionValue = CurrentParameterValues["SailVersion"] as string ?? "4SAIL";
+            string SailVersionValue = SailVersionString;
 
             CanopyOptics results = ProsailCore.PRO4SAIL(
                 // leaf
