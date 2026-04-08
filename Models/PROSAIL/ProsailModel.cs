@@ -1139,12 +1139,12 @@ namespace Models.PROSAIL
 
             WriteMessage(LogLevel.Info, $"ProsailModel: OnDoEndOfDay called on {Clock.Today:yyyy-MM-dd}.");
 
-            // Calculte soil reflectance based on wet/dry factor
+            // Calculte soil reflectance based on wet/dry factor, 0 for wet, 1 for dry
             Double psoilValue;
             if (string.IsNullOrWhiteSpace(Psoil))
             {
                 // Use APSIM calculated soil water content of top layer if Psoil is not specified
-                psoilValue = waterBalance.SW[0];
+                psoilValue = 1 - waterBalance.SW[0];
                 WriteMessage(LogLevel.Info, "ProsailModel: Psoil is not specified, using APSIM calculated soil water content of soil top layer.");
             }
             else
