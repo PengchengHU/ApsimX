@@ -203,7 +203,8 @@ namespace UnitTests.PROSAIL
                     $"LMA={testInput.LMA:F2}, " +
                     $"SunZenith={testInput.SunZenithAngle:F2}, ObserverZenith={testInput.ObserverZenithAngle:F2}, " +
                     $"RelativeAzimuth={testInput.RelativeAzimuthAngle:F2}, HotSpot={testInput.HotSpot:F2}, " +
-                    $"TypeLidf={testInput.TypeLidf}, LIDFa={testInput.LIDFa:F2}, FractionBrown={testInput.FractionBrown:F2}");
+                    $"TypeLidf={testInput.TypeLidf}, LIDFa={testInput.LIDFa:F2}, FractionBrown={testInput.FractionBrown:F2}, " +
+                    $"Psoil={testInput.Psoil:F2}");
 
                 SoilOptics soil = CalculateSoilReflectanceFromWetDry(cachedWetDrySoilReflectance,
                     testInput.Psoil);
