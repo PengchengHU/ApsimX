@@ -239,7 +239,7 @@ namespace Models.PROSAIL.PROSPECT
             Vector<double> bNm1 = b.PointwisePower(N - 1);
             Vector<double> bN2 = bNm1.PointwisePower(2);
             Vector<double> a2 = a.PointwisePower(2);
-            denom = a2.PointwiseMultiply(bN2) - 1 + 1e-10;
+            denom = a2.PointwiseMultiply(bN2) - 1;
 
             Vector<double> Rsub = a.PointwiseMultiply(bN2 - 1).PointwiseDivide(denom);
             Vector<double> Tsub = bNm1.PointwiseMultiply(a2 - 1).PointwiseDivide(denom);
@@ -247,7 +247,7 @@ namespace Models.PROSAIL.PROSPECT
             // Case of zero absorption
             for (int i = 0; i < R.Count; i++)
             {
-                if (R[i] + T[i] >= 1.0 - 1e-10)
+                if (R[i] + T[i] >= 1.0)
                 {
                     Tsub[i] = T[i] / (T[i] + (1 - T[i]) * Math.Max(N - 1, 1e-10));
                     Rsub[i] = 1 - Tsub[i];
@@ -255,13 +255,13 @@ namespace Models.PROSAIL.PROSPECT
             }
 
             // leaf reflectance and transmittance : combine top layer with next N-1 layers
-            denom = 1 - Rsub.PointwiseMultiply(R) + 1e-10;
+            denom = 1 - Rsub.PointwiseMultiply(R);
             Vector<double> transmittance = Ta.PointwiseMultiply(Tsub).PointwiseDivide(denom);
             Vector<double> reflectance = Ra + Ta.PointwiseMultiply(Rsub).PointwiseMultiply(T).PointwiseDivide(denom);
 
             // Clamp results to physical limits
-            reflectance = reflectance.Map(x => Math.Round(Math.Max(0, Math.Min(1, x)), 4)); // 4 digits
-            transmittance = transmittance.Map(x => Math.Round(Math.Max(0, Math.Min(1, x)), 4));
+            reflectance   = reflectance.Map(x => Math.Max(0, Math.Min(1, x)));
+            transmittance = transmittance.Map(x => Math.Max(0, Math.Min(1, x)));
 
             LeafOptics LeafOpticsResult = new LeafOptics
             {
@@ -279,57 +279,14 @@ namespace Models.PROSAIL.PROSPECT
         /// <returns>Transmittance vector (tau) for each wavelength.</returns>
         private static Vector<double> ComputeTau(Vector<double> k)
         {
-            return k.Map(k_i =>
+             return k.Map(k_i =>
             {
-                // Handle edge cases for the absorption coefficient
-                if (k_i <= 0) return 1.0; // No absorption, full transmittance
-                if (k_i > 100) return 0.0; // High absorption, no transmittance (prevents overflow)
-
-                // Check if k_i is close to 1, where ExponentialIntegral may fail to converge
-                // The error "Continued fraction failed to converge for x=1.0xxx" suggests
-                // that SpecialFunctions.ExponentialIntegral(k_i, 1) uses a continued fraction internally,
-                // which struggles when k_i ≈ 1 due to slow convergence or oscillation.
-                if (Math.Abs(k_i - 1.0) < 0.05) // Threshold for problematic values
-                {
-                    // Use a series approximation for E_1(k_i) when k_i ≈ 1 to avoid convergence issues
-                    // E_1(x) ≈ -γ - ln(x) + x - x^2/4 + x^3/18 (Taylor expansion around x=1)
-                    // where γ is the Euler-Mascheroni constant (0.5772156649...)
-                    const double gamma = 0.5772156649015329;
-                    double delta = k_i - 1.0;
-                    double eiApprox = -gamma - Math.Log(k_i) + k_i - k_i * k_i / 4.0 + k_i * k_i * k_i / 18.0;
-                    double expTerm = (1 - k_i) * Math.Exp(-k_i);
-                    double tauApprox = expTerm + k_i * k_i * eiApprox;
-
-                    // Log the use of the approximation for debugging
-                    Console.WriteLine($"Warning: ProspectCore: Using E_1 approximation for k_i={k_i:F6} (close to 1)");
-
-                    // Ensure tau is within physical bounds [0, 1]
-                    return Math.Max(0, Math.Min(1, tauApprox));
-                }
-
-                try
-                {
-                    // Standard PROSPECT calculation for tau
-                    // tau = (1 - k) * e^(-k) + k^2 * E_1(k)
-                    // where E_1(k) is the exponential integral of order 1
-                    double expTerm = (1 - k_i) * Math.Exp(-k_i);
-                    double eiTerm = k_i * k_i * SpecialFunctions.ExponentialIntegral(k_i, 1);
-                    double tau = expTerm + eiTerm;
-
-                    // Ensure tau is within physical bounds [0, 1]
-                    return Math.Max(0, Math.Min(1, tau));
-                }
-                catch (Exception ex)
-                {
-                    // If ExponentialIntegral fails (e.g., due to continued fraction convergence failure),
-                    // fall back to a simple approximation: tau ≈ e^(-k_i)
-                    // This is a reasonable approximation for moderate absorption and avoids simulation failure Using approximation tau ≈ e^(-k_i).");
-                    Console.WriteLine($"Warning: ProspectCore: Failed to compute ExponentialIntegral for k_i={k_i:F6}: {ex.Message}. Using approximation tau ≈ e^(-k_i).");
-                    double tauFallback = Math.Exp(-k_i);
-
-                    // Ensure the fallback value is within physical bounds [0, 1]
-                    return Math.Max(0, Math.Min(1, tauFallback));
-                }
+                if (k_i <= 0) return 1.0;
+                // tau = (1 - k) * exp(-k) + k² * E₁(k)
+                double expTerm = (1 - k_i) * Math.Exp(-k_i);
+                double eiTerm  = k_i * k_i * SpecialFunctions.ExponentialIntegral(k_i, 1);
+                double tau = expTerm + eiTerm;
+                return Math.Max(0, Math.Min(1, tau));
             });
         }
 
@@ -363,7 +320,7 @@ namespace Models.PROSAIL.PROSPECT
                 double tp1 = -2 * n2 * (b - a) / (np * np);
                 double tp2 = -2 * n2 * np * Math.Log(b / a) / (nm * nm);
                 double tp3 = n2 * (1 / b - 1 / a) / 2;
-                double tp4 = 16 * n2 * n2 * (n2 + 1) * Math.Log((2 * np * b - nm * nm) / (2 * np * a - nm * nm)) / (np * np * np * nm * nm);
+                double tp4 = 16 * n2 * n2 * ((n2 * n2) + 1) * Math.Log(((2 * np * b) - (nm * nm)) / ((2 * np * a) - (nm * nm))) / ((np * np * np) * (nm * nm));
                 double tp5 = 16 * n2 * n2 * n2 * (1 / (2 * np * b - nm * nm) - 1 / (2 * np * a - nm * nm)) / (np * np * np);
 
                 double result = (ts + tp1 + tp2 + tp3 + tp4 + tp5) / (2 * sa2);
