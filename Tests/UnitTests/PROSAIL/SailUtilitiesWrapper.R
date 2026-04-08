@@ -213,6 +213,20 @@ if (functionName == "adjust_PROSPECT_2_SAIL") {
   params$fractionBrown <- NULL # Remove original
 }
 
+### Special handling for PRO4SAIL ####
+# C# sends CAB but R expects CHL; C# sends SailVersion but R expects SAILversion
+if (functionName == "PRO4SAIL") {
+  # Rename CAB to CHL
+  if (!is.null(params$CAB)) {
+    params$CHL <- params$CAB
+    params$CAB <- NULL
+  }
+  # Rename SailVersion to SAILversion
+  if (!is.null(params$SailVersion)) {
+    params$SAILversion <- params$SailVersion
+    params$SailVersion <- NULL
+  }
+}
 
 # Function Execution ####
 # Check if the target function exists in the sourced environment
