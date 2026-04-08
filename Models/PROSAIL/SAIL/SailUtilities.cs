@@ -865,12 +865,6 @@ namespace Models.PROSAIL.SAIL
         /// <returns>Result of the J2 function.</returns>
         public static double Jfunc2(double k, double l, double t)
         {
-            // Early return for t = 0 case
-            if (Math.Abs(t) < 1e-15)  // Using machine epsilon tolerance
-            {
-                return 0.0;
-            }
-
             // Calculate the sum k+l
             double sum_kl = k + l;
             double Jout; // Result
@@ -928,14 +922,8 @@ namespace Models.PROSAIL.SAIL
             double del = m * t;
             double out_val; // Result
 
-            // Handle m exactly zero using limit analysis
-            if (Math.Abs(m) < 1e-9)
-            {
-                // Limit of J4 as m->0 is t/2
-                out_val = 0.5 * t;
-            }
             // Use direct formula if |m*t| is not too small
-            else if (Math.Abs(del) > 1e-3)
+            if (Math.Abs(del) > 1e-3)
             {
                 double exp_del = Math.Exp(-del); // Calculate exponential term
                 double denom = m * (1.0 + exp_del); // Calculate denominator
