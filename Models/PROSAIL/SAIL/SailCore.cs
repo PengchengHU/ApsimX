@@ -714,8 +714,8 @@ namespace Models.PROSAIL.Sail
 
             // Layer LAIs
             // Use the ORIGINAL fractionBrown here, not the adjusted 'fb'
-            double lai1 = (1.0 - fractionBrown) * lai; // Top layer LAI (Green)
-            double lai2 = fractionBrown * lai; // Bottom layer LAI (Brown)
+            double lai1 = (1.0 - fb) * lai; // Top layer LAI (Green)
+            double lai2 = fb * lai; // Bottom layer LAI (Brown)
 
 
             // Hotspot Calculation (Two Layers)
@@ -764,7 +764,7 @@ namespace Models.PROSAIL.Sail
                 // Integrate Layer 1 (path fraction 0 to 1-fb_orig)
                 double x1_l1 = 0, y1_l1 = 0, sumint1 = 0;
                 double f1_l1 = 1.0; // exp(y1) where y1=0
-                double layer1_frac_end = 1.0 - fractionBrown;
+                double layer1_frac_end = 1.0 - fb;
                 double prob_end_l1 = 1.0 - Math.Exp(-alf * layer1_frac_end);
                 double fint1 = prob_end_l1 * (1.0 / nsteps); // Step size in probability space for layer 1
 
@@ -1156,26 +1156,13 @@ namespace Models.PROSAIL.Sail
                 // fCover[i] = 1.0 - tooc[i];
 
                 // Final fCover based on the green layer, unclumped
-                fCover[i] = 1.0 - too_L1[i];
+                fCover[i] = 1.0 - too_L1[i];            
 
                 // Albedo Components (Rsd*, Rdd*)
-                /* WARNING: R code calculates these using variables from the layer combination step, i.e., 
-                 * BEFORE clumping and final soil interaction for other reflectances applied to these variables. 
-                 * This might be not correct???? 
-                 * Translating R code directly by using: rsd_L1, tss_L1, tsd_L1, tdd_L1, rdd_L1, rddb (L2 refl), rsoil (input), rn (L1-L2 interaction) */
-                double rn_alb = 1.0 - rdd_L1[i] * rddb[i]; // Interaction term from layer combination step
-                if (Math.Abs(rn_alb) < 1e-12) rn_alb = 1e-12;
-
-                /* WARNING: These calculations seem inconsistent with the final rsdt/rddt which include clumping (Cv, Cs, Co).
-                 * The R code uses (1) the un-clumped layer 1 and layer 2 properties, (2) rsoil (input) directly instead of rsdsoil/rddsoil used above,
-                 * and (3) rn_alb (from layer combination) instead of rn_soil (final soil interaction). 
-                 * Corrected calculation: Albedo components should be equal to the final 
-                 * hemispherical reflectance factors, which already include all clumping and soil effects.
-                rsdstar[i] = rsdt[i];
-                rddstar[i] = rddt[i]; */
-                // Replicating R code's apparent logic:
-                rsdstar[i] = rsd_L1[i] + (tss_L1[i] + tsd_L1[i]) * rsoil[i] * tdd_L1[i] / rn_alb;
-                rddstar[i] = rdd_L1[i] + (tdd_L1[i] * tdd_L1[i] * rsoil[i]) / rn_alb;
+                // R computes these using top-layer L1 optical properties with rn = 1-rddcb*rddsoil
+                // (the soil interaction denominator, not the L1-L2 interaction denominator)
+                rsdstar[i] = rsd_L1[i] + (tss_L1[i] + tsd_L1[i]) * rsoil[i] * tdd_L1[i] / rn_soil;
+                rddstar[i] = rdd_L1[i] + (tdd_L1[i] * tdd_L1[i] * rsoil[i]) / rn_soil;                          
             } // End wavelength loop
 
 
