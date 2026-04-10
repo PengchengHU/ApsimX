@@ -327,7 +327,7 @@ namespace UnitTests.PROSAIL
                     Cv: testInput.CrownCover,
                     Zeta: testInput.TreeShape,
                     SoilReflectance: soil,
-                    SailVersion: "4SAIL"
+                    SailVersion: "4SAIL2"
                 );
 
                 // R implementation
