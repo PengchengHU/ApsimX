@@ -934,3 +934,63 @@ public struct CanopyBRF : ISpectralData
         });
     }
 }
+
+/// <summary>
+/// Spectral data for the BSM (Brightness Soil Model).
+/// Contains Global Soil Vectors (GSV) and water optical properties loaded from BSM_data.json.
+/// Wavelength range: 400–2500 nm (after extension from the base 400–2400 nm data).
+/// </summary>
+public struct BsmSpectralData : ISpectralData
+{
+    /// <summary>Wavelength vector (nm)</summary>
+    public Vector<double> Wavelength { get; set; }
+
+    /// <summary>First Global Soil Vector (dry soil spectral basis)</summary>
+    public Vector<double> GSV_1 { get; set; }
+
+    /// <summary>Second Global Soil Vector (dry soil spectral basis)</summary>
+    public Vector<double> GSV_2 { get; set; }
+
+    /// <summary>Third Global Soil Vector (dry soil spectral basis)</summary>
+    public Vector<double> GSV_3 { get; set; }
+
+    /// <summary>Water refraction index spectrum</summary>
+    public Vector<double> nw { get; set; }
+
+    /// <summary>Water absorption coefficient spectrum</summary>
+    public Vector<double> kw { get; set; }
+
+    /// <summary>Dictionary mapping wavelengths to their indices</summary>
+    public Dictionary<double, int> WavelengthToIndex { get; set; }
+
+    /// <summary>Indicates whether this struct contains valid data.</summary>
+    public readonly bool HasValue => Wavelength != null && GSV_1 != null && GSV_2 != null &&
+                                     GSV_3 != null && nw != null && kw != null &&
+                                     WavelengthToIndex != null && Wavelength.Count > 0;
+
+    /// <summary>Gets wavelengths as double array (implements ISpectralData)</summary>
+    public double[] GetWavelengths() => Wavelength?.ToArray() ?? Array.Empty<double>();
+
+    /// <summary>Gets wavelength-to-index mapping (implements ISpectralData)</summary>
+    public Dictionary<double, int> GetWavelengthToIndex() => WavelengthToIndex;
+
+    /// <summary>Creates a subset of BsmSpectralData for the specified wavelengths.</summary>
+    public BsmSpectralData SubsetByWavelengths(double[] targetWavelengths)
+    {
+        return SpectralDataUtils.SubsetByWavelengths(this, targetWavelengths, (source, indices) =>
+        {
+            var wl = Vector<double>.Build.DenseOfEnumerable(indices.Select(i => source.Wavelength[i]));
+            var wlToIdx = wl.Select((w, i) => (w, i)).ToDictionary(x => x.w, x => x.i);
+            return new BsmSpectralData
+            {
+                Wavelength = wl,
+                GSV_1 = Vector<double>.Build.DenseOfEnumerable(indices.Select(i => source.GSV_1[i])),
+                GSV_2 = Vector<double>.Build.DenseOfEnumerable(indices.Select(i => source.GSV_2[i])),
+                GSV_3 = Vector<double>.Build.DenseOfEnumerable(indices.Select(i => source.GSV_3[i])),
+                nw = Vector<double>.Build.DenseOfEnumerable(indices.Select(i => source.nw[i])),
+                kw = Vector<double>.Build.DenseOfEnumerable(indices.Select(i => source.kw[i])),
+                WavelengthToIndex = wlToIdx
+            };
+        });
+    }
+}
