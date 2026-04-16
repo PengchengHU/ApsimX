@@ -2,10 +2,10 @@
 using MathNet.Numerics.LinearAlgebra;
 using Models.Core;
 using Models.Functions;
-using Models.Interfaces;
 using Models.PMF;
 using APSIM.Core;
 using Models.Prosail;
+using Models.PROSAIL.BSM;
 using Models.PROSAIL.PROSPECT;
 using Models.PROSAIL.SAIL;
 using System;
@@ -49,8 +49,6 @@ namespace Models.PROSAIL
         /// <summary>Structure instance supplied by APSIM.core.</summary>
         public IStructure Structure { private get; set; }
 
-        /// <summary>Link to the soil water model to soil water content of the top layer</summary>
-        [Link] private ISoilWater waterBalance = null;
         #endregion
 
         #region PROSAIL Input Parameters (Expressions)
@@ -170,87 +168,77 @@ namespace Models.PROSAIL
         public string TreeShape { get; set; } = "1.0";
         #endregion
 
-        #region Soil Reflectance
-        /// <summary>Path to wet/dry soil reflectance data file.</summary>
-        [Separator("Soil reflectance")]
-        [Description("Wet/dry soil reflectance file")]
-        [Tooltip("CSV file with columns: Wavelength, Dry_Soil, Wet_Soil. If not specified, built-in default data is used.")]
-        [Display(Type = DisplayType.FileName)]
-        public string WetDrySoilReflectancePath { get; set; }
-
-        /// <summary>The expression for the soil brightness parameter (psoil).</summary>
-        [Description("Psoil - Soil water content (0=dry, 1=wet)")]
-        [Tooltip("Soil water content of the top layer (unitless; 0 for dry, 1 for wet). Can be a literal or APSIM expression. If not specified, auto-calculated from APSIM soil water model.")]
-        public string Psoil { get; set; }
-        #endregion
-
-        #region Observation Dates and Per-Date Parameters (CSV file option first)
-        /// <summary>Path to a CSV file containing observation dates and per-date parameters.</summary>
-        [Separator("Observation data from CSV file (specify ObservationDates, SunZenithAngle, ObserverZenithAngle, RelativeAzimuthAngle from a file)")]
-        [Description("Observation data CSV file")]
-        [Tooltip("CSV file with columns: Date (required), Psoil, SunZenithAngle, ObserverZenithAngle, RelativeAzimuthAngle (all optional). "
-            + "If provided, overrides the UI arrays and expression fields below for the 3 geometry angles and ObservationDates. "
-            + "Leave empty to use the UI arrays or expression fields below, or to run daily.")]
-        [Display(Type = DisplayType.FileName)]
-        public string ObservationDataFilePath { get; set; }
-        #endregion
-
-        #region Observation Dates and Per-Date Parameters (UI input option)
+        #region Sun-Observer Geometry
         /// <summary>Observation dates specified via the UI.</summary>
-        [Separator("Observation data from UI (used when no CSV file is specified above)")]
+        [Separator("Sun-Observer Geometry")]
         [Description("Observation dates")]
-        [Tooltip("Dates on which PROSAIL should run. Leave empty to run daily (whenever plant is alive and emerged). Ignored if a CSV file is specified above.")]
-        [Display(VisibleCallback = nameof(NoObservationDataFile))]
+        [Tooltip("Dates on which PROSAIL will run. If empty, PROSAIL runs every day the plant is alive and emerged. Dates outside the simulation range are ignored with a warning.")]
         public DateTime[] ObservationDates { get; set; }
 
-        /// <summary>Per-date Psoil values from the UI.</summary>
-        [Description("Per-date Psoil values")]
-        [Tooltip("One value per observation date, or a single value for all dates. If empty, uses the Psoil expression or auto-calculates from soil water.")]
-        [Display(VisibleCallback = nameof(HasObservationDatesInUI))]
-        public double[] PsoilValues { get; set; }
+        /// <summary>The expression or per-date list for the sun zenith angle (tts).</summary>
+        [Description("TTS - Sun zenith angle (\u00B0)")]
+        [Tooltip("Sun zenith angle (°, 0–90). Accepts: a single literal (e.g. 30) applied to all dates; a comma-separated list of one value per observation date (e.g. 25, 30, 35); or an APSIM expression evaluated each day. Defaults to 30° if left unchanged.")]
+        public string SunZenithAngle { get; set; } = "30";
 
-        /// <summary>Per-date sun zenith angle values from the UI.</summary>
-        [Description("Per-date Sun Zenith Angle (\u00B0)")]
-        [Tooltip("One value per observation date, or a single value for all dates. If empty, uses the SunZenithAngle expression below or default (30\u00B0).")]
-        [Display(VisibleCallback = nameof(HasObservationDatesInUI))]
-        public double[] SunZenithAngleValues { get; set; }
+        /// <summary>The expression or per-date list for the observer zenith angle (tto).</summary>
+        [Description("TTO - Observer zenith angle (\u00B0)")]
+        [Tooltip("Observer (sensor) zenith angle (°, 0–90). Accepts: a single literal (e.g. 0); a comma-separated list of one value per observation date; or an APSIM expression evaluated each day. Defaults to 0°.")]
+        public string ObserverZenithAngle { get; set; } = "0";
 
-        /// <summary>Per-date observer zenith angle values from the UI.</summary>
-        [Description("Per-date Observer Zenith Angle (\u00B0)")]
-        [Tooltip("One value per observation date, or a single value for all dates. If empty, uses the ObserverZenithAngle expression below or default (0\u00B0).")]
-        [Display(VisibleCallback = nameof(HasObservationDatesInUI))]
-        public double[] ObserverZenithAngleValues { get; set; }
+        /// <summary>The expression or per-date list for the relative azimuth angle (psi).</summary>
+        [Description("PSI - Relative azimuth angle (\u00B0)")]
+        [Tooltip("Relative azimuth angle between sun and observer (°, 0–360). Accepts: a single literal (e.g. 0); a comma-separated list of one value per observation date; or an APSIM expression evaluated each day. Defaults to 0°.")]
+        public string RelativeAzimuthAngle { get; set; } = "0";
 
-        /// <summary>Per-date relative azimuth angle values from the UI.</summary>
-        [Description("Per-date Relative Azimuth Angle (\u00B0)")]
-        [Tooltip("One value per observation date, or a single value for all dates. If empty, uses the RelativeAzimuthAngle expression below or default (0\u00B0).")]
-        [Display(VisibleCallback = nameof(HasObservationDatesInUI))]
-        public double[] RelativeAzimuthAngleValues { get; set; }
-
-        /// <summary>True when no CSV file is specified (show UI arrays).</summary>
-        public bool NoObservationDataFile => string.IsNullOrWhiteSpace(ObservationDataFilePath);
-
-        /// <summary>True when observation dates are in the UI (not CSV) and at least one is set.</summary>
-        public bool HasObservationDatesInUI => NoObservationDataFile
-            && ObservationDates != null && ObservationDates.Length > 0;
+        /// <summary>True when observation dates are specified in the UI and at least one is set.</summary>
+        public bool HasObservationDatesInUI => ObservationDates != null && ObservationDates.Length > 0;
         #endregion
 
-        #region Sun-Observer Geometry (expression fallback)
-        /// <summary>The expression for the sun zenith angle (tts).</summary>
-        [Separator("Sun-Observer Geometry expressions (used when no CSV file or per-date UI array is specified)")]
-        [Description("TTS - Sun zenith angle (\u00B0)")]
-        [Tooltip("Sun zenith angle in degrees (0-90). Can be a literal or APSIM expression. Used as a fallback when neither the CSV file nor the per-date UI array is specified. Default: 30\u00B0 if left empty.")]
-        public string SunZenithAngle { get; set; }
+        #region Soil Reflectance
+        /// <summary>Use BSM (Brightness Soil Model) for soil reflectance instead of wet/dry interpolation.</summary>
+        [Separator("Soil reflectance")]
+        [Description("Use BSM for soil reflectance")]
+        [Tooltip("If enabled, uses the Brightness Soil Model (BSM; Verhoef et al. 2018) to simulate soil reflectance from BsmBrightness, BsmLat, BsmLon, and SMp. If disabled, reflectance is a linear mix of dry and wet spectra weighted by Psoil.")]
+        public bool UseBSM { get; set; } = false;
 
-        /// <summary>The expression for the observer zenith angle (tto).</summary>
-        [Description("TTO - Observer zenith angle (\u00B0)")]
-        [Tooltip("Observer zenith angle in degrees (0-90). Can be a literal or APSIM expression. Used as a fallback when neither the CSV file nor the per-date UI array is specified. Default: 0\u00B0 if left empty.")]
-        public string ObserverZenithAngle { get; set; }
+        /// <summary>Returns true when BSM is NOT selected.</summary>
+        public bool IsNotBSM => !UseBSM;
 
-        /// <summary>The expression for the relative azimuth angle (psi).</summary>
-        [Description("PSI - Relative azimuth angle (\u00B0)")]
-        [Tooltip("Relative azimuth angle between sun and observer in degrees (0-360). Can be a literal or APSIM expression. Used as a fallback when neither the CSV file nor the per-date UI array is specified. Default: 0\u00B0 if left empty.")]
-        public string RelativeAzimuthAngle { get; set; }
+        /// <summary>Path to wet/dry soil reflectance data file.</summary>
+        [Description("Wet/dry soil reflectance file")]
+        [Tooltip("Optional CSV file (columns: Wavelength, Dry_Soil, Wet_Soil) to override the built-in SpecSOIL.json data. Leave empty to use the built-in default.")]
+        [Display(Type = DisplayType.FileName, VisibleCallback = nameof(IsNotBSM))]
+        public string WetDrySoilReflectancePath { get; set; }
+
+        /// <summary>Psoil — dry-to-wet mixing factor, per-date list, or APSIM expression.</summary>
+        [Description("Psoil - Soil water content (0=dry, 1=wet)")]
+        [Tooltip("Dry-to-wet mixing factor (0 = fully wet, 1 = fully dry). Accepts: a single literal (e.g. 0.5) applied to all dates; a comma-separated list of one value per observation date (e.g. 0.3, 0.5, 0.7); or an APSIM expression evaluated each day (e.g. 1 - [Soil].SW[0]). Defaults to 1 \u2212 [Soil].SW[0].")]
+        [Display(VisibleCallback = nameof(IsNotBSM))]
+        public string Psoil { get; set; } = "1 - [Soil].SW[0]";
+
+        /// <summary>BSM soil brightness parameter.</summary>
+        [Description("BsmBrightness - Soil brightness (0-1)")]
+        [Tooltip("Soil brightness scaling factor (0\u20131) for BSM. Scales the magnitude of the dry soil spectrum. Enter a literal (e.g. 0.5) or an APSIM expression.")]
+        [Display(VisibleCallback = nameof(UseBSM))]
+        public string BsmBrightness { get; set; } = "0.5";
+
+        /// <summary>BSM spectral shape latitude.</summary>
+        [Description("BsmLat - Spectral shape latitude (20-40\u00B0)")]
+        [Tooltip("Spectral latitude for BSM (recommended 20\u201340\u00B0). Controls the spectral shape of the dry soil spectrum. Enter a literal or APSIM expression.")]
+        [Display(VisibleCallback = nameof(UseBSM))]
+        public string BsmLat { get; set; } = "25";
+
+        /// <summary>BSM spectral shape longitude.</summary>
+        [Description("BsmLon - Spectral shape longitude (45-65\u00B0)")]
+        [Tooltip("Spectral longitude for BSM (recommended 45\u201365\u00B0). Controls the spectral shape of the dry soil spectrum. Enter a literal or APSIM expression.")]
+        [Display(VisibleCallback = nameof(UseBSM))]
+        public string BsmLon { get; set; } = "45";
+
+        /// <summary>SMp — soil moisture percentage, per-date list, or APSIM expression.</summary>
+        [Description("SMp - Soil moisture percentage (5-55%)")]
+        [Tooltip("Soil moisture volume percentage (5\u201355%) for BSM. Accepts: a single literal (e.g. 25) applied to all dates; a comma-separated list of one value per observation date (e.g. 20, 25, 30); or an APSIM expression evaluated each day (e.g. [Soil].SW[0] * 100). Defaults to [Soil].SW[0] * 100.")]
+        [Display(VisibleCallback = nameof(UseBSM))]
+        public string SMp { get; set; } = "[Soil].SW[0] * 100";
         #endregion
 
         #region Sensor Selection
@@ -335,6 +323,10 @@ namespace Models.PROSAIL
         private static string DefaultSpecAtmDataPath => Path.Combine(
             AppContext.BaseDirectory, "PROSAIL", "InputProperties", "SpectralData", "SpecATM.json");
 
+        // BSM spectral data
+        private static string DefaultBsmDataPath => Path.Combine(
+            AppContext.BaseDirectory, "PROSAIL", "InputProperties", "SpectralData", "BSM_GSV.json");
+
         /// <summary>Path to the SQLite database file (relative to simulation directory)</summary>
         private string ProsailSQLiteDatabasePath;
 
@@ -346,6 +338,9 @@ namespace Models.PROSAIL
 
         /// <summary>The cached wet and dry soil reflectance at simulation start</summary>
         private WetDrySoilReflectance? cachedWetDrySoilReflectance = null;
+
+        /// <summary>The cached BSM spectral data (loaded if UseBSM = true)</summary>
+        private BsmSpectralData? cachedBsmData = null;
 
         /// <summary>Cached PROSAIL results for the current day</summary>
         private CanopyOptics cachedProsailOutputs = null;
@@ -365,13 +360,15 @@ namespace Models.PROSAIL
         /// <summary>Lookup: date -> index in the observation arrays (populated from CSV or UI). Null = daily mode.</summary>
         private Dictionary<DateTime, int> observationDateLookup;
 
-        /// <summary>Resolved per-date Psoil values (from CSV or UI).</summary>
+        /// <summary>Resolved per-date Psoil values.</summary>
         private double[] resolvedPsoilValues;
-        /// <summary>Resolved per-date sun zenith values (from CSV or UI).</summary>
+        /// <summary>Resolved per-date SMp values (BSM path).</summary>
+        private double[] resolvedSmpValues;
+        /// <summary>Resolved per-date sun zenith values (parsed from SunZenithAngle string).</summary>
         private double[] resolvedSunZenithValues;
-        /// <summary>Resolved per-date observer zenith values (from CSV or UI).</summary>
+        /// <summary>Resolved per-date observer zenith values (parsed from ObserverZenithAngle string).</summary>
         private double[] resolvedObserverZenithValues;
-        /// <summary>Resolved per-date relative azimuth values (from CSV or UI).</summary>
+        /// <summary>Resolved per-date relative azimuth values (parsed from RelativeAzimuthAngle string).</summary>
         private double[] resolvedRelativeAzimuthValues;
         #endregion
 
@@ -440,6 +437,24 @@ namespace Models.PROSAIL
                 WriteMessage(LogLevel.Error, $"Failed to evaluate parameter expression '{expression}' on {Clock?.Today:yyyy-MM-dd}: {ex.Message}");
                 throw;
             }
+        }
+
+        /// <summary>
+        /// Tries to parse a string as a comma-separated list of doubles.
+        /// Returns the parsed array if all tokens are valid numbers; otherwise returns null
+        /// (indicating the string should be treated as an APSIM expression).
+        /// A single-number string returns a length-1 array that broadcasts to all dates.
+        /// </summary>
+        private static double[] TryParseCommaDoubles(string s)
+        {
+            if (string.IsNullOrWhiteSpace(s)) return null;
+            var parts = s.Split(',', StringSplitOptions.TrimEntries | StringSplitOptions.RemoveEmptyEntries);
+            if (parts.Length == 0) return null;
+            var result = new double[parts.Length];
+            for (int i = 0; i < parts.Length; i++)
+                if (!double.TryParse(parts[i], System.Globalization.NumberStyles.Float,
+                    System.Globalization.CultureInfo.InvariantCulture, out result[i])) return null;
+            return result;
         }
 
         /// <summary>
@@ -650,25 +665,41 @@ namespace Models.PROSAIL
                 throw;
             }
 
-            // Load wet/dry soil reflectance data (CSV or default JSON)
-            try
+            // Load soil reflectance data
+            if (UseBSM)
             {
-                if (!string.IsNullOrWhiteSpace(WetDrySoilReflectancePath))
+                try
                 {
-                    string resolvedPath = ProsailInputLoader.ResolvePath(WetDrySoilReflectancePath, Simulation.FileName);
-                    cachedWetDrySoilReflectance = ProsailInputLoader.LoadWetDrySoilReflectanceFromCsv(resolvedPath);
-                    WriteMessage(LogLevel.Info, $"ProsailModel: Soil reflectance loaded from {resolvedPath}.");
+                    cachedBsmData = BsmCore.LoadBsmData(DefaultBsmDataPath);
+                    WriteMessage(LogLevel.Info, "ProsailModel: BSM spectral data loaded.");
                 }
-                else
+                catch (Exception ex)
                 {
-                    cachedWetDrySoilReflectance = LoadWetDrySoilReflectanData(DefaultSpecSoilDataPath);
-                    WriteMessage(LogLevel.Info, "ProsailModel: Using default soil reflectance data.");
+                    WriteMessage(LogLevel.Error, $"ProsailModel: Failed to load BSM spectral data: {ex.Message}");
+                    throw;
                 }
             }
-            catch (Exception ex)
+            else
             {
-                WriteMessage(LogLevel.Error, $"ProsailModel: Failed to load wet and dry soil reflectance data: {ex.Message}");
-                throw;
+                try
+                {
+                    if (!string.IsNullOrWhiteSpace(WetDrySoilReflectancePath))
+                    {
+                        string resolvedPath = ProsailInputLoader.ResolvePath(WetDrySoilReflectancePath, Simulation.FileName);
+                        cachedWetDrySoilReflectance = ProsailInputLoader.LoadWetDrySoilReflectanceFromCsv(resolvedPath);
+                        WriteMessage(LogLevel.Info, $"ProsailModel: Soil reflectance loaded from {resolvedPath}.");
+                    }
+                    else
+                    {
+                        cachedWetDrySoilReflectance = LoadWetDrySoilReflectanData(DefaultSpecSoilDataPath);
+                        WriteMessage(LogLevel.Info, "ProsailModel: Using default soil reflectance data.");
+                    }
+                }
+                catch (Exception ex)
+                {
+                    WriteMessage(LogLevel.Error, $"ProsailModel: Failed to load wet and dry soil reflectance data: {ex.Message}");
+                    throw;
+                }
             }
 
             // Parse wavelength range
@@ -689,7 +720,8 @@ namespace Models.PROSAIL
 
             // Subset spectral data to input wavelengths
             cachedLeafOpticalConstants = cachedLeafOpticalConstants.Value.SubsetByWavelengths(inputWavelengths);
-            cachedWetDrySoilReflectance = cachedWetDrySoilReflectance.Value.SubsetByWavelengths(inputWavelengths);
+            if (!UseBSM)
+                cachedWetDrySoilReflectance = cachedWetDrySoilReflectance.Value.SubsetByWavelengths(inputWavelengths);
             cachedAtmosphericSpectralData = cachedAtmosphericSpectralData.SubsetByWavelengths(inputWavelengths);
 
             // Load custom SRF if selected
@@ -703,26 +735,12 @@ namespace Models.PROSAIL
                 WriteMessage(LogLevel.Info, $"ProsailModel: Custom SRF loaded from {resolvedSRFPath}.");
             }
 
-            // Load observation dates and per-date parameters
-            if (!string.IsNullOrWhiteSpace(ObservationDataFilePath))
-            {
-                string resolvedObsPath = ProsailInputLoader.ResolvePath(ObservationDataFilePath, Simulation.FileName);
-                var obsData = ProsailInputLoader.LoadObservationDataFromFile(resolvedObsPath);
-                ObservationDates = obsData.Dates;
-                resolvedPsoilValues = obsData.PsoilValues;
-                resolvedSunZenithValues = obsData.SunZenithAngleValues;
-                resolvedObserverZenithValues = obsData.ObserverZenithAngleValues;
-                resolvedRelativeAzimuthValues = obsData.RelativeAzimuthAngleValues;
-                WriteMessage(LogLevel.Info, $"ProsailModel: Loaded {ObservationDates.Length} observation dates from {ObservationDataFilePath}.");
-            }
-            else
-            {
-                // Use UI arrays directly
-                resolvedPsoilValues = PsoilValues;
-                resolvedSunZenithValues = SunZenithAngleValues;
-                resolvedObserverZenithValues = ObserverZenithAngleValues;
-                resolvedRelativeAzimuthValues = RelativeAzimuthAngleValues;
-            }
+            // Parse string inputs as comma-separated doubles if possible, else treat as APSIM expression each day
+            resolvedPsoilValues = TryParseCommaDoubles(Psoil);
+            resolvedSmpValues = TryParseCommaDoubles(SMp);
+            resolvedSunZenithValues = TryParseCommaDoubles(SunZenithAngle);
+            resolvedObserverZenithValues = TryParseCommaDoubles(ObserverZenithAngle);
+            resolvedRelativeAzimuthValues = TryParseCommaDoubles(RelativeAzimuthAngle);
 
             // Build date lookup and validate
             if (ObservationDates != null && ObservationDates.Length > 0)
@@ -736,6 +754,7 @@ namespace Models.PROSAIL
                     WriteMessage(LogLevel.Warning, $"ProsailModel: ObservationDate {d:yyyy-MM-dd} is outside simulation range.");
 
                 ProsailInputLoader.ValidatePerDateArray(resolvedPsoilValues, "Psoil", ObservationDates.Length);
+                ProsailInputLoader.ValidatePerDateArray(resolvedSmpValues, "SMp", ObservationDates.Length);
                 ProsailInputLoader.ValidatePerDateArray(resolvedSunZenithValues, "SunZenithAngle", ObservationDates.Length);
                 ProsailInputLoader.ValidatePerDateArray(resolvedObserverZenithValues, "ObserverZenithAngle", ObservationDates.Length);
                 ProsailInputLoader.ValidatePerDateArray(resolvedRelativeAzimuthValues, "RelativeAzimuthAngle", ObservationDates.Length);
@@ -780,15 +799,29 @@ namespace Models.PROSAIL
 
             WriteMessage(LogLevel.Info, $"ProsailModel: OnDoEndOfDay called on {Clock.Today:yyyy-MM-dd}.");
 
-            // Resolve Psoil: per-date array > expression > auto-calc from soil water
-            double? psoilResolved = ProsailInputLoader.ResolveObservationParameter(
-                resolvedPsoilValues, Psoil, "Psoil", Clock.Today, observationDateLookup,
-                EvaluateExpression, allowAutoCalc: true, writeMessage: WriteMessage);
-            double psoilValue = psoilResolved ?? waterBalance.SW[0];
-            if (!psoilResolved.HasValue)
-                WriteMessage(LogLevel.Info, "ProsailModel: Psoil auto-calculated from soil water content.");
-
-            SoilReflectance = CalculateSoilReflectanceFromWetDry((WetDrySoilReflectance)cachedWetDrySoilReflectance, psoilValue);
+            // Compute soil reflectance (BSM or wet/dry interpolation)
+            double psoilValue;
+            if (UseBSM)
+            {
+                double bVal = EvaluateExpression(BsmBrightness);
+                double latVal = EvaluateExpression(BsmLat);
+                double lonVal = EvaluateExpression(BsmLon);
+                double smpVal = ProsailInputLoader.ResolveObservationParameter(
+                    resolvedSmpValues, SMp, "SMp", Clock.Today, observationDateLookup,
+                    EvaluateExpression, writeMessage: WriteMessage).Value;
+                SoilReflectance = BsmCore.BSM(bVal, latVal, lonVal, smpVal, cachedBsmData.Value)
+                                         .SubsetByWavelengths(inputWavelengths);
+                psoilValue = smpVal;
+            }
+            else
+            {
+                // Resolve Psoil: per-date array > expression (defaults to "1 - [Soil].SW[0]")
+                double psoilResolved = ProsailInputLoader.ResolveObservationParameter(
+                    resolvedPsoilValues, Psoil, "Psoil", Clock.Today, observationDateLookup,
+                    EvaluateExpression, writeMessage: WriteMessage).Value;
+                psoilValue = psoilResolved;
+                SoilReflectance = CalculateSoilReflectanceFromWetDry((WetDrySoilReflectance)cachedWetDrySoilReflectance, psoilValue);
+            }
 
             // Evaluate PROSPECT/SAIL expression parameters
             CurrentParameterValues.Clear();
