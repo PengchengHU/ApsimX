@@ -297,7 +297,7 @@ namespace Models.PROSAIL.PROSPECT
         /// <param name="Alpha">Incidence angle in degrees</param>
         /// <param name="nr">Refractive index vector</param>
         /// <returns>Transmissivity vector</returns>
-        private static Vector<double> ComputeTav(double Alpha, Vector<double> nr)
+        internal static Vector<double> ComputeTav(double Alpha, Vector<double> nr)
         {
             double rd = Math.PI / 180.0;
             double sa = Math.Sin(Alpha * rd);
