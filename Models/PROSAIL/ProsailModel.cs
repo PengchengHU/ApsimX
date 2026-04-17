@@ -55,17 +55,19 @@ namespace Models.PROSAIL
         /// <summary>The expression for N (Leaf structure parameter)</summary>
         [Separator("Expressions to link APSIM variables and PROSPECT inputs")]
         [Description("N - Leaf structure (unitless)")]
-        [Tooltip("Leaf structure parameter. Can be a literal value or an APSIM expression (e.g., 1.5). Typical range: 1.0-2.6.")]
+        [Tooltip("Leaf structure parameter. Can be a literal value or an APSIM expression" + 
+        "(e.g., IIF([Wheat].Leaf.SpecificAreaCanopy * 10 <= 0.1, 1.6, (0.9 * [Wheat].Leaf.SpecificAreaCanopy * 10 + 0.025) / ([Wheat].Leaf.SpecificAreaCanopy * 10 - 0.1)) )." + 
+        "Typical range: 1.0-2.6.")]
         public string N { get; set; } = "1.5";
 
         /// <summary>The expression for CAB (Chlorophyll a + b content)</summary>
         [Description("CAB - Chlorophyll a+b (\u03BCg/cm\u00B2)")]
-        [Tooltip("Chlorophyll a + b content. Can be a literal value or an APSIM expression (e.g., [Wheat].Leaf.ChlorophyllContent). Typical range: 10-80 \u03BCg/cm\u00B2.")]
+        [Tooltip("Chlorophyll a + b content. Can be a literal value or an APSIM expression (e.g., [Wheat].Leaf.SpecificNitrogen * 26 ). Typical range: 10-80 \u03BCg/cm\u00B2.")]
         public string CAB { get; set; } = "40.0";
 
         /// <summary>The expression for CAR (Carotenoid content)</summary>
         [Description("CAR - Carotenoid (\u03BCg/cm\u00B2)")]
-        [Tooltip("Carotenoid content. Can be a literal or APSIM expression. Typical range: 1-24 \u03BCg/cm\u00B2.")]
+        [Tooltip("Carotenoid content. Can be a literal or APSIM expression (e.g., [Wheat].Leaf.SpecificNitrogen * 26 * 0.216 ). Typical range: 1-24 \u03BCg/cm\u00B2.")]
         public string CAR { get; set; } = "8.0";
 
         /// <summary>The expression for EWT (Equivalent Water Thickness)</summary>
@@ -75,7 +77,7 @@ namespace Models.PROSAIL
 
         /// <summary>The expression for LMA (Leaf Mass per Area)</summary>
         [Description("LMA - Dry matter (g/cm\u00B2)")]
-        [Tooltip("Leaf Mass per Area (CM). Can be a literal or APSIM expression. Typical range: 0.001-0.02 g/cm\u00B2.")]
+        [Tooltip("Leaf Mass per Area (CM). Can be a literal or APSIM expression (e.g., (1 / ([Wheat].Leaf.SpecificAreaCanopy + 0.0001)) * 10^(-4) ). Typical range: 0.001-0.02 g/cm\u00B2.")]
         public string LMA { get; set; } = "0.008";
 
         /// <summary>The expression for BROWN (Brown pigment content)</summary>
@@ -177,17 +179,17 @@ namespace Models.PROSAIL
 
         /// <summary>The expression or per-date list for the sun zenith angle (tts).</summary>
         [Description("TTS - Sun zenith angle (\u00B0)")]
-        [Tooltip("Sun zenith angle (°, 0–90). Accepts: a single literal (e.g. 30) applied to all dates; a comma-separated list of one value per observation date (e.g. 25, 30, 35); or an APSIM expression evaluated each day. Defaults to 30° if left unchanged.")]
-        public string SunZenithAngle { get; set; } = "30";
+        [Tooltip("Sun zenith angle (°, 0-90). Accepts: a single literal (e.g. 30) applied to all dates or a comma-separated list of one value per observation date (e.g. 25, 30, 35). Defaults to 90°.")]
+        public string SunZenithAngle { get; set; } = "90";
 
         /// <summary>The expression or per-date list for the observer zenith angle (tto).</summary>
         [Description("TTO - Observer zenith angle (\u00B0)")]
-        [Tooltip("Observer (sensor) zenith angle (°, 0–90). Accepts: a single literal (e.g. 0); a comma-separated list of one value per observation date; or an APSIM expression evaluated each day. Defaults to 0°.")]
+        [Tooltip("Observer (sensor) zenith angle (°, 0-90). Accepts: a single literal (e.g. 0) or a comma-separated list of one value per observation date (e.g. 0, 30, 60). Defaults to 0°.")]
         public string ObserverZenithAngle { get; set; } = "0";
 
         /// <summary>The expression or per-date list for the relative azimuth angle (psi).</summary>
         [Description("PSI - Relative azimuth angle (\u00B0)")]
-        [Tooltip("Relative azimuth angle between sun and observer (°, 0–360). Accepts: a single literal (e.g. 0); a comma-separated list of one value per observation date; or an APSIM expression evaluated each day. Defaults to 0°.")]
+        [Tooltip("Relative azimuth angle between sun and observer (°, 0-360). Accepts: a single literal (e.g. 0) or a comma-separated list of one value per observation date (e.g. 0, 90, 180). Defaults to 0°.")]
         public string RelativeAzimuthAngle { get; set; } = "0";
 
         /// <summary>True when observation dates are specified in the UI and at least one is set.</summary>
@@ -211,32 +213,32 @@ namespace Models.PROSAIL
         public string WetDrySoilReflectancePath { get; set; }
 
         /// <summary>Psoil — dry-to-wet mixing factor, per-date list, or APSIM expression.</summary>
-        [Description("Psoil - Soil dry-to-wet factor (0=wet, 1=dry)")]
-        [Tooltip("Dry-to-wet mixing factor (0 = fully wet, 1 = fully dry). Accepts: a single literal (e.g. 0.5) applied to all dates; a comma-separated list of one value per observation date (e.g. 0.3, 0.5, 0.7); or an APSIM expression evaluated each day (e.g. 1 - [WaterBalance].SW[1]). Defaults to 1 \u2212 [WaterBalance].SW[1].")]
+        [Description("Psoil - Soil dry-to-wet factor")]
+        [Tooltip("Dry-to-wet mixing factor (0 = fully wet, 1 = fully dry). Accepts: a single literal (e.g., 0.5) applied to all dates; a comma-separated list of one value per observation date (e.g. 0.3, 0.5, 0.7); or an APSIM expression evaluated each day (e.g. 1 - [WaterBalance].SW[1]). Defaults to 1 \u2212 [WaterBalance].SW[1].")]
         [Display(VisibleCallback = nameof(IsNotBSM))]
         public string Psoil { get; set; } = "1 - [WaterBalance].SW[1]";
 
         /// <summary>BSM soil brightness parameter.</summary>
         [Description("BsmBrightness - Soil brightness (0-1)")]
-        [Tooltip("Soil brightness scaling factor (0\u20131) for BSM. Scales the magnitude of the dry soil spectrum. Enter a literal (e.g. 0.5) or an APSIM expression.")]
+        [Tooltip("Soil brightness scaling factor (0\u20131) for BSM. Scales the magnitude of the dry soil spectrum. Enter a literal (e.g., 0.5).")]
         [Display(VisibleCallback = nameof(UseBSM))]
         public string BsmBrightness { get; set; } = "0.5";
 
         /// <summary>BSM spectral shape latitude.</summary>
         [Description("BsmLat - Spectral shape latitude (20-40\u00B0)")]
-        [Tooltip("Spectral latitude for BSM (recommended 20\u201340\u00B0). Controls the spectral shape of the dry soil spectrum. Enter a literal or APSIM expression.")]
+        [Tooltip("Spectral latitude for BSM (recommended 20\u201340\u00B0). Controls the spectral shape of the dry soil spectrum. Enter a literal (e.g., 25).")]
         [Display(VisibleCallback = nameof(UseBSM))]
         public string BsmLat { get; set; } = "25";
 
         /// <summary>BSM spectral shape longitude.</summary>
         [Description("BsmLon - Spectral shape longitude (45-65\u00B0)")]
-        [Tooltip("Spectral longitude for BSM (recommended 45\u201365\u00B0). Controls the spectral shape of the dry soil spectrum. Enter a literal or APSIM expression.")]
+        [Tooltip("Spectral longitude for BSM (recommended 45\u201365\u00B0). Controls the spectral shape of the dry soil spectrum. Enter a literal (e.g., 45) or an APSIM expression.")]
         [Display(VisibleCallback = nameof(UseBSM))]
         public string BsmLon { get; set; } = "45";
 
         /// <summary>SMp — soil moisture percentage, per-date list, or APSIM expression.</summary>
         [Description("SMp - Soil moisture percentage (5-55%)")]
-        [Tooltip("Soil moisture volume percentage (5\u201355%) for BSM. Accepts: a single literal (e.g. 25) applied to all dates; a comma-separated list of one value per observation date (e.g. 20, 25, 30); or an APSIM expression evaluated each day (e.g. [WaterBalance].SW[1] * 100). Defaults to [WaterBalance].SW[1] * 100.")]
+        [Tooltip("Soil moisture volume percentage (5\u201355%) for BSM. Accepts: a single literal (e.g., 25) applied to all dates; a comma-separated list of one value per observation date (e.g. 20, 25, 30); or an APSIM expression evaluated each day (e.g. [WaterBalance].SW[1] * 100). Defaults to [WaterBalance].SW[1] * 100.")]
         [Display(VisibleCallback = nameof(UseBSM))]
         public string SMp { get; set; } = "[WaterBalance].SW[1] * 100";
         #endregion
@@ -284,33 +286,33 @@ namespace Models.PROSAIL
         #region Simulation and Output Control
         /// <summary>Whether to write the Parameters table to the database.</summary>
         [Separator("Simulation and Output Control")]
-        [Description("Save Parameters to database")]
-        [Tooltip("Save daily PROSAIL input parameters (leaf, canopy, soil, geometry, sensor) to the Parameters table.")]
+        [Description("Save input parameters")]
+        [Tooltip("Save daily PROSAIL input parameters (leaf, canopy, soil, geometry, sensor) to the Parameters table of the database.")]
         public bool OutputParameters { get; set; } = true;
 
         /// <summary>Whether to write the CanopyOpticalVariable table to the database.</summary>
-        [Description("Save CanopyOpticalVariable to database")]
-        [Tooltip("Save per-wavelength canopy optical variables (Rdot, Rsot, Rddt, Rsdt, FCover, Abs_dir, Abs_hem, Rsdstar, Rddstar) to the CanopyOpticalVariable table.")]
+        [Description("Save canopy Optical variable")]
+        [Tooltip("Save per-wavelength canopy optical variables (Rdot, Rsot, Rddt, Rsdt, FCover, Abs_dir, Abs_hem, Rsdstar, Rddstar) to the CanopyOpticalVariable table of the database.")]
         public bool OutputCanopyOpticalVariable { get; set; } = true;
 
         /// <summary>Whether to compute and save canopy state variables (fAPAR, fCover, albedo).</summary>
-        [Description("Compute and save CanopyStateVariable to database")]
-        [Tooltip("Compute broadband fAPAR, fCover, and albedo and save them to the CanopyStateVariable table.")]
+        [Description("Compute and save canopy state variable")]
+        [Tooltip("Compute broadband fAPAR, fCover, and albedo and save them to the CanopyStateVariable table of the database.")]
         public bool OutputCanopyStateVariable { get; set; } = true;
 
         /// <summary>Whether to compute and save canopy BRF.</summary>
-        [Description("Compute and save CanopyBRF to database")]
-        [Tooltip("Compute per-wavelength bidirectional reflectance factor (BRF) and save it to the CanopyBRF table.")]
+        [Description("Compute and save canopy bidirectional reflectance factor (BRF)")]
+        [Tooltip("Compute per-wavelength bidirectional reflectance factor (BRF) and save it to the CanopyBRF table of the database.")]
         public bool OutputCanopyBRF { get; set; } = true;
 
         /// <summary>Whether to compute and save reflectance resampled to a sensor.</summary>
-        [Description("Compute and save ReflectanceResampledToSensor to database")]
-        [Tooltip("Resample BRF to sensor bands and save to the ReflectanceResampledToSensor table. Requires selecting a sensor type below.")]
+        [Description("Compute and save reflectance resampled to sensor")]
+        [Tooltip("Resample BRF to sensor bands and save to the ReflectanceResampledToSensor table of the database. Requires selecting a sensor type below.")]
         public bool OutputReflectanceResampledToSensor { get; set; } = true;
 
         /// <summary>Sensor type used for spectral resampling. Visible only when ReflectanceResampledToSensor output is enabled.</summary>
-        [Description("Sensor type")]
-        [Tooltip("Select a built-in sensor to use its spectral response function (SRF), or Custom to provide your own SRF CSV file.")]
+        [Description("Sensor for spectral resampling")]
+        [Tooltip("Select a built-in sensor to use its spectral response function (SRF), or custom to provide a SRF CSV file.")]
         [Display(VisibleCallback = nameof(OutputReflectanceResampledToSensor))]
         public SensorTypes SensorType
         {
@@ -325,7 +327,7 @@ namespace Models.PROSAIL
 
         /// <summary>Path to a custom SRF CSV file (used when SensorType is Custom).</summary>
         [Description("Custom SRF CSV file")]
-        [Tooltip("CSV file: first column = wavelength (nm), remaining columns = band SRF values. Column headers are used as band names.")]
+        [Tooltip("CSV file: first column is wavelength (nm), remaining columns are band SRF values. Column headers are used as band names.")]
         [Display(Type = DisplayType.FileName, VisibleCallback = nameof(IsCustomSensorAndOutputResampled))]
         public string CustomSRFPath { get; set; }
 
@@ -866,7 +868,7 @@ namespace Models.PROSAIL
             // Resolve geometry: per-date array > expression > hardcoded defaults
             CurrentParameterValues["SunZenithAngle"] = ProsailInputLoader.ResolveObservationParameter(
                 resolvedSunZenithValues, SunZenithAngle, "SunZenithAngle", Clock.Today, observationDateLookup,
-                EvaluateExpression, defaultValue: 30.0, writeMessage: WriteMessage);
+                EvaluateExpression, defaultValue: 90.0, writeMessage: WriteMessage);
             CurrentParameterValues["ObserverZenithAngle"] = ProsailInputLoader.ResolveObservationParameter(
                 resolvedObserverZenithValues, ObserverZenithAngle, "ObserverZenithAngle", Clock.Today, observationDateLookup,
                 EvaluateExpression, defaultValue: 0.0, writeMessage: WriteMessage);
