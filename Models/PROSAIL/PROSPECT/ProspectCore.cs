@@ -1,7 +1,6 @@
 ﻿using System;
 using System.Linq;
 using System.IO;
-using MathNet.Numerics;
 using MathNet.Numerics.LinearAlgebra;
 using Newtonsoft.Json;
 using APSIM.Shared.Utilities;
@@ -273,18 +272,61 @@ namespace Models.PROSAIL.PROSPECT
         }
 
         /// <summary>
+        /// Numerically stable exponential integral E₁(x) for x > 0.
+        /// Uses series expansion for small x and asymptotic expansion for large x,
+        /// avoiding the continued-fraction convergence failures in MathNet for x near 1.
+        /// </summary>
+        private static double E1(double x)
+        {
+            if (x <= 0) return double.PositiveInfinity;
+            const double euler = 0.5772156649015328606;
+            if (x <= 1.0)
+            {
+                // Series: E₁(x) = -γ - ln(x) - Σ_{n=1}^∞ (-x)^n / (n·n!)
+                double sum = 0.0;
+                double term = -x;
+                for (int n = 1; n <= 50; n++)
+                {
+                    sum += term / n;
+                    term *= -x / (n + 1);
+                    if (Math.Abs(term / n) < 1e-15 * Math.Abs(sum + 1)) break;
+                }
+                return -euler - Math.Log(x) - sum;
+            }
+            else
+            {
+                // Asymptotic continued-fraction (Abramowitz & Stegun 5.1.22), stable for x > 1
+                // E₁(x) = exp(-x)/x * cf  where cf = 1/(1+1/(x+1/(1+2/(x+...))))
+                // Implemented via modified Lentz method
+                const int maxIter = 100;
+                const double eps = 1e-15;
+                double b = x + 1.0, c = 1.0 / double.Epsilon, d = 1.0 / b;
+                double h = d;
+                for (int n = 1; n <= maxIter; n++)
+                {
+                    double a = -n;
+                    b += 2.0;
+                    d = 1.0 / (b + a * d); c = b + a / c;
+                    double delta = c * d; h *= delta;
+                    if (Math.Abs(delta - 1.0) < eps) break;
+                }
+                return Math.Exp(-x) * h;
+            }
+        }
+
+        /// <summary>
         /// Computes the reflectance and transmittance of one layer (tau).
         /// </summary>
         /// <param name="k">Absorption coefficient vector (Kall).</param>
         /// <returns>Transmittance vector (tau) for each wavelength.</returns>
         private static Vector<double> ComputeTau(Vector<double> k)
         {
-             return k.Map(k_i =>
+            return k.Map(k_i =>
             {
                 if (k_i <= 0) return 1.0;
                 // tau = (1 - k) * exp(-k) + k² * E₁(k)
                 double expTerm = (1 - k_i) * Math.Exp(-k_i);
-                double eiTerm  = k_i * k_i * SpecialFunctions.ExponentialIntegral(k_i, 1);
+                double eiTerm  = k_i * k_i * E1(k_i);
                 double tau = expTerm + eiTerm;
                 return Math.Max(0, Math.Min(1, tau));
             });
