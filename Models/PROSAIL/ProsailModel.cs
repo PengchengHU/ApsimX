@@ -212,9 +212,9 @@ namespace Models.PROSAIL
 
         /// <summary>Psoil — dry-to-wet mixing factor, per-date list, or APSIM expression.</summary>
         [Description("Psoil - Soil dry-to-wet factor (0=wet, 1=dry)")]
-        [Tooltip("Dry-to-wet mixing factor (0 = fully wet, 1 = fully dry). Accepts: a single literal (e.g. 0.5) applied to all dates; a comma-separated list of one value per observation date (e.g. 0.3, 0.5, 0.7); or an APSIM expression evaluated each day (e.g. 1 - [Soil].SW[0]). Defaults to 1 \u2212 [Soil].SW[0].")]
+        [Tooltip("Dry-to-wet mixing factor (0 = fully wet, 1 = fully dry). Accepts: a single literal (e.g. 0.5) applied to all dates; a comma-separated list of one value per observation date (e.g. 0.3, 0.5, 0.7); or an APSIM expression evaluated each day (e.g. 1 - [WaterBalance].SW[1]). Defaults to 1 \u2212 [WaterBalance].SW[1].")]
         [Display(VisibleCallback = nameof(IsNotBSM))]
-        public string Psoil { get; set; } = "1 - [Soil].SW[0]";
+        public string Psoil { get; set; } = "1 - [WaterBalance].SW[1]";
 
         /// <summary>BSM soil brightness parameter.</summary>
         [Description("BsmBrightness - Soil brightness (0-1)")]
@@ -236,9 +236,9 @@ namespace Models.PROSAIL
 
         /// <summary>SMp — soil moisture percentage, per-date list, or APSIM expression.</summary>
         [Description("SMp - Soil moisture percentage (5-55%)")]
-        [Tooltip("Soil moisture volume percentage (5\u201355%) for BSM. Accepts: a single literal (e.g. 25) applied to all dates; a comma-separated list of one value per observation date (e.g. 20, 25, 30); or an APSIM expression evaluated each day (e.g. [Soil].SW[0] * 100). Defaults to [Soil].SW[0] * 100.")]
+        [Tooltip("Soil moisture volume percentage (5\u201355%) for BSM. Accepts: a single literal (e.g. 25) applied to all dates; a comma-separated list of one value per observation date (e.g. 20, 25, 30); or an APSIM expression evaluated each day (e.g. [WaterBalance].SW[1] * 100). Defaults to [WaterBalance].SW[1] * 100.")]
         [Display(VisibleCallback = nameof(UseBSM))]
-        public string SMp { get; set; } = "[Soil].SW[0] * 100";
+        public string SMp { get; set; } = "[WaterBalance].SW[1] * 100";
         #endregion
 
         /// <summary>Holds the loaded spectral response function for the selected sensor.</summary>
@@ -851,7 +851,7 @@ namespace Models.PROSAIL
             }
             else
             {
-                // Resolve Psoil: per-date array > expression (defaults to "1 - [Soil].SW[0]")
+                // Resolve Psoil: per-date array > expression (defaults to "1 - [WaterBalance].SW[1]")
                 double psoilResolved = ProsailInputLoader.ResolveObservationParameter(
                     resolvedPsoilValues, Psoil, "Psoil", Clock.Today, observationDateLookup,
                     EvaluateExpression, writeMessage: WriteMessage).Value;
