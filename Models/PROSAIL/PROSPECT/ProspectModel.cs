@@ -228,6 +228,7 @@ namespace Models.PROSAIL.PROSPECT
             catch (Exception ex)
             {
                 WriteMessage(LogLevel.Error, $"ProspectModel: Error in OnDoEndOfDay: {ex.Message}");
+                throw;
             }
         }
 

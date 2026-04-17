@@ -153,7 +153,7 @@ namespace Models.PROSAIL
             catch (Exception ex)
             {
                 writeMessage(LogLevel.Error, $"Failed to initialize PROSAIL database: {ex.Message}");
-                return null;
+                throw;
             }
         }
 

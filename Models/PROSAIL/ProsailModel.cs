@@ -958,6 +958,7 @@ namespace Models.PROSAIL
             catch (Exception ex)
             {
                 WriteMessage(LogLevel.Error, $"ProsailModel: Error in OnDoEndOfDay: {ex.Message}");
+                throw;
             }
         }
 
