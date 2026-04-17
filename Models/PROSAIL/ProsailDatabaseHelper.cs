@@ -28,16 +28,24 @@ namespace Models.PROSAIL
         }
 
         /// <summary>
-        /// Initializes the SQLite database: creates tables for PROSAIL results and inserts the simulation record.
+        /// Initializes the SQLite database: creates tables for selected PROSAIL outputs.
         /// </summary>
         /// <param name="dbPath">Full path to the database file.</param>
         /// <param name="simulationName">Sanitized simulation name (single quotes escaped).</param>
         /// <param name="startDate">Simulation start date.</param>
         /// <param name="endDate">Simulation end date.</param>
+        /// <param name="outputParameters">Whether to create the Parameters table.</param>
+        /// <param name="outputCanopyOpticalVariable">Whether to create the CanopyOpticalVariable table.</param>
+        /// <param name="outputCanopyStateVariable">Whether to create the CanopyStateVariable table.</param>
+        /// <param name="outputCanopyBRF">Whether to create the CanopyBRF table.</param>
+        /// <param name="outputReflectanceResampledToSensor">Whether to create the ReflectanceResampledToSensor table.</param>
         /// <param name="writeMessage">Logging callback.</param>
         /// <returns>An open SQLite connection, or null if initialization fails.</returns>
         public static SQLite InitializeDatabase(string dbPath, string simulationName,
-            DateTime startDate, DateTime endDate, Action<LogLevel, string> writeMessage)
+            DateTime startDate, DateTime endDate,
+            bool outputParameters, bool outputCanopyOpticalVariable, bool outputCanopyStateVariable,
+            bool outputCanopyBRF, bool outputReflectanceResampledToSensor,
+            Action<LogLevel, string> writeMessage)
         {
             try
             {
@@ -48,110 +56,96 @@ namespace Models.PROSAIL
                 var db = new SQLite();
                 db.OpenDatabase(dbPath, false);
 
-                // Clear existing tables
-                db.ExecuteNonQuery("DROP TABLE IF EXISTS CanopyOpticalVariable;");
-                db.ExecuteNonQuery("DROP TABLE IF EXISTS CanopyStateVariable;");
-                db.ExecuteNonQuery("DROP TABLE IF EXISTS CanopyBRF;");
-                db.ExecuteNonQuery("DROP TABLE IF EXISTS resampledReflectance;");
-                db.ExecuteNonQuery("DROP TABLE IF EXISTS Parameters;");
-                db.ExecuteNonQuery("DROP TABLE IF EXISTS Simulations;");
+                // Drop existing tables (dependents first)
+                if (outputCanopyOpticalVariable) db.ExecuteNonQuery("DROP TABLE IF EXISTS CanopyOpticalVariable;");
+                if (outputCanopyStateVariable)   db.ExecuteNonQuery("DROP TABLE IF EXISTS CanopyStateVariable;");
+                if (outputCanopyBRF)             db.ExecuteNonQuery("DROP TABLE IF EXISTS CanopyBRF;");
+                if (outputReflectanceResampledToSensor) db.ExecuteNonQuery("DROP TABLE IF EXISTS ReflectanceResampledToSensor;");
+                if (outputParameters)            db.ExecuteNonQuery("DROP TABLE IF EXISTS Parameters;");
 
-                db.ExecuteNonQuery(@"
-                    CREATE TABLE IF NOT EXISTS Simulations (
-                        SimulationName TEXT PRIMARY KEY,
-                        StartDate TEXT,
-                        EndDate TEXT,
-                        CreatedAt TEXT
-                    )");
+                if (outputParameters)
+                    db.ExecuteNonQuery(@"
+                        CREATE TABLE IF NOT EXISTS Parameters (
+                            SimulationName TEXT,
+                            Date TEXT,
+                            N REAL,
+                            CAB REAL,
+                            CAR REAL,
+                            EWT REAL,
+                            LMA REAL,
+                            ANT REAL,
+                            BROWN REAL,
+                            PROT REAL,
+                            CBC REAL,
+                            Alpha REAL,
+                            LAI REAL,
+                            HotSpot REAL,
+                            TypeLidf REAL,
+                            LIDFa REAL,
+                            LIDFb REAL,
+                            FractionBrown REAL,
+                            Dissociation REAL,
+                            CrownCover REAL,
+                            TreeShape REAL,
+                            WetDrySoilReflectancePath TEXT,
+                            Psoil REAL,
+                            SunZenithAngle REAL,
+                            ObserverZenithAngle REAL,
+                            RelativeAzimuthAngle REAL,
+                            SailVersion TEXT,
+                            SensorType TEXT,
+                            PRIMARY KEY (SimulationName, Date)
+                        )");
 
-                db.ExecuteNonQuery(@"
-                    CREATE TABLE IF NOT EXISTS Parameters (
-                        SimulationName TEXT,
-                        Date TEXT,
-                        N REAL,
-                        CAB REAL,
-                        CAR REAL,
-                        EWT REAL,
-                        LMA REAL,
-                        ANT REAL,
-                        BROWN REAL,
-                        PROT REAL,
-                        CBC REAL,
-                        Alpha REAL,
-                        LAI REAL,
-                        HotSpot REAL,
-                        TypeLidf REAL,
-                        LIDFa REAL,
-                        LIDFb REAL,
-                        FractionBrown REAL,
-                        Dissociation REAL,
-                        CrownCover REAL,
-                        TreeShape REAL,
-                        WetDrySoilReflectancePath TEXT,
-                        Psoil REAL,
-                        SunZenithAngle REAL,
-                        ObserverZenithAngle REAL,
-                        RelativeAzimuthAngle REAL,
-                        SailVersion TEXT,
-                        SensorType TEXT,
-                        PRIMARY KEY (SimulationName, Date),
-                        FOREIGN KEY (SimulationName) REFERENCES Simulations(SimulationName)
-                    )");
+                if (outputCanopyOpticalVariable)
+                    db.ExecuteNonQuery(@"
+                        CREATE TABLE IF NOT EXISTS CanopyOpticalVariable (
+                            SimulationName TEXT,
+                            Date TEXT,
+                            Wavelength REAL,
+                            Rdot REAL,
+                            Rsot REAL,
+                            Rddt REAL,
+                            Rsdt REAL,
+                            FCover REAL,
+                            Abs_dir REAL,
+                            Abs_hem REAL,
+                            Rsdstar REAL,
+                            Rddstar REAL,
+                            PRIMARY KEY (SimulationName, Date, Wavelength)
+                        )");
 
-                db.ExecuteNonQuery(@"
-                    CREATE TABLE IF NOT EXISTS CanopyOpticalVariable (
-                        SimulationName TEXT,
-                        Date TEXT,
-                        Wavelength REAL,
-                        Rdot REAL,
-                        Rsot REAL,
-                        Rddt REAL,
-                        Rsdt REAL,
-                        FCover REAL,
-                        Abs_dir REAL,
-                        Abs_hem REAL,
-                        Rsdstar REAL,
-                        Rddstar REAL,
-                        PRIMARY KEY (SimulationName, Date, Wavelength),
-                        FOREIGN KEY (SimulationName, Date) REFERENCES Parameters(SimulationName, Date)
-                    )");
+                if (outputCanopyStateVariable)
+                    db.ExecuteNonQuery(@"
+                        CREATE TABLE IF NOT EXISTS CanopyStateVariable (
+                            SimulationName TEXT,
+                            Date TEXT,
+                            fAPAR REAL,
+                            fCover REAL,
+                            albedo REAL,
+                            PRIMARY KEY (SimulationName, Date)
+                        )");
 
-                db.ExecuteNonQuery(@"
-                    CREATE TABLE IF NOT EXISTS CanopyStateVariable (
-                        SimulationName TEXT,
-                        Date TEXT,
-                        fAPAR REAL,
-                        fCover REAL,
-                        albedo REAL,
-                        PRIMARY KEY (SimulationName, Date),
-                        FOREIGN KEY (SimulationName, Date) REFERENCES Parameters(SimulationName, Date)
-                    )");
+                if (outputCanopyBRF)
+                    db.ExecuteNonQuery(@"
+                        CREATE TABLE IF NOT EXISTS CanopyBRF (
+                            SimulationName TEXT,
+                            Date TEXT,
+                            Wavelength REAL,
+                            BRF REAL,
+                            PRIMARY KEY (SimulationName, Date, Wavelength)
+                        )");
 
-                db.ExecuteNonQuery(@"
-                    CREATE TABLE IF NOT EXISTS CanopyBRF (
-                        SimulationName TEXT,
-                        Date TEXT,
-                        Wavelength REAL,
-                        BRF REAL,
-                        PRIMARY KEY (SimulationName, Date, Wavelength),
-                        FOREIGN KEY (SimulationName, Date) REFERENCES Parameters(SimulationName, Date)
-                    )");
-
-                db.ExecuteNonQuery(@"
-                    CREATE TABLE IF NOT EXISTS ReflectanceResampledToSensor (
-                        SimulationName TEXT,
-                        Date TEXT,
-                        Wavelength REAL,
-                        BandName TEXT,
-                        Reflectance REAL,
-                        PRIMARY KEY (SimulationName, Date, Wavelength),
-                        FOREIGN KEY (SimulationName, Date) REFERENCES Parameters(SimulationName, Date)
-                    )");
-
-                string sql = $@"
-                    INSERT INTO Simulations (SimulationName, StartDate, EndDate, CreatedAt)
-                    VALUES ('{simulationName}', '{startDate:yyyy-MM-dd}', '{endDate:yyyy-MM-dd}', '{DateTime.Now:yyyy-MM-dd HH:mm:ss}')";
-                db.ExecuteNonQuery(sql);
+                if (outputReflectanceResampledToSensor)
+                    db.ExecuteNonQuery(@"
+                        CREATE TABLE IF NOT EXISTS ReflectanceResampledToSensor (
+                            SimulationName TEXT,
+                            Date TEXT,
+                            Wavelength REAL,
+                            BandName TEXT,
+                            Reflectance REAL,
+                            PRIMARY KEY (SimulationName, Date, Wavelength)
+                        )");
 
                 writeMessage(LogLevel.Info, $"PROSAIL database initialized: {dbPath}");
                 return db;
@@ -177,50 +171,25 @@ namespace Models.PROSAIL
         /// <param name="canopyStateVariables">Canopy state variable results.</param>
         /// <param name="canopyBRF">Canopy BRF results.</param>
         /// <param name="spectralResamplingResult">Resampled reflectance results (may be null).</param>
+        /// <param name="outputParameters">Whether to write the Parameters table.</param>
+        /// <param name="outputCanopyOpticalVariable">Whether to write the CanopyOpticalVariable table.</param>
+        /// <param name="outputCanopyStateVariable">Whether to write the CanopyStateVariable table.</param>
+        /// <param name="outputCanopyBRF">Whether to write the CanopyBRF table.</param>
+        /// <param name="outputReflectanceResampledToSensor">Whether to write the ReflectanceResampledToSensor table.</param>
         /// <param name="writeMessage">Logging callback.</param>
         public static void WriteToDatabase(SQLite db, string simulationName, DateTime date,
             Dictionary<string, object> parameterValues,
             string wetDrySoilReflectancePath, string sailVersionString, string sensorTypeString,
             CanopyOptics canopyOptics, CanopyStateVariables canopyStateVariables,
             CanopyBRF canopyBRF, SpectralResamplingResult spectralResamplingResult,
+            bool outputParameters, bool outputCanopyOpticalVariable, bool outputCanopyStateVariable,
+            bool outputCanopyBRF, bool outputReflectanceResampledToSensor,
             Action<LogLevel, string> writeMessage)
         {
-            if (db == null || canopyOptics?.Wavelength == null)
+            if (db == null)
             {
-                writeMessage(LogLevel.Error, "ProsailModel: WriteToDatabase skipped due to null dbConnection or canopy properties.");
-                throw new InvalidOperationException("ProsailModel: WriteToDatabase skipped due to null dbConnection or canopy properties.");
-            }
-
-            double[] Rdot = canopyOptics.Rdot;
-            double[] Rsot = canopyOptics.Rsot;
-            double[] Rddt = canopyOptics.Rddt;
-            double[] Rsdt = canopyOptics.Rsdt;
-            double[] FCover = canopyOptics.FCover;
-            double[] Abs_dir = canopyOptics.Abs_dir;
-            double[] Abs_hem = canopyOptics.Abs_hem;
-            double[] Rsdstar = canopyOptics.Rsdstar;
-            double[] Rddstar = canopyOptics.Rddstar;
-            double[] usedWavelength = canopyOptics.Wavelength;
-
-            if (Rdot == null || Rsot == null || Rddt == null || Rsdt == null ||
-                FCover == null || Abs_dir == null || Abs_hem == null || Rsdstar == null || Rddstar == null)
-            {
-                writeMessage(LogLevel.Error, "ProsailModel: WriteToDatabase skipped due to one or more null canopy radiative property arrays.");
-                throw new InvalidOperationException("ProsailModel: WriteToDatabase skipped due to one or more null canopy radiative property arrays.");
-            }
-
-            if (Rdot.Length != usedWavelength.Length ||
-                Rsot.Length != usedWavelength.Length ||
-                Rddt.Length != usedWavelength.Length ||
-                Rsdt.Length != usedWavelength.Length ||
-                FCover.Length != usedWavelength.Length ||
-                Abs_dir.Length != usedWavelength.Length ||
-                Abs_hem.Length != usedWavelength.Length ||
-                Rsdstar.Length != usedWavelength.Length ||
-                Rddstar.Length != usedWavelength.Length)
-            {
-                writeMessage(LogLevel.Error, "ProsailModel: Array length mismatch in WriteToDatabase");
-                throw new InvalidOperationException("ProsailModel: Array length mismatch in WriteToDatabase.");
+                writeMessage(LogLevel.Error, "ProsailModel: WriteToDatabase skipped: null dbConnection.");
+                throw new InvalidOperationException("ProsailModel: WriteToDatabase: null dbConnection.");
             }
 
             try
@@ -229,7 +198,9 @@ namespace Models.PROSAIL
                 string dateStr = date.ToString("yyyy-MM-dd");
 
                 // Parameters INSERT
-                string paramSql = $@"
+                if (outputParameters)
+                {
+                    string paramSql = $@"
             INSERT OR REPLACE INTO Parameters (
                 SimulationName, Date, N, CAB, CAR, EWT, LMA, ANT, BROWN, PROT, CBC, Alpha,
                 LAI, HotSpot, TypeLidf, LIDFa, LIDFb, FractionBrown, Dissociation, CrownCover, TreeShape,
@@ -247,36 +218,54 @@ namespace Models.PROSAIL
                 {parameterValues["SunZenithAngle"]}, {parameterValues["ObserverZenithAngle"]},
                 {parameterValues["RelativeAzimuthAngle"]}, '{sailVersionString}', '{sensorTypeString}'
             )";
-                db.ExecuteNonQuery(paramSql);
+                    db.ExecuteNonQuery(paramSql);
+                }
 
                 // CanopyOpticalVariable INSERT
-                StringBuilder spectraSql = new StringBuilder("INSERT OR REPLACE INTO CanopyOpticalVariable (SimulationName, Date, Wavelength, Rdot, Rsot, Rddt, Rsdt, fCover, Abs_dir, Abs_hem, Rsdstar, Rddstar) VALUES ");
-                bool firstSpectra = true;
-                for (int i = 0; i < usedWavelength.Length; i++)
+                if (outputCanopyOpticalVariable && canopyOptics?.Wavelength != null)
                 {
-                    if (!firstSpectra) spectraSql.Append(",");
-                    spectraSql.Append($"('{simulationName}', '{dateStr}', {usedWavelength[i]}, {Rdot[i]}, {Rsot[i]}, {Rddt[i]}, {Rsdt[i]}, {FCover[i]}," +
-                        $"{Abs_dir[i]}, {Abs_hem[i]}, {Rsdstar[i]}, {Rddstar[i]})");
-                    firstSpectra = false;
-                }
-                if (!firstSpectra)
-                {
-                    spectraSql.Append(";");
-                    writeMessage(LogLevel.Debug, "ProsailModel: Executing CanopyOpticalVariable INSERT.");
-                    db.ExecuteNonQuery(spectraSql.ToString());
+                    double[] Rdot = canopyOptics.Rdot;
+                    double[] Rsot = canopyOptics.Rsot;
+                    double[] Rddt = canopyOptics.Rddt;
+                    double[] Rsdt = canopyOptics.Rsdt;
+                    double[] FCover = canopyOptics.FCover;
+                    double[] Abs_dir = canopyOptics.Abs_dir;
+                    double[] Abs_hem = canopyOptics.Abs_hem;
+                    double[] Rsdstar = canopyOptics.Rsdstar;
+                    double[] Rddstar = canopyOptics.Rddstar;
+                    double[] usedWavelength = canopyOptics.Wavelength;
+
+                    StringBuilder spectraSql = new StringBuilder("INSERT OR REPLACE INTO CanopyOpticalVariable (SimulationName, Date, Wavelength, Rdot, Rsot, Rddt, Rsdt, fCover, Abs_dir, Abs_hem, Rsdstar, Rddstar) VALUES ");
+                    bool firstSpectra = true;
+                    for (int i = 0; i < usedWavelength.Length; i++)
+                    {
+                        if (!firstSpectra) spectraSql.Append(",");
+                        spectraSql.Append($"('{simulationName}', '{dateStr}', {usedWavelength[i]}, {Rdot[i]}, {Rsot[i]}, {Rddt[i]}, {Rsdt[i]}, {FCover[i]}," +
+                            $"{Abs_dir[i]}, {Abs_hem[i]}, {Rsdstar[i]}, {Rddstar[i]})");
+                        firstSpectra = false;
+                    }
+                    if (!firstSpectra)
+                    {
+                        spectraSql.Append(";");
+                        writeMessage(LogLevel.Debug, "ProsailModel: Executing CanopyOpticalVariable INSERT.");
+                        db.ExecuteNonQuery(spectraSql.ToString());
+                    }
                 }
 
                 // CanopyStateVariable INSERT
-                string stateSql = $@"
+                if (outputCanopyStateVariable)
+                {
+                    string stateSql = $@"
             INSERT OR REPLACE INTO CanopyStateVariable (
                 SimulationName, Date, fAPAR, fCover, albedo
             ) VALUES (
                 '{simulationName}', '{dateStr}', {canopyStateVariables.fAPAR}, {canopyStateVariables.fcover}, {canopyStateVariables.albedo}
             )";
-                db.ExecuteNonQuery(stateSql);
+                    db.ExecuteNonQuery(stateSql);
+                }
 
                 // ReflectanceResampledToSensor INSERT
-                if (spectralResamplingResult != null && spectralResamplingResult.Reflectance != null)
+                if (outputReflectanceResampledToSensor && spectralResamplingResult?.Reflectance != null)
                 {
                     try
                     {
@@ -316,7 +305,7 @@ namespace Models.PROSAIL
                 }
 
                 // CanopyBRF INSERT
-                if (canopyBRF.Wavelength != null && canopyBRF.BRF != null)
+                if (outputCanopyBRF && canopyBRF.Wavelength != null && canopyBRF.BRF != null)
                 {
                     StringBuilder brfSql = new StringBuilder("INSERT OR REPLACE INTO CanopyBRF (SimulationName, Date, Wavelength, BRF) VALUES ");
                     bool firstBRF = true;

@@ -12,6 +12,8 @@ namespace Models.PROSAIL
     /// <summary>Enum for supported sensors.</summary>
     public enum SensorTypes
     {
+        /// <summary>No sensor selected (must be set before running)</summary>
+        None,
         /// <summary>Landsat_7</summary>
         Landsat_7,
         /// <summary>Landsat_8</summary>

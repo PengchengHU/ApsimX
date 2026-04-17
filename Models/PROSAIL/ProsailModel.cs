@@ -211,7 +211,7 @@ namespace Models.PROSAIL
         public string WetDrySoilReflectancePath { get; set; }
 
         /// <summary>Psoil — dry-to-wet mixing factor, per-date list, or APSIM expression.</summary>
-        [Description("Psoil - Soil water content (0=dry, 1=wet)")]
+        [Description("Psoil - Soil dry-to-wet factor (0=wet, 1=dry)")]
         [Tooltip("Dry-to-wet mixing factor (0 = fully wet, 1 = fully dry). Accepts: a single literal (e.g. 0.5) applied to all dates; a comma-separated list of one value per observation date (e.g. 0.3, 0.5, 0.7); or an APSIM expression evaluated each day (e.g. 1 - [Soil].SW[0]). Defaults to 1 \u2212 [Soil].SW[0].")]
         [Display(VisibleCallback = nameof(IsNotBSM))]
         public string Psoil { get; set; } = "1 - [Soil].SW[0]";
@@ -241,33 +241,8 @@ namespace Models.PROSAIL
         public string SMp { get; set; } = "[Soil].SW[0] * 100";
         #endregion
 
-        #region Sensor Selection
-        /// <summary>List of available sensors for the drop-down.</summary>
-        [Separator("Sensor selection")]
-        [Description("Sensor type")]
-        [Tooltip("Select a built-in sensor to use its spectral response function (SRF), or Custom to provide your own SRF CSV file.")]
-        public SensorTypes SensorType
-        {
-            get => sensorType;
-            set
-            {
-                sensorType = value;
-                SetSensorSRF();
-            }
-        }
-        private SensorTypes sensorType;
-
         /// <summary>Holds the loaded spectral response function for the selected sensor.</summary>
         public SpectralResponseFunction SensorSRF { get; private set; }
-
-        /// <summary>Path to a custom SRF CSV file (used when SensorType is Custom).</summary>
-        [Description("Custom SRF CSV file")]
-        [Tooltip("CSV file: first column = wavelength (nm), remaining columns = band SRF values. Column headers are used as band names.")]
-        [Display(Type = DisplayType.FileName, VisibleCallback = nameof(IsCustomSensor))]
-        public string CustomSRFPath { get; set; }
-
-        /// <summary>Whether the user selected Custom sensor type.</summary>
-        public bool IsCustomSensor => SensorType == SensorTypes.Custom;
 
         /// <summary>Mapping from sensor enum to local SRF file path.</summary>
         private readonly Dictionary<SensorTypes, string> sensorFileMap = new()
@@ -289,9 +264,9 @@ namespace Models.PROSAIL
         /// <summary>Loads the SRF for the currently selected sensor.</summary>
         private void SetSensorSRF()
         {
-            if (SensorType == SensorTypes.Custom)
+            if (SensorType == SensorTypes.None || SensorType == SensorTypes.Custom)
             {
-                SensorSRF = null; // Loaded in OnCommencing
+                SensorSRF = null; // None: not set; Custom: loaded in OnCommencing
                 return;
             }
             if (sensorFileMap.TryGetValue(SensorType, out var filePath))
@@ -305,9 +280,61 @@ namespace Models.PROSAIL
                 throw new ArgumentException($"Unknown sensor: {SensorType}");
             }
         }
-        #endregion
 
-        #region Logging
+        #region Simulation and Output Control
+        /// <summary>Whether to write the Parameters table to the database.</summary>
+        [Separator("Simulation and Output Control")]
+        [Description("Save Parameters to database")]
+        [Tooltip("Save daily PROSAIL input parameters (leaf, canopy, soil, geometry, sensor) to the Parameters table.")]
+        public bool OutputParameters { get; set; } = true;
+
+        /// <summary>Whether to write the CanopyOpticalVariable table to the database.</summary>
+        [Description("Save CanopyOpticalVariable to database")]
+        [Tooltip("Save per-wavelength canopy optical variables (Rdot, Rsot, Rddt, Rsdt, FCover, Abs_dir, Abs_hem, Rsdstar, Rddstar) to the CanopyOpticalVariable table.")]
+        public bool OutputCanopyOpticalVariable { get; set; } = true;
+
+        /// <summary>Whether to compute and save canopy state variables (fAPAR, fCover, albedo).</summary>
+        [Description("Compute and save CanopyStateVariable to database")]
+        [Tooltip("Compute broadband fAPAR, fCover, and albedo and save them to the CanopyStateVariable table.")]
+        public bool OutputCanopyStateVariable { get; set; } = true;
+
+        /// <summary>Whether to compute and save canopy BRF.</summary>
+        [Description("Compute and save CanopyBRF to database")]
+        [Tooltip("Compute per-wavelength bidirectional reflectance factor (BRF) and save it to the CanopyBRF table.")]
+        public bool OutputCanopyBRF { get; set; } = true;
+
+        /// <summary>Whether to compute and save reflectance resampled to a sensor.</summary>
+        [Description("Compute and save ReflectanceResampledToSensor to database")]
+        [Tooltip("Resample BRF to sensor bands and save to the ReflectanceResampledToSensor table. Requires selecting a sensor type below.")]
+        public bool OutputReflectanceResampledToSensor { get; set; } = true;
+
+        /// <summary>Sensor type used for spectral resampling. Visible only when ReflectanceResampledToSensor output is enabled.</summary>
+        [Description("Sensor type")]
+        [Tooltip("Select a built-in sensor to use its spectral response function (SRF), or Custom to provide your own SRF CSV file.")]
+        [Display(VisibleCallback = nameof(OutputReflectanceResampledToSensor))]
+        public SensorTypes SensorType
+        {
+            get => sensorType;
+            set
+            {
+                sensorType = value;
+                SetSensorSRF();
+            }
+        }
+        private SensorTypes sensorType;
+
+        /// <summary>Path to a custom SRF CSV file (used when SensorType is Custom).</summary>
+        [Description("Custom SRF CSV file")]
+        [Tooltip("CSV file: first column = wavelength (nm), remaining columns = band SRF values. Column headers are used as band names.")]
+        [Display(Type = DisplayType.FileName, VisibleCallback = nameof(IsCustomSensorAndOutputResampled))]
+        public string CustomSRFPath { get; set; }
+
+        /// <summary>Whether the user selected Custom sensor type and resampled output is enabled.</summary>
+        public bool IsCustomSensorAndOutputResampled => OutputReflectanceResampledToSensor && SensorType == SensorTypes.Custom;
+
+        /// <summary>Whether the user selected Custom sensor type.</summary>
+        public bool IsCustomSensor => SensorType == SensorTypes.Custom;
+
         /// <summary>Logging verbosity level</summary>
         [Description("Logging level")]
         [Tooltip("Controls verbosity: Error (errors only), Warning (+ warnings), Info (+ informational), Debug (all messages).")]
@@ -374,8 +401,6 @@ namespace Models.PROSAIL
 
         /// <summary>Soil reflectance</summary>
         public SoilOptics SoilReflectance { get; set; } = new SoilOptics();
-        /// <summary>Flag to enable daily SQLite database output</summary>
-        public bool EnableSQLiteOutput { get; set; } = true;
         /// <summary>Input wavelengths</summary>
         public double[] inputWavelengths;
 
@@ -724,15 +749,22 @@ namespace Models.PROSAIL
                 cachedWetDrySoilReflectance = cachedWetDrySoilReflectance.Value.SubsetByWavelengths(inputWavelengths);
             cachedAtmosphericSpectralData = cachedAtmosphericSpectralData.SubsetByWavelengths(inputWavelengths);
 
-            // Load custom SRF if selected
-            if (SensorType == SensorTypes.Custom)
+            // Validate and load SRF if resampled output is enabled
+            if (OutputReflectanceResampledToSensor)
             {
-                if (string.IsNullOrWhiteSpace(CustomSRFPath))
-                    throw new InvalidOperationException("Custom sensor selected but no SRF file specified.");
+                if (SensorType == SensorTypes.None)
+                    throw new InvalidOperationException(
+                        "ProsailModel: ReflectanceResampledToSensor output is enabled but no sensor type has been selected.");
 
-                string resolvedSRFPath = ProsailInputLoader.ResolvePath(CustomSRFPath, Simulation.FileName);
-                SensorSRF = ProsailInputLoader.LoadSRFFromCsv(resolvedSRFPath);
-                WriteMessage(LogLevel.Info, $"ProsailModel: Custom SRF loaded from {resolvedSRFPath}.");
+                if (SensorType == SensorTypes.Custom)
+                {
+                    if (string.IsNullOrWhiteSpace(CustomSRFPath))
+                        throw new InvalidOperationException("Custom sensor selected but no SRF file specified.");
+
+                    string resolvedSRFPath = ProsailInputLoader.ResolvePath(CustomSRFPath, Simulation.FileName);
+                    SensorSRF = ProsailInputLoader.LoadSRFFromCsv(resolvedSRFPath);
+                    WriteMessage(LogLevel.Info, $"ProsailModel: Custom SRF loaded from {resolvedSRFPath}.");
+                }
             }
 
             // Parse string inputs as comma-separated doubles if possible, else treat as APSIM expression each day
@@ -769,9 +801,13 @@ namespace Models.PROSAIL
             ProsailSQLiteDatabasePath = $"{simulationFileName}_Prosail.db";
             string dbPath = ProsailDatabaseHelper.GetFullDatabasePath(ProsailSQLiteDatabasePath, Simulation.FileName);
             simulationName = Simulation.Name.Replace("'", "''");
-            dbConnection = ProsailDatabaseHelper.InitializeDatabase(dbPath, simulationName, Clock.StartDate, Clock.EndDate, WriteMessage);
-            if (dbConnection == null)
-                EnableSQLiteOutput = false;
+            bool anyOutput = OutputParameters || OutputCanopyOpticalVariable || OutputCanopyStateVariable
+                || OutputCanopyBRF || OutputReflectanceResampledToSensor;
+            if (!anyOutput)
+                throw new InvalidOperationException("ProsailModel: At least one output table must be selected.");
+            dbConnection = ProsailDatabaseHelper.InitializeDatabase(dbPath, simulationName, Clock.StartDate, Clock.EndDate,
+                OutputParameters, OutputCanopyOpticalVariable, OutputCanopyStateVariable,
+                OutputCanopyBRF, OutputReflectanceResampledToSensor, WriteMessage);
         }
 
         /// <summary>Called when [do management calculations].</summary>
@@ -854,56 +890,67 @@ namespace Models.PROSAIL
 
                 WriteMessage(LogLevel.Info, $"ProsailModel: PROSAIL calculation completed, Wavelength[{canopyOpticalVariables.Wavelength.Length}]");
 
-                // Compute BRF
-                CanopyBRF canopyBRF = ComputeBRF(
-                    wavelength: canopyOpticalVariables.Wavelength,
-                    rdot: canopyOpticalVariables.Rdot,
-                    rsot: canopyOpticalVariables.Rsot,
-                    tts: Convert.ToDouble(CurrentParameterValues["SunZenithAngle"]),
-                    atmosphericSpectralData: cachedAtmosphericSpectralData);
+                double tts = Convert.ToDouble(CurrentParameterValues["SunZenithAngle"]);
 
-                // Compute fAPAR
-                double fAPAR = ComputeFAPAR(
-                    abs_dir: canopyOpticalVariables.Abs_dir,
-                    abs_hem: canopyOpticalVariables.Abs_hem,
-                    tts: Convert.ToDouble(CurrentParameterValues["SunZenithAngle"]),
-                    atmosphericSpectralData: cachedAtmosphericSpectralData);
+                // Compute BRF (needed for CanopyBRF and resampling outputs)
+                CanopyBRF? canopyBRF = null;
+                if (OutputCanopyBRF || OutputReflectanceResampledToSensor)
+                {
+                    canopyBRF = ComputeBRF(
+                        wavelength: canopyOpticalVariables.Wavelength,
+                        rdot: canopyOpticalVariables.Rdot,
+                        rsot: canopyOpticalVariables.Rsot,
+                        tts: tts,
+                        atmosphericSpectralData: cachedAtmosphericSpectralData);
+                }
 
-                // Compute broadband albedo
-                double albedo = ComputeAlbedo(
-                    rddstar: canopyOpticalVariables.Rddstar,
-                    rsdstar: canopyOpticalVariables.Rsdstar,
-                    tts: Convert.ToDouble(CurrentParameterValues["SunZenithAngle"]),
-                    atmosphericSpectralData: cachedAtmosphericSpectralData);
+                // Compute canopy state variables (fAPAR, fCover, albedo)
+                CanopyStateVariables? canopyStateVariables = null;
+                if (OutputCanopyStateVariable)
+                {
+                    double fAPAR = ComputeFAPAR(
+                        abs_dir: canopyOpticalVariables.Abs_dir,
+                        abs_hem: canopyOpticalVariables.Abs_hem,
+                        tts: tts,
+                        atmosphericSpectralData: cachedAtmosphericSpectralData);
+
+                    double albedo = ComputeAlbedo(
+                        rddstar: canopyOpticalVariables.Rddstar,
+                        rsdstar: canopyOpticalVariables.Rsdstar,
+                        tts: tts,
+                        atmosphericSpectralData: cachedAtmosphericSpectralData);
+
+                    canopyStateVariables = new CanopyStateVariables
+                    {
+                        fAPAR = fAPAR,
+                        fcover = canopyOpticalVariables.FCover.Distinct().First(),
+                        albedo = albedo
+                    };
+                }
 
                 // Spectral resampling to sensor
-                SpectralResamplingResult resampledReflectance = ResampleReflectanceToSensor(
-                    wavelength: canopyBRF.Wavelength.ToArray(),
-                    reflectance: canopyBRF.BRF.ToArray(),
-                    srf: SensorSRF);
-
-                var canopyStateVariables = new CanopyStateVariables
+                SpectralResamplingResult resampledReflectance = null;
+                if (OutputReflectanceResampledToSensor && canopyBRF.HasValue)
                 {
-                    fAPAR = fAPAR,
-                    fcover = canopyOpticalVariables.FCover.Distinct().First(),
-                    albedo = albedo
-                };
+                    resampledReflectance = ResampleReflectanceToSensor(
+                        wavelength: canopyBRF.Value.Wavelength.ToArray(),
+                        reflectance: canopyBRF.Value.BRF.ToArray(),
+                        srf: SensorSRF);
+                }
 
                 // Save to database
-                if (EnableSQLiteOutput && dbConnection != null)
+                if (dbConnection != null)
                 {
-                    string sensorTypeStr = SensorType == SensorTypes.Custom
-                        ? $"Custom:{CustomSRFPath}"
-                        : SensorType.ToString();
+                    string sensorTypeStr = OutputReflectanceResampledToSensor
+                        ? (SensorType == SensorTypes.Custom ? $"Custom:{CustomSRFPath}" : SensorType.ToString())
+                        : string.Empty;
 
                     ProsailDatabaseHelper.WriteToDatabase(dbConnection, simulationName, Clock.Today,
                         CurrentParameterValues, WetDrySoilReflectancePath, SailVersionString, sensorTypeStr,
-                        canopyOpticalVariables, canopyStateVariables, canopyBRF, resampledReflectance, WriteMessage);
+                        canopyOpticalVariables, canopyStateVariables ?? default, canopyBRF ?? default, resampledReflectance,
+                        OutputParameters, OutputCanopyOpticalVariable, OutputCanopyStateVariable,
+                        OutputCanopyBRF, OutputReflectanceResampledToSensor, WriteMessage);
                     WriteMessage(LogLevel.Info, $"ProsailModel: Wrote results to database for {Clock.Today:yyyy-MM-dd}.");
-                }
-                else
-                {
-                    WriteMessage(LogLevel.Info, "ProsailModel: SQLite output disabled, results not saved to database.");
                 }
             }
             catch (Exception ex)
