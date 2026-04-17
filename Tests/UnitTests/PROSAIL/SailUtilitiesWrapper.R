@@ -213,6 +213,27 @@ if (functionName == "adjust_PROSPECT_2_SAIL") {
   params$fractionBrown <- NULL # Remove original
 }
 
+# POSSIBLE KNOWN BUG IN R REFERENCE IMPLEMENTATION (Lib_PROSAIL.R) — LAI = 0 case
+# --------------------------------------------------------------------------
+# In both `fourSAIL` and `fourSAIL2`, when LAI <= 0, the following output
+# variables are NEVER assigned, so R returns NA for them:
+#   - abs_dir  (canopy absorptance for direct solar flux)
+#   - abs_hem  (canopy absorptance for hemispherical diffuse flux)
+#   - rsdstar  (contribution of direct flux to albedo)
+#   - rddstar  (contribution of diffuse flux to albedo)
+#
+# The physically correct values for LAI = 0 are:
+#   - abs_dir = abs_hem = 0      (no canopy to absorb)
+#   - rsdstar = rddstar = rsoil  (albedo = bare soil)
+#   - rdot = rsot = rddt = rsdt = rsoil  (reflectance = bare soil) <- R assigns these correctly
+#
+# The C# implementation (SailCore.cs, FourSAIL / FourSAIL2) handles this correctly by
+# explicitly initialising all outputs in the LAI=0 branch.
+#
+# CONSEQUENCE FOR UNIT TESTS: Do not compare abs_dir, abs_hem, rsdstar, rddstar between
+# R and C# when LAI = 0; skip or NA-filter those fields in the test assertions.
+# --------------------------------------------------------------------------
+
 ### Special handling for PRO4SAIL ####
 # C# sends CAB but R expects CHL; C# sends SailVersion but R expects SAILversion
 if (functionName == "PRO4SAIL") {
