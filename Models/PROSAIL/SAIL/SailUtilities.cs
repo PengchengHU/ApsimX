@@ -182,11 +182,7 @@ namespace Models.PROSAIL.SAIL
                 BRF[i] = Math.Max(0.0, Math.Min(1.0, BRF[i]));
             }
 
-            // Convert arrays to Vector<double> and create CanopyBRF using constructor
-            Vector<double> wavelengthVector = Vector<double>.Build.DenseOfArray(wavelength);
-            Vector<double> brfVector = Vector<double>.Build.DenseOfArray(BRF);
-
-            return new CanopyBRF(wavelengthVector, brfVector);
+            return new CanopyBRF(wavelength, BRF);
         }
 
         /// <summary>
@@ -740,7 +736,8 @@ namespace Models.PROSAIL.SAIL
                 freq[i] = Math.Max(0.0, freq[i]);
             }
 
-            double sumFreq = freq.Sum();
+            double sumFreq = 0;
+            for (int i = 0; i < freq.Length; i++) sumFreq += freq[i];
             if (Math.Abs(sumFreq) > 1e-6 && Math.Abs(sumFreq - 1.0) > 1e-6) // Normalize if sum is not near 0 or 1
             {
                 Console.WriteLine($"Warning: Dladgen frequencies sum to {sumFreq:F6}. Normalizing.");
@@ -869,13 +866,10 @@ namespace Models.PROSAIL.SAIL
             double sum_kl = k + l;
             double Jout; // Result
 
-            // Handle denominator near zero (k+l ≈ 0)
+            // Handle denominator near zero (k+l ≈ 0): indeterminate form 0/0 → NaN (matches R)
             if (Math.Abs(sum_kl) < 1e-9)
             {
-                // Use L'Hopital's rule limit: t*exp(-(sum_kl)*t) -> t
-                Jout = t;
-                // Console.WriteLine($"Warning: k + l ≈ 0 ({sum_kl:E3}). Return NaN");
-                // return double.NaN;
+                return double.NaN;
             }
             // Handle small exponent case using Taylor expansion exp(-x) ≈ 1 - x
             else if (Math.Abs(sum_kl * t) < 1e-6)
@@ -1070,7 +1064,7 @@ namespace Models.PROSAIL.SAIL
             // Extract wavelength arrays
             double[] lambdaLeafConstants = leafConstants.Wavelength?.ToArray();
             double[] lambdaSoil = soilProperties.Wavelength.ToArray();
-            double[] lambdaAtm = specAtm.Wavelength.ToArray();
+            double[] lambdaAtm = specAtm.Wavelength;
 
             // Check if any wavelength array is null
             if (lambdaLeafConstants == null || lambdaSoil == null || lambdaAtm == null)
@@ -1479,6 +1473,40 @@ namespace Models.PROSAIL.SAIL
             if (wavelength.Length != reflectance.Length)
                 throw new ArgumentException("Wavelength and reflectance arrays must have the same length");
 
+            // Fast path: use precomputed indices and weights (populated by Preprocess at startup)
+            if (srf.PrecomputedInputIndices != null)
+            {
+                int nbBands = srf.PrecomputedInputIndices.Length;
+                var resampledReflectance = new List<double[]>(nbBands);
+                for (int i = 0; i < nbBands; i++)
+                {
+                    int[]    indices = srf.PrecomputedInputIndices[i];
+                    double[] weights = srf.PrecomputedWeights[i];
+                    double   total   = srf.PrecomputedTotalWeights[i];
+                    if (indices.Length > 0 && total > 0)
+                    {
+                        double weightedSum = 0;
+                        for (int j = 0; j < indices.Length; j++)
+                            weightedSum += weights[j] * reflectance[indices[j]];
+                        resampledReflectance.Add(new double[] { weightedSum / total });
+                    }
+                    else
+                    {
+                        resampledReflectance.Add(new double[] { 0.0 });
+                    }
+                }
+                string[] bandNames = new string[nbBands];
+                for (int i = 0; i < nbBands; i++)
+                    bandNames[i] = srf.SpectralBandName?[i]?.ToString() ?? $"Band_{i + 1}";
+                return new SpectralResamplingResult
+                {
+                    Wavelength = srf.CentralWavelength,
+                    Reflectance = resampledReflectance,
+                    BandNames = bandNames
+                };
+            }
+
+            // Fallback path: build lookup on-the-fly (when Preprocess has not been called)
             int nbBandsOrigin = wavelength.Length;
             int nbBandsSensor = srf.SpectralResponse.Count;
 
@@ -1493,46 +1521,44 @@ namespace Models.PROSAIL.SAIL
                 nbBandsSensor = spectralResponse.Count;
             }
 
-            // Pre-compute wavelength lookup for performance
-            var wavelengthLookup = wavelength
-                .Select((wvl, idx) => new { wvl, idx })
-                .ToDictionary(x => x.wvl, x => x.idx);
+            var wavelengthLookup = new Dictionary<double, int>(wavelength.Length);
+            for (int i = 0; i < wavelength.Length; i++)
+                wavelengthLookup[wavelength[i]] = i;
 
-            var resampledReflectance = new List<double[]>(nbBandsSensor);
-
+            var resampledFallback = new List<double[]>(nbBandsSensor);
             for (int i = 0; i < nbBandsSensor; i++)
             {
                 var bandName = srf.SpectralBandName?[i]?.ToString() ?? $"Band_{i + 1}";
-
-                // Find non-zero SRF indices and corresponding input wavelength indices
-                var validPairs = spectralResponse[i]
-                    .Select((srfValue, srfIdx) => new { srfValue, srfIdx })
-                    .Where(x => x.srfValue > 0 && x.srfIdx < srf.OriginalBandWavelength.Length)
-                    .Select(x => new {
-                        weight = x.srfValue,
-                        inputIdx = wavelengthLookup.GetValueOrDefault(srf.OriginalBandWavelength[x.srfIdx], -1)
-                    })
-                    .Where(x => x.inputIdx >= 0)
-                    .ToArray();
-
-                if (validPairs.Length > 0)
+                double[] bandSRF = spectralResponse[i];
+                int maxPairs = Math.Min(bandSRF.Length, srf.OriginalBandWavelength.Length);
+                double totalWeight = 0, weightedSum = 0;
+                int matched = 0;
+                for (int k = 0; k < maxPairs; k++)
                 {
-                    double totalWeight = validPairs.Sum(x => x.weight);
-                    double weightedSum = validPairs.Sum(x => x.weight * reflectance[x.inputIdx]);
-                    resampledReflectance.Add(new double[] { weightedSum / totalWeight });
+                    if (bandSRF[k] > 0 && wavelengthLookup.TryGetValue(srf.OriginalBandWavelength[k], out int inputIdx))
+                    {
+                        totalWeight += bandSRF[k];
+                        weightedSum += bandSRF[k] * reflectance[inputIdx];
+                        matched++;
+                    }
                 }
+                if (matched > 0 && totalWeight > 0)
+                    resampledFallback.Add(new double[] { weightedSum / totalWeight });
                 else
                 {
                     Console.WriteLine($"Warning: No wavelength matches for {bandName} - values set to 0");
-                    resampledReflectance.Add(new double[] { 0.0 });
+                    resampledFallback.Add(new double[] { 0.0 });
                 }
             }
 
+            string[] fallbackBandNames = new string[nbBandsSensor];
+            for (int i = 0; i < nbBandsSensor; i++)
+                fallbackBandNames[i] = srf.SpectralBandName?[i]?.ToString() ?? $"Band_{i + 1}";
             return new SpectralResamplingResult
             {
                 Wavelength = srf.CentralWavelength,
-                Reflectance = resampledReflectance,
-                BandNames = Enumerable.Range(0, nbBandsSensor).Select(i => srf.SpectralBandName?[i]?.ToString() ?? $"Band_{i + 1}").ToArray()
+                Reflectance = resampledFallback,
+                BandNames = fallbackBandNames
             };
         }
 
@@ -1552,6 +1578,89 @@ namespace Models.PROSAIL.SAIL
 
             /// <summary> Original bands (wavelengths, nm) for which SRF is defined (length = nWvl) </summary>
             public double[] OriginalBandWavelength { get; set; }
+
+            // --- Precomputed data (populated by Preprocess) ---
+
+            /// <summary> For each sensor band: indices into the input reflectance array. </summary>
+            public int[][] PrecomputedInputIndices { get; private set; }
+
+            /// <summary> For each sensor band: SRF weights at the valid indices. </summary>
+            public double[][] PrecomputedWeights { get; private set; }
+
+            /// <summary> For each sensor band: sum of valid SRF weights. </summary>
+            public double[] PrecomputedTotalWeights { get; private set; }
+
+            /// <summary>
+            /// Pre-processes this SRF against a given input wavelength grid so that
+            /// <see cref="ResampleReflectanceToSensor"/> can avoid rebuilding lookups every call.
+            /// Must be called once after loading, with the same wavelength array used for simulation.
+            /// </summary>
+            public void Preprocess(double[] wavelength)
+            {
+                if (wavelength == null || SpectralResponse == null)
+                    return;
+
+                int nbBandsOrigin = wavelength.Length;
+
+                // Handle transposition: if matrix is [nWvl × nBands] instead of [nBands × nWvl]
+                var spectralResponse = SpectralResponse;
+                int nbBandsSensor = spectralResponse.Count;
+                if (nbBandsSensor == nbBandsOrigin && spectralResponse[0].Length != nbBandsOrigin)
+                {
+                    int nBands = spectralResponse[0].Length;
+                    var transposed = new List<double[]>(nBands);
+                    for (int i = 0; i < nBands; i++)
+                    {
+                        double[] row = new double[nbBandsOrigin];
+                        for (int j = 0; j < nbBandsOrigin; j++)
+                            row[j] = spectralResponse[j][i];
+                        transposed.Add(row);
+                    }
+                    spectralResponse = transposed;
+                    nbBandsSensor = nBands;
+                }
+
+                // Build wavelength → index lookup
+                var wavelengthLookup = new Dictionary<double, int>(wavelength.Length);
+                for (int i = 0; i < wavelength.Length; i++)
+                    wavelengthLookup[wavelength[i]] = i;
+
+                PrecomputedInputIndices  = new int[nbBandsSensor][];
+                PrecomputedWeights       = new double[nbBandsSensor][];
+                PrecomputedTotalWeights  = new double[nbBandsSensor];
+
+                for (int b = 0; b < nbBandsSensor; b++)
+                {
+                    double[] bandSRF = spectralResponse[b];
+                    int maxPairs = Math.Min(bandSRF.Length, OriginalBandWavelength.Length);
+
+                    // First pass: count valid entries
+                    int count = 0;
+                    for (int k = 0; k < maxPairs; k++)
+                        if (bandSRF[k] > 0 && wavelengthLookup.ContainsKey(OriginalBandWavelength[k]))
+                            count++;
+
+                    int[]    indices = new int[count];
+                    double[] weights = new double[count];
+                    double   total   = 0;
+                    int      pos     = 0;
+
+                    for (int k = 0; k < maxPairs; k++)
+                    {
+                        if (bandSRF[k] > 0 && wavelengthLookup.TryGetValue(OriginalBandWavelength[k], out int inputIdx))
+                        {
+                            indices[pos] = inputIdx;
+                            weights[pos] = bandSRF[k];
+                            total += bandSRF[k];
+                            pos++;
+                        }
+                    }
+
+                    PrecomputedInputIndices[b]  = indices;
+                    PrecomputedWeights[b]       = weights;
+                    PrecomputedTotalWeights[b]  = total;
+                }
+            }
         }
 
         /// <summary>
