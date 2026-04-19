@@ -309,7 +309,7 @@ namespace Models.PROSAIL
                 {
                     StringBuilder brfSql = new StringBuilder("INSERT OR REPLACE INTO CanopyBRF (SimulationName, Date, Wavelength, BRF) VALUES ");
                     bool firstBRF = true;
-                    for (int i = 0; i < canopyBRF.Wavelength.Count; i++)
+                    for (int i = 0; i < canopyBRF.Wavelength.Length; i++)
                     {
                         if (!firstBRF) brfSql.Append(",");
                         brfSql.Append($"('{simulationName}', '{dateStr}', {canopyBRF.Wavelength[i]}, {canopyBRF.BRF[i]})");

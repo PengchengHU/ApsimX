@@ -873,10 +873,10 @@ public class CanopyOptics : ISpectralData
 public struct CanopyBRF : ISpectralData
 {
     /// <summary>Wavelengths in nanometers (nm)</summary>
-    public Vector<double> Wavelength { get; set; }
+    public double[] Wavelength { get; set; }
 
     /// <summary>Canopy BRF (unitless fraction, 0-1)</summary>
-    public Vector<double> BRF { get; set; }
+    public double[] BRF { get; set; }
 
     /// <summary>Dictionary mapping wavelengths to their indices in the Wavelength array for optimized access</summary>
     public Dictionary<double, int> WavelengthToIndex { get; set; }
@@ -884,13 +884,13 @@ public struct CanopyBRF : ISpectralData
     /// <summary>
     /// Initializes a new instance of CanopyBRF with automatic WavelengthToIndex creation
     /// </summary>
-    /// <param name="wavelength">Wavelength vector (nm)</param>
-    /// <param name="brf">Reflectance vector (0-1)</param>
-    /// <exception cref="ArgumentException">Thrown when vectors have different lengths</exception>
-    public CanopyBRF(Vector<double> wavelength, Vector<double> brf)
+    /// <param name="wavelength">Wavelength array (nm)</param>
+    /// <param name="brf">BRF array (0-1)</param>
+    /// <exception cref="ArgumentException">Thrown when arrays have different lengths</exception>
+    public CanopyBRF(double[] wavelength, double[] brf)
     {
-        if (wavelength?.Count != brf?.Count)
-            throw new ArgumentException("Wavelength and BRF vectors must have the same length");
+        if (wavelength?.Length != brf?.Length)
+            throw new ArgumentException("Wavelength and BRF arrays must have the same length");
 
         Wavelength = wavelength;
         BRF = brf;
@@ -899,18 +899,18 @@ public struct CanopyBRF : ISpectralData
     }
 
     /// <summary>
-    /// Indicates whether this SoilOptics object contains valid data.
+    /// Indicates whether this CanopyBRF object contains valid data.
     /// Returns false if Wavelength or BRF is null or empty.
     /// </summary>
     public readonly bool HasValue => Wavelength != null && BRF != null &&
-                                   WavelengthToIndex != null && Wavelength.Count > 0 &&
-                                   Wavelength.Count == BRF.Count;
+                                   WavelengthToIndex != null && Wavelength.Length > 0 &&
+                                   Wavelength.Length == BRF.Length;
 
     /// <summary>
     /// Gets wavelengths as double array (implements ISpectralData)
     /// </summary>
     /// <returns>Array of wavelengths in nm</returns>
-    public double[] GetWavelengths() => Wavelength?.ToArray() ?? Array.Empty<double>();
+    public double[] GetWavelengths() => Wavelength ?? Array.Empty<double>();
 
     /// <summary>
     /// Gets wavelength-to-index mapping (implements ISpectralData)
@@ -928,8 +928,8 @@ public struct CanopyBRF : ISpectralData
         return SpectralDataUtils.SubsetByWavelengths(this, targetWavelengths, (source, indices) =>
         {
             return new CanopyBRF(
-                Vector<double>.Build.DenseOfEnumerable(indices.Select(i => source.Wavelength[i])),
-                Vector<double>.Build.DenseOfEnumerable(indices.Select(i => source.BRF[i]))
+                indices.Select(i => source.Wavelength[i]).ToArray(),
+                indices.Select(i => source.BRF[i]).ToArray()
             );
         });
     }

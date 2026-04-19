@@ -1,5 +1,4 @@
 ﻿
-using MathNet.Numerics.LinearAlgebra;
 using System;
 using System.Collections.Generic;
 using System.Linq;
@@ -80,20 +79,14 @@ namespace Models.PROSAIL.Sail
             {
                 // If LAI is 0 or invalid, reflectance is just soil reflectance
                 // Transmittances are 1, absorptances are 0
-                var rsoilVector = MathNet.Numerics.LinearAlgebra.Vector<double>.Build.DenseOfArray(rsoil);
-                var zeroVector = MathNet.Numerics.LinearAlgebra.Vector<double>.Build.Dense(nLambda, 0.0);
+                rdot = (double[])rsoil.Clone();
+                rsot = (double[])rsoil.Clone();
+                rddt = (double[])rsoil.Clone();
+                rsdt = (double[])rsoil.Clone();
+                rsdstar = (double[])rsoil.Clone();
+                rddstar = (double[])rsoil.Clone();
+                // fCover, abs_dir, abs_hem remain new double[nLambda] (zero by default)
 
-                // Vectorized assignments
-                rdot = rsoilVector.ToArray();
-                rsot = rsoilVector.ToArray();
-                rddt = rsoilVector.ToArray();
-                rsdt = rsoilVector.ToArray();
-                rsdstar = rsoilVector.ToArray();
-                rddstar = rsoilVector.ToArray();
-                fCover = zeroVector.ToArray();
-                abs_dir = zeroVector.ToArray();
-                abs_hem = zeroVector.ToArray();
-                
                 if (lai < 0)
                 {
                     Console.WriteLine("Warning: LAI is negative. Results computed assuming LAI = 0.");
@@ -419,8 +412,8 @@ namespace Models.PROSAIL.Sail
                 rddstar[i] = rdd[i] + (tdd[i] * tdd[i] * rsoil_i) / dn;
 
                 // fCover: Fraction of green Vegetation Cover (= 1 - beam transmittance in the target-view path)
-                fCover[i] = 1.0 - too;
             } // End of wavelength loop
+            Array.Fill(fCover, 1.0 - too);
 
             return new CanopyOptics
             {
@@ -532,18 +525,13 @@ namespace Models.PROSAIL.Sail
             {
                 if (lai < 0) Console.WriteLine("Warning: LAI is negative. Results computed assuming LAI = 0.");
 
-                var rsoilVector = MathNet.Numerics.LinearAlgebra.Vector<double>.Build.DenseOfArray(rsoil);
-                var zeroVector = MathNet.Numerics.LinearAlgebra.Vector<double>.Build.Dense(nLambda, 0.0);
-
-                rdot = rsoilVector.ToArray();
-                rsot = rsoilVector.ToArray();
-                rddt = rsoilVector.ToArray();
-                rsdt = rsoilVector.ToArray();
-                rsdstar = rsoilVector.ToArray();
-                rddstar = rsoilVector.ToArray();
-                fCover = zeroVector.ToArray();
-                abs_dir = zeroVector.ToArray();
-                abs_hem = zeroVector.ToArray();
+                rdot = (double[])rsoil.Clone();
+                rsot = (double[])rsoil.Clone();
+                rddt = (double[])rsoil.Clone();
+                rsdt = (double[])rsoil.Clone();
+                rsdstar = (double[])rsoil.Clone();
+                rddstar = (double[])rsoil.Clone();
+                // fCover, abs_dir, abs_hem remain new double[nLambda] (zero by default)
 
                 return new CanopyOptics 
                 { 
@@ -647,40 +635,12 @@ namespace Models.PROSAIL.Sail
             double[] tau2 = new double[nLambda];
             double denom1 = (1.0 - fb);
             double denom2 = fb;
-            // Avoid division by zero if fb is 0 or 1 (after the artificial adjustment above)
-            bool denom1_is_zero = Math.Abs(denom1) < 1e-9;
-            bool denom2_is_zero = Math.Abs(denom2) < 1e-9;
-
             for (int i = 0; i < nLambda; i++)
             {
-                // Top layer (more green)
-                if (denom1_is_zero)
-                {
-                    // If 1-fb is zero (i.e., fb=1), layer 1 doesn't exist or has zero LAI, so optics don't matter.
-                    // However, R calculation proceeds. If diss=1, s=0, rho1=0/0 -> NaN. If diss<1, s>0.
-                    // If fb=1 (after adjustment fb=0.5), denom1 = 0.5.
-                    // Assume the artificial fb adjustment prevents denom zero.
-                    rho1[i] = ((1.0 - fb - s) * effectiveLeafGreen.Reflectance[i] + s * effectiveLeafBrown.Reflectance[i]) / denom1;
-                    tau1[i] = ((1.0 - fb - s) * effectiveLeafGreen.Transmittance[i] + s * effectiveLeafBrown.Transmittance[i]) / denom1;
-                }
-                else
-                {
-                    rho1[i] = ((1.0 - fb - s) * effectiveLeafGreen.Reflectance[i] + s * effectiveLeafBrown.Reflectance[i]) / denom1;
-                    tau1[i] = ((1.0 - fb - s) * effectiveLeafGreen.Transmittance[i] + s * effectiveLeafBrown.Transmittance[i]) / denom1;
-                }
-
-                // Bottom layer (more brown)
-                if (denom2_is_zero)
-                {
-                    // If fb=0 (after adjustment fb=0.5), denom2 = 0.5.
-                    rho2[i] = (s * effectiveLeafGreen.Reflectance[i] + (fb - s) * effectiveLeafBrown.Reflectance[i]) / denom2;
-                    tau2[i] = (s * effectiveLeafGreen.Transmittance[i] + (fb - s) * effectiveLeafBrown.Transmittance[i]) / denom2;
-                }
-                else
-                {
-                    rho2[i] = (s * effectiveLeafGreen.Reflectance[i] + (fb - s) * effectiveLeafBrown.Reflectance[i]) / denom2;
-                    tau2[i] = (s * effectiveLeafGreen.Transmittance[i] + (fb - s) * effectiveLeafBrown.Transmittance[i]) / denom2;
-                }
+                rho1[i] = ((1.0 - fb - s) * effectiveLeafGreen.Reflectance[i] + s * effectiveLeafBrown.Reflectance[i]) / denom1;
+                tau1[i] = ((1.0 - fb - s) * effectiveLeafGreen.Transmittance[i] + s * effectiveLeafBrown.Transmittance[i]) / denom1;
+                rho2[i] = (s * effectiveLeafGreen.Reflectance[i] + (fb - s) * effectiveLeafBrown.Reflectance[i]) / denom2;
+                tau2[i] = (s * effectiveLeafGreen.Transmittance[i] + (fb - s) * effectiveLeafBrown.Transmittance[i]) / denom2;
             }
 
 
@@ -840,8 +800,8 @@ namespace Models.PROSAIL.Sail
 
             // Calculate Scattering for Bottom Layer (Layer 2 - Brown)
             // Using lai2 and rho2/tau2
-            double[] tss_L2 = new double[nLambda]; // Solar transmittance Layer 2
-            double[] too_L2 = new double[nLambda]; // Observer transmittance Layer 2
+            double tss_L2 = Math.Exp(-ks * lai2); // Solar transmittance Layer 2 (wavelength-independent)
+            double too_L2 = Math.Exp(-ko * lai2); // Observer transmittance Layer 2 (wavelength-independent)
             double[] sigb_L2 = new double[nLambda];
             double[] sigf_L2 = new double[nLambda];
             double[] att_L2 = new double[nLambda];
@@ -861,13 +821,8 @@ namespace Models.PROSAIL.Sail
             double[] rdo_L2 = new double[nLambda];
             double[] rsod_L2 = new double[nLambda];
 
-            List<int> ncsIndices_L2 = new List<int>(); // Indices for Non-Conservative Scattering
-            List<int> csIndices_L2 = new List<int>();  // Indices for Conservative Scattering
-
             for (int i = 0; i < nLambda; i++)
             {
-                tss_L2[i] = Math.Exp(-ks * lai2);
-                too_L2[i] = Math.Exp(-ko * lai2);
                 sigb_L2[i] = ddb * rho2[i] + ddf * tau2[i];
                 sigf_L2[i] = ddf * rho2[i] + ddb * tau2[i];
                 att_L2[i] = 1.0 - sigf_L2[i];
@@ -879,67 +834,10 @@ namespace Models.PROSAIL.Sail
                 vb_L2[i] = dob * rho2[i] + dof * tau2[i];
                 w_L2[i] = sob * rho2[i] + sof * tau2[i];
 
-                // Segregate indices based on m value
-                if (m_L2[i] > 0.01) ncsIndices_L2.Add(i);
-                else csIndices_L2.Add(i);
             }
-
-            // Apply Non-Conservative Scattering calculations for relevant indices
-            if (ncsIndices_L2.Count > 0)
-            {
-                double[] m_ncs = ncsIndices_L2.Select(idx => m_L2[idx]).ToArray();
-                double[] att_ncs = ncsIndices_L2.Select(idx => att_L2[idx]).ToArray();
-                double[] sigb_ncs = ncsIndices_L2.Select(idx => sigb_L2[idx]).ToArray();
-                double[] sf_ncs = ncsIndices_L2.Select(idx => sf_L2[idx]).ToArray();
-                double[] sb_ncs = ncsIndices_L2.Select(idx => sb_L2[idx]).ToArray();
-                double[] vf_ncs = ncsIndices_L2.Select(idx => vf_L2[idx]).ToArray();
-                double[] vb_ncs = ncsIndices_L2.Select(idx => vb_L2[idx]).ToArray();
-
-                ScatteringResult resNCS = NonConservativeScattering(
-                    m_ncs, lai2, att_ncs, sigb_ncs, ks, ko, sf_ncs, sb_ncs, vf_ncs, vb_ncs,
-                    Math.Exp(-ks * lai2), Math.Exp(-ko * lai2)); // Use layer-specific lai2
-
-                // Map results back to the full arrays
-                for (int j = 0; j < ncsIndices_L2.Count; j++)
-                {
-                    int idx = ncsIndices_L2[j];
-                    tdd_L2[idx] = resNCS.Tdd[j];
-                    rdd_L2[idx] = resNCS.Rdd[j];
-                    tsd_L2[idx] = resNCS.Tsd[j];
-                    rsd_L2[idx] = resNCS.Rsd[j];
-                    tdo_L2[idx] = resNCS.Tdo[j];
-                    rdo_L2[idx] = resNCS.Rdo[j];
-                    rsod_L2[idx] = resNCS.Rsod[j];
-                }
-            }
-
-            // Apply Conservative Scattering calculations for relevant indices
-            if (csIndices_L2.Count > 0)
-            {
-                double[] m_cs = csIndices_L2.Select(idx => m_L2[idx]).ToArray();
-                double[] att_cs = csIndices_L2.Select(idx => att_L2[idx]).ToArray();
-                double[] sigb_cs = csIndices_L2.Select(idx => sigb_L2[idx]).ToArray();
-                double[] sf_cs = csIndices_L2.Select(idx => sf_L2[idx]).ToArray();
-                double[] sb_cs = csIndices_L2.Select(idx => sb_L2[idx]).ToArray();
-                double[] vf_cs = csIndices_L2.Select(idx => vf_L2[idx]).ToArray();
-                double[] vb_cs = csIndices_L2.Select(idx => vb_L2[idx]).ToArray();
-
-                ScatteringResult resCS = ConservativeScattering(
-                     m_cs, lai2, att_cs, sigb_cs, ks, ko, sf_cs, sb_cs, vf_cs, vb_cs,
-                     Math.Exp(-ks * lai2), Math.Exp(-ko * lai2));
-
-                for (int j = 0; j < csIndices_L2.Count; j++)
-                {
-                    int idx = csIndices_L2[j];
-                    tdd_L2[idx] = resCS.Tdd[j];
-                    rdd_L2[idx] = resCS.Rdd[j];
-                    tsd_L2[idx] = resCS.Tsd[j];
-                    rsd_L2[idx] = resCS.Rsd[j];
-                    tdo_L2[idx] = resCS.Tdo[j];
-                    rdo_L2[idx] = resCS.Rdo[j];
-                    rsod_L2[idx] = resCS.Rsod[j];
-                }
-            }
+            ComputeScatteringInPlace(m_L2, lai2, att_L2, sigb_L2, ks, ko,
+                sf_L2, sb_L2, vf_L2, vb_L2, tss_L2, too_L2,
+                tdd_L2, rdd_L2, tsd_L2, rsd_L2, tdo_L2, rdo_L2, rsod_L2);
             // Background properties = Layer 2 on black soil
             double[] rddb = rdd_L2; // Bi-hemispherical Refl. of background (Layer 2)
             double[] rsdb = rsd_L2; // Dir-hem Refl. of background
@@ -948,13 +846,13 @@ namespace Models.PROSAIL.Sail
             double[] tddb = tdd_L2; // Bi-hem Trans. of background
             double[] tsdb = tsd_L2; // Dir-hem Trans. of background
             double[] tdob = tdo_L2; // Hem-dir Trans. of background
-            double[] toob = too_L2; // Beam Trans. (obs) of background
-            double[] tssb = tss_L2; // Beam Trans. (sun) of background
+            double toob = too_L2; // Beam Trans. (obs) of background (scalar — wavelength-independent)
+            double tssb = tss_L2; // Beam Trans. (sun) of background (scalar — wavelength-independent)
 
             // Calculate Scattering for Top Layer (Layer 1 - Green)
             // Using lai1 and rho1/tau1
-            double[] tss_L1 = new double[nLambda];
-            double[] too_L1 = new double[nLambda];
+            double tss_L1 = Math.Exp(-ks * lai1); // Solar transmittance Layer 1 (wavelength-independent)
+            double too_L1 = Math.Exp(-ko * lai1); // Observer transmittance Layer 1 (wavelength-independent)
             double[] sigb_L1 = new double[nLambda];
             double[] sigf_L1 = new double[nLambda];
             double[] att_L1 = new double[nLambda];
@@ -973,13 +871,8 @@ namespace Models.PROSAIL.Sail
             double[] rdo_L1 = new double[nLambda];
             double[] rsod_L1 = new double[nLambda];
 
-            List<int> ncsIndices_L1 = new List<int>();
-            List<int> csIndices_L1 = new List<int>();
-
             for (int i = 0; i < nLambda; i++)
             {
-                tss_L1[i] = Math.Exp(-ks * lai1);
-                too_L1[i] = Math.Exp(-ko * lai1);
                 sigb_L1[i] = ddb * rho1[i] + ddf * tau1[i];
                 sigf_L1[i] = ddf * rho1[i] + ddb * tau1[i];
                 att_L1[i] = 1.0 - sigf_L1[i];
@@ -991,52 +884,10 @@ namespace Models.PROSAIL.Sail
                 vb_L1[i] = dob * rho1[i] + dof * tau1[i];
                 w_L1[i] = sob * rho1[i] + sof * tau1[i];
 
-                if (m_L1[i] > 0.01) ncsIndices_L1.Add(i);
-                else csIndices_L1.Add(i);
             }
-
-            if (ncsIndices_L1.Count > 0)
-            {
-                double[] m_ncs = ncsIndices_L1.Select(idx => m_L1[idx]).ToArray();
-                double[] att_ncs = ncsIndices_L1.Select(idx => att_L1[idx]).ToArray();
-                double[] sigb_ncs = ncsIndices_L1.Select(idx => sigb_L1[idx]).ToArray();
-                double[] sf_ncs = ncsIndices_L1.Select(idx => sf_L1[idx]).ToArray();
-                double[] sb_ncs = ncsIndices_L1.Select(idx => sb_L1[idx]).ToArray();
-                double[] vf_ncs = ncsIndices_L1.Select(idx => vf_L1[idx]).ToArray();
-                double[] vb_ncs = ncsIndices_L1.Select(idx => vb_L1[idx]).ToArray();
-                ScatteringResult resNCS = NonConservativeScattering(
-                    m_ncs, lai1, att_ncs, sigb_ncs, ks, ko, sf_ncs, sb_ncs, vf_ncs, vb_ncs,
-                     Math.Exp(-ks * lai1), Math.Exp(-ko * lai1)); // Use layer-specific lai1
-
-                for (int j = 0; j < ncsIndices_L1.Count; j++)
-                {
-                    int idx = ncsIndices_L1[j];
-                    tdd_L1[idx] = resNCS.Tdd[j]; rdd_L1[idx] = resNCS.Rdd[j]; tsd_L1[idx] = resNCS.Tsd[j];
-                    rsd_L1[idx] = resNCS.Rsd[j]; tdo_L1[idx] = resNCS.Tdo[j]; rdo_L1[idx] = resNCS.Rdo[j];
-                    rsod_L1[idx] = resNCS.Rsod[j];
-                }
-            }
-            if (csIndices_L1.Count > 0)
-            {
-                double[] m_cs = csIndices_L1.Select(idx => m_L1[idx]).ToArray();
-                double[] att_cs = csIndices_L1.Select(idx => att_L1[idx]).ToArray();
-                double[] sigb_cs = csIndices_L1.Select(idx => sigb_L1[idx]).ToArray();
-                double[] sf_cs = csIndices_L1.Select(idx => sf_L1[idx]).ToArray();
-                double[] sb_cs = csIndices_L1.Select(idx => sb_L1[idx]).ToArray();
-                double[] vf_cs = csIndices_L1.Select(idx => vf_L1[idx]).ToArray();
-                double[] vb_cs = csIndices_L1.Select(idx => vb_L1[idx]).ToArray();
-                ScatteringResult resCS = ConservativeScattering(
-                     m_cs, lai1, att_cs, sigb_cs, ks, ko, sf_cs, sb_cs, vf_cs, vb_cs,
-                     Math.Exp(-ks * lai1), Math.Exp(-ko * lai1));
-
-                for (int j = 0; j < csIndices_L1.Count; j++)
-                {
-                    int idx = csIndices_L1[j];
-                    tdd_L1[idx] = resCS.Tdd[j]; rdd_L1[idx] = resCS.Rdd[j]; tsd_L1[idx] = resCS.Tsd[j];
-                    rsd_L1[idx] = resCS.Rsd[j]; tdo_L1[idx] = resCS.Tdo[j]; rdo_L1[idx] = resCS.Rdo[j];
-                    rsod_L1[idx] = resCS.Rsod[j];
-                }
-            }
+            ComputeScatteringInPlace(m_L1, lai1, att_L1, sigb_L1, ks, ko,
+                sf_L1, sb_L1, vf_L1, vb_L1, tss_L1, too_L1,
+                tdd_L1, rdd_L1, tsd_L1, rsd_L1, tdo_L1, rdo_L1, rsod_L1);
 
             // Combine Layers (Adding Method)
             // Reflectances/Transmittances of the combined two-layer canopy (no soil yet)
@@ -1059,13 +910,13 @@ namespace Models.PROSAIL.Sail
                 if (Math.Abs(rn) < 1e-12) rn = 1e-12;
 
                 // Term for transmission down L1, reflection up from L2, transmission up L1
-                double tup = (tss_L1[i] * rsdb[i] + tsd_L1[i] * rddb[i]) / rn;
+                double tup = (tss_L1 * rsdb[i] + tsd_L1[i] * rddb[i]) / rn;
                 // Term for Tdn = transmitted solar that gets through bottom layer L2
-                double tdn = (tsd_L1[i] + tss_L1[i] * rsdb[i] * rdd_L1[i]) / rn; 
+                double tdn = (tsd_L1[i] + tss_L1 * rsdb[i] * rdd_L1[i]) / rn; 
 
                 rsdt_comb[i] = rsd_L1[i] + tup * tdd_L1[i]; // R_sd = R_sd_L1 + T_ss_L1*R_sd_L2*T_dd_L1/rn + T_sd_L1*R_dd_L2*T_dd_L1/rn
-                rdot_comb[i] = rdo_L1[i] + tdd_L1[i] * (rddb[i] * tdo_L1[i] + rdob[i] * too_L1[i]) / rn;
-                rsodt_comb[i] = rsod_L1[i] + (tss_L1[i] * rsodb[i] + tdn * rdob[i]) * too_L1[i] + tup * tdo_L1[i]; // Multiple Scattering BiDi
+                rdot_comb[i] = rdo_L1[i] + tdd_L1[i] * (rddb[i] * tdo_L1[i] + rdob[i] * too_L1) / rn;
+                rsodt_comb[i] = rsod_L1[i] + (tss_L1 * rsodb[i] + tdn * rdob[i]) * too_L1 + tup * tdo_L1[i]; // Multiple Scattering BiDi
 
                 // Single scattering combined - weighted sum of contributions from each layer's integral
                 // Note: R code uses w1, s1, w2, s2 directly. Need w1=w_L1, w2=w_L2.
@@ -1078,10 +929,10 @@ namespace Models.PROSAIL.Sail
                 rddt_b_comb[i] = rddb[i] + tddb[i] * rdd_L1[i] * tddb[i] / rn; // Bottom view
 
                 // Transmittances of the combined canopy layers
-                tsst_comb[i] = tss_L1[i] * tssb[i]; // Beam down Sun
-                toot_comb[i] = too_L1[i] * toob[i]; // Beam up Obs
-                tsdt_comb[i] = tss_L1[i] * tsdb[i] + tdn * tddb[i]; // Dir-Hem Trans
-                tdot_comb[i] = tdob[i] * too_L1[i] + tddb[i] * (tdo_L1[i] + rdd_L1[i] * rdob[i] * too_L1[i]) / rn; // Hem-Dir Trans
+                tsst_comb[i] = tss_L1 * tssb; // Beam down Sun
+                toot_comb[i] = too_L1 * toob; // Beam up Obs
+                tsdt_comb[i] = tss_L1 * tsdb[i] + tdn * tddb[i]; // Dir-Hem Trans
+                tdot_comb[i] = tdob[i] * too_L1 + tddb[i] * (tdo_L1[i] + rdd_L1[i] * rdob[i] * too_L1) / rn; // Hem-Dir Trans
                 tddt_comb[i] = tdd_L1[i] * tddb[i] / rn; // Bi-Hem Trans
             }
 
@@ -1156,12 +1007,12 @@ namespace Models.PROSAIL.Sail
                 // fCover[i] = 1.0 - tooc[i];
 
                 // Final fCover based on the green layer, unclumped
-                fCover[i] = 1.0 - too_L1[i];            
+                fCover[i] = 1.0 - too_L1;            
 
                 // Albedo Components (Rsd*, Rdd*)
                 // R computes these using top-layer L1 optical properties with rn = 1-rddcb*rddsoil
                 // (the soil interaction denominator, not the L1-L2 interaction denominator)
-                rsdstar[i] = rsd_L1[i] + (tss_L1[i] + tsd_L1[i]) * rsoil[i] * tdd_L1[i] / rn_soil;
+                rsdstar[i] = rsd_L1[i] + (tss_L1 + tsd_L1[i]) * rsoil[i] * tdd_L1[i] / rn_soil;
                 rddstar[i] = rdd_L1[i] + (tdd_L1[i] * tdd_L1[i] * rsoil[i]) / rn_soil;                          
             } // End wavelength loop
 
@@ -1180,5 +1031,77 @@ namespace Models.PROSAIL.Sail
                 Wavelength = leafGreen.Wavelength
             };
         }
-    } 
+
+        /// <summary>
+        /// Fills scattering output arrays in a single pass over all wavelengths, branching per
+        /// element between Non-Conservative (m > 0.01) and Conservative (m ≤ 0.01) formulas.
+        /// </summary>
+        private static void ComputeScatteringInPlace(
+            double[] m, double lai, double[] att, double[] sigb, double ks, double ko,
+            double[] sf, double[] sb, double[] vf, double[] vb, double tss, double too,
+            double[] tdd, double[] rdd, double[] tsd, double[] rsd, double[] tdo, double[] rdo, double[] rsod)
+        {
+            int n = m.Length;
+            for (int i = 0; i < n; i++)
+            {
+                double mi = m[i]; double atti = att[i]; double sigbi = sigb[i];
+                double sfi = sf[i]; double sbi = sb[i]; double vfi = vf[i]; double vbi = vb[i];
+
+                if (mi > 0.01)
+                {
+                    // Non-Conservative Scattering
+                    double rinf = (atti - mi) / sigbi;
+                    double e1 = Math.Exp(-mi * lai); double e2 = e1 * e1;
+                    double rinf2 = rinf * rinf; double re = rinf * e1;
+                    double denom = 1.0 - rinf2 * e2;
+                    if (Math.Abs(denom) < 1e-12) denom = denom >= 0 ? 1e-12 : -1e-12;
+                    double J1ks = Jfunc1(ks, mi, lai); double J2ks = Jfunc2(ks, mi, lai);
+                    double J1ko = Jfunc1(ko, mi, lai); double J2ko = Jfunc2(ko, mi, lai);
+                    double Ps = (sfi + sbi * rinf) * J1ks; double Qs = (sfi * rinf + sbi) * J2ks;
+                    double Pv = (vfi + vbi * rinf) * J1ko; double Qv = (vfi * rinf + vbi) * J2ko;
+                    tdd[i] = (1.0 - rinf2) * e1 / denom;
+                    rdd[i] = rinf * (1.0 - e2) / denom;
+                    tsd[i] = (Ps - re * Qs) / denom;
+                    rsd[i] = (Qs - re * Ps) / denom;
+                    tdo[i] = (Pv - re * Qv) / denom;
+                    rdo[i] = (Qv - re * Pv) / denom;
+                    double z = Jfunc2(ks, ko, lai);
+                    double g1d = ko + mi; double g2d = ks + mi;
+                    if (Math.Abs(g1d) < 1e-12) g1d = 1e-12; if (Math.Abs(g2d) < 1e-12) g2d = 1e-12;
+                    double g1 = (z - J1ks * too) / g1d; double g2 = (z - J1ko * tss) / g2d;
+                    double Tv1 = (vfi * rinf + vbi) * g1; double Tv2 = (vfi + vbi * rinf) * g2;
+                    double T1 = Tv1 * (sfi + sbi * rinf); double T2 = Tv2 * (sfi * rinf + sbi);
+                    double T3 = (rdo[i] * Qs + tdo[i] * Ps) * rinf;
+                    double rd = 1.0 - rinf2;
+                    if (Math.Abs(rd) < 1e-12) rd = 1e-12;
+                    rsod[i] = (T1 + T2 - T3) / rd;
+                }
+                else
+                {
+                    // Conservative Scattering
+                    double J4v = Jfunc4(mi, lai);
+                    double amsig = atti - sigbi; double apsig = atti + sigbi;
+                    double drtp = 1.0 + amsig * J4v; double drtm = 1.0 + apsig * J4v;
+                    if (Math.Abs(drtp) < 1e-12) drtp = 1e-12; if (Math.Abs(drtm) < 1e-12) drtm = 1e-12;
+                    double rtp = (1.0 - amsig * J4v) / drtp;
+                    double rtm = (-1.0 + apsig * J4v) / drtm;
+                    rdd[i] = 0.5 * (rtp + rtm); tdd[i] = 0.5 * (rtp - rtm);
+                    double dns = ks * ks - mi * mi; double dno = ko * ko - mi * mi;
+                    if (Math.Abs(dns) < 1e-12) dns = 1e-12; if (Math.Abs(dno) < 1e-12) dno = 1e-12;
+                    double cks = (sbi * (ks - atti) - sfi * sigbi) / dns;
+                    double cko = (vbi * (ko - atti) - vfi * sigbi) / dno;
+                    double dks = (-sfi * (ks + atti) - sbi * sigbi) / dns;
+                    double dko = (-vfi * (ko + atti) - vbi * sigbi) / dno;
+                    double kpk = ko + ks;
+                    if (Math.Abs(kpk) < 1e-12) kpk = 1e-12;
+                    double ho = (sfi * cko + sbi * dko) / kpk;
+                    rsd[i] = cks * (1.0 - tss * tdd[i]) - dks * rdd[i];
+                    rdo[i] = cko * (1.0 - too * tdd[i]) - dko * rdd[i];
+                    tsd[i] = dks * (tss - tdd[i]) - cks * tss * rdd[i];
+                    tdo[i] = dko * (too - tdd[i]) - cko * too * rdd[i];
+                    rsod[i] = ho * (1.0 - tss * too) - cko * tsd[i] * too - dko * rsd[i];
+                }
+            }
+        }
+    }
 }

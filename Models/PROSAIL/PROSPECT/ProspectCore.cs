@@ -176,36 +176,61 @@ namespace Models.PROSAIL.PROSPECT
                 // Map wavelengths to their indices in the original array
                 var indices = Wavelengths.Select(w => LeafConstants.WavelengthToIndex[w]).ToArray();
 
-                // Create a new OpticalConstants with only the specified wavelengths
+                // Build subset arrays in a single loop
+                int n = indices.Length;
+                double[] nref = new double[n], sac_cab = new double[n], sac_car = new double[n],
+                         sac_ewt = new double[n], sac_lma = new double[n], tav40 = new double[n],
+                         tav90 = new double[n], sac_ant = new double[n], sac_brown = new double[n],
+                         sac_prot = new double[n], sac_cbc = new double[n];
+                for (int k = 0; k < n; k++)
+                {
+                    int idx = indices[k];
+                    nref[k]      = LeafConstants.RefractiveIndex[idx];
+                    sac_cab[k]   = LeafConstants.SAC_CAB[idx];
+                    sac_car[k]   = LeafConstants.SAC_CAR[idx];
+                    sac_ewt[k]   = LeafConstants.SAC_EWT[idx];
+                    sac_lma[k]   = LeafConstants.SAC_LMA[idx];
+                    tav40[k]     = LeafConstants.Tav40[idx];
+                    tav90[k]     = LeafConstants.Tav90[idx];
+                    sac_ant[k]   = LeafConstants.SAC_ANT[idx];
+                    sac_brown[k] = LeafConstants.SAC_BROWN[idx];
+                    sac_prot[k]  = LeafConstants.SAC_PROT[idx];
+                    sac_cbc[k]   = LeafConstants.SAC_CBC[idx];
+                }
+
+                // Create a new LeafOpticalConsts with only the specified wavelengths
                 LeafConstants = new LeafOpticalConsts
                 {
-                    Wavelength = Vector<double>.Build.DenseOfArray(Wavelengths),
-                    RefractiveIndex = Vector<double>.Build.DenseOfEnumerable(indices.Select(i => LeafConstants.RefractiveIndex[i])),
-                    SAC_CAB = Vector<double>.Build.DenseOfEnumerable(indices.Select(i => LeafConstants.SAC_CAB[i])),
-                    SAC_CAR = Vector<double>.Build.DenseOfEnumerable(indices.Select(i => LeafConstants.SAC_CAR[i])),
-                    SAC_EWT = Vector<double>.Build.DenseOfEnumerable(indices.Select(i => LeafConstants.SAC_EWT[i])),
-                    SAC_LMA = Vector<double>.Build.DenseOfEnumerable(indices.Select(i => LeafConstants.SAC_LMA[i])),
-                    Tav40 = Vector<double>.Build.DenseOfEnumerable(indices.Select(i => LeafConstants.Tav40[i])),
-                    Tav90 = Vector<double>.Build.DenseOfEnumerable(indices.Select(i => LeafConstants.Tav90[i])),
-                    SAC_ANT = Vector<double>.Build.DenseOfEnumerable(indices.Select(i => LeafConstants.SAC_ANT[i])),
-                    SAC_BROWN = Vector<double>.Build.DenseOfEnumerable(indices.Select(i => LeafConstants.SAC_BROWN[i])),
-                    SAC_PROT = Vector<double>.Build.DenseOfEnumerable(indices.Select(i => LeafConstants.SAC_PROT[i])),
-                    SAC_CBC = Vector<double>.Build.DenseOfEnumerable(indices.Select(i => LeafConstants.SAC_CBC[i])),
-                    WavelengthToIndex = Wavelengths.Select((w, i) => new { Wavelength = w, Index = i })
-                                                 .ToDictionary(x => x.Wavelength, x => x.Index)
+                    Wavelength        = Vector<double>.Build.DenseOfArray(Wavelengths),
+                    RefractiveIndex   = Vector<double>.Build.DenseOfArray(nref),
+                    SAC_CAB           = Vector<double>.Build.DenseOfArray(sac_cab),
+                    SAC_CAR           = Vector<double>.Build.DenseOfArray(sac_car),
+                    SAC_EWT           = Vector<double>.Build.DenseOfArray(sac_ewt),
+                    SAC_LMA           = Vector<double>.Build.DenseOfArray(sac_lma),
+                    Tav40             = Vector<double>.Build.DenseOfArray(tav40),
+                    Tav90             = Vector<double>.Build.DenseOfArray(tav90),
+                    SAC_ANT           = Vector<double>.Build.DenseOfArray(sac_ant),
+                    SAC_BROWN         = Vector<double>.Build.DenseOfArray(sac_brown),
+                    SAC_PROT          = Vector<double>.Build.DenseOfArray(sac_prot),
+                    SAC_CBC           = Vector<double>.Build.DenseOfArray(sac_cbc),
+                    WavelengthToIndex = Wavelengths.Select((w, i) => (w, i)).ToDictionary(x => x.w, x => x.i)
                 };
             }
 
             // Compute total absorption corresponding to each homogeneous layer
             // Kall = (sum of constituent absorptions) / N
-            Vector<double> Kall = (CAB * LeafConstants.SAC_CAB +
-                                 CAR * LeafConstants.SAC_CAR +
-                                 EWT * LeafConstants.SAC_EWT +
-                                 LMA * LeafConstants.SAC_LMA +
-                                 ANT * LeafConstants.SAC_ANT +
-                                 BROWN * LeafConstants.SAC_BROWN +
-                                 PROT * LeafConstants.SAC_PROT +
-                                 CBC * LeafConstants.SAC_CBC) / N;
+            int nw = LeafConstants.SAC_CAB.Count;
+            double[] kallArr = new double[nw];
+            for (int i = 0; i < nw; i++)
+                kallArr[i] = (CAB   * LeafConstants.SAC_CAB[i]   +
+                              CAR   * LeafConstants.SAC_CAR[i]   +
+                              EWT   * LeafConstants.SAC_EWT[i]   +
+                              LMA   * LeafConstants.SAC_LMA[i]   +
+                              ANT   * LeafConstants.SAC_ANT[i]   +
+                              BROWN * LeafConstants.SAC_BROWN[i] +
+                              PROT  * LeafConstants.SAC_PROT[i]  +
+                              CBC   * LeafConstants.SAC_CBC[i])   / N;
+            Vector<double> Kall = Vector<double>.Build.DenseOfArray(kallArr);
 
             // reflectance and transmittance of one layer (tau)
             Vector<double> tau = ComputeTau(Kall);

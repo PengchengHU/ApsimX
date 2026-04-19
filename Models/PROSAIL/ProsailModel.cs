@@ -767,6 +767,10 @@ namespace Models.PROSAIL
                     SensorSRF = ProsailInputLoader.LoadSRFFromCsv(resolvedSRFPath);
                     WriteMessage(LogLevel.Info, $"ProsailModel: Custom SRF loaded from {resolvedSRFPath}.");
                 }
+
+                // Pre-process SRF against the simulation wavelength grid so ResampleReflectanceToSensor
+                // can skip rebuilding the lookup dictionary on every daily call.
+                SensorSRF?.Preprocess(inputWavelengths);
             }
 
             // Parse string inputs as comma-separated doubles if possible, else treat as APSIM expression each day
@@ -925,7 +929,7 @@ namespace Models.PROSAIL
                     canopyStateVariables = new CanopyStateVariables
                     {
                         fAPAR = fAPAR,
-                        fcover = canopyOpticalVariables.FCover.Distinct().First(),
+                        fcover = canopyOpticalVariables.FCover[0],
                         albedo = albedo
                     };
                 }
@@ -935,8 +939,8 @@ namespace Models.PROSAIL
                 if (OutputReflectanceResampledToSensor && canopyBRF.HasValue)
                 {
                     resampledReflectance = ResampleReflectanceToSensor(
-                        wavelength: canopyBRF.Value.Wavelength.ToArray(),
-                        reflectance: canopyBRF.Value.BRF.ToArray(),
+                        wavelength: canopyBRF.Value.Wavelength,
+                        reflectance: canopyBRF.Value.BRF,
                         srf: SensorSRF);
                 }
 
