@@ -91,8 +91,8 @@ namespace UnitTests.PROSAIL
         private class SpecATMDataJason
         {
             public double[] Wavelength { get; set; }
-            public double[] Direct_Light { get; set; }
-            public double[] Diffuse_Light { get; set; }
+            public double[] DirectLight { get; set; }
+            public double[] DiffuseLight { get; set; }
         }
 
         // Helper class for JSON deserialization
@@ -135,8 +135,8 @@ namespace UnitTests.PROSAIL
             return new AtmosphericSpectralData
             {
                 Wavelength = ATMData.Wavelength,
-                DirectLight = ATMData.Direct_Light,
-                DiffuseLight = ATMData.Diffuse_Light
+                DirectLight = ATMData.DirectLight,
+                DiffuseLight = ATMData.DiffuseLight
             };
         }
 

@@ -145,8 +145,9 @@ if (functionName == "adjust_PROSPECT_2_SAIL") {
     params$prospectConstants$SAC_CAB <- NULL # Remove original
   }
 
-  # WavelengthToIndex is not required in R
-  params$prospectConstants$WavelengthToIndex <- NULL 
+  # WavelengthToIndex and HasValue are not required by R
+  params$prospectConstants$WavelengthToIndex <- NULL
+  params$prospectConstants$HasValue <- NULL
   # Rename parameter itself
   params$Spec_Sensor <- params$prospectConstants
   params$prospectConstants <- NULL
@@ -185,6 +186,22 @@ if (functionName == "adjust_PROSPECT_2_SAIL") {
       params$Input_PROSPECT <- NULL # Handle empty case
     }
     params$inputProspectList <- NULL # Remove original C# param name
+
+    # adjust_PROSPECT_2_SAIL also expects individual scalar params (CHL, CAR, ...) alongside
+    # Input_PROSPECT. Extract them from the first row of Input_PROSPECT.
+    if (!is.null(params$Input_PROSPECT) && nrow(params$Input_PROSPECT) >= 1) {
+      row1 <- params$Input_PROSPECT[1, ]
+      params$CHL   <- as.numeric(row1$CHL)
+      params$CAR   <- as.numeric(row1$CAR)
+      params$ANT   <- as.numeric(row1$ANT)
+      params$BROWN <- as.numeric(row1$BROWN)
+      params$EWT   <- as.numeric(row1$EWT)
+      params$LMA   <- as.numeric(row1$LMA)
+      params$PROT  <- as.numeric(row1$PROT)
+      params$CBC   <- as.numeric(row1$CBC)
+      params$N     <- as.numeric(row1$N)
+      params$alpha <- as.numeric(row1$alpha)
+    }
   } else {
     params$Input_PROSPECT <- NULL # Ensure it's NULL if not provided
   }
@@ -199,14 +216,13 @@ if (functionName == "adjust_PROSPECT_2_SAIL") {
     # Ensure Reflectance/Transmittance are numeric
     params$BrownLOP$Reflectance <- as.numeric(params$BrownLOP$Reflectance)
     params$BrownLOP$Transmittance <- as.numeric(params$BrownLOP$Transmittance)
-    # Convert to dataframe? adjust_PROSPECT_2_SAIL seems to expect dataframe via check_BrownLOP
+    # Remove C# fields not needed by R (must be done BEFORE as.data.frame)
+    params$BrownLOP$WavelengthToIndex <- NULL
+    params$BrownLOP$HasValue <- NULL
     params$BrownLOP <- as.data.frame(params$BrownLOP)
   } else {
     params$BrownLOP <- NULL # Ensure NULL is passed if C# sends null
   }
-
-  # HasValue is not required by R
-  params$BrownLOP$HasValue <- NULL
   
   # Rename fraction_brown from C#
   params$fraction_brown <- params$fractionBrown
