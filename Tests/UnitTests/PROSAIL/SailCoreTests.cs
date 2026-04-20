@@ -186,6 +186,15 @@ namespace UnitTests.PROSAIL
             public double ObserverZenithAngle { get; set; }
             public double RelativeAzimuthAngle { get; set; }
             public string SailVersion { get; set; }
+            public double? BrownN     { get; set; }
+            public double? BrownCAB   { get; set; }
+            public double? BrownCAR   { get; set; }
+            public double? BrownEWT   { get; set; }
+            public double? BrownLMA   { get; set; }
+            public double? BrownANT   { get; set; }
+            public double? BrownBROWN { get; set; }
+            public double? BrownPROT  { get; set; }
+            public double? BrownCBC   { get; set; }
         }
 
         [Test]
@@ -273,8 +282,7 @@ namespace UnitTests.PROSAIL
         [Test]
         public void FourSAIL2_Validation_Test()
         {
-            //var testInputs = LoadTestInputs().Where(t => t.SailVersion == "4SAIL2").ToList();
-            var testInputs = LoadTestInputs().ToList();
+            var testInputs = LoadTestInputs().Where(t => t.SailVersion == "4SAIL2").ToList();
             LeafOpticalConsts leafConst = GetCachedLeafOpticalConstants();
             //AtmosphericSpectralData atm = LoadAtmosphericSpectralData(DefaultSpecATMDataPath);
             WetDrySoilReflectance cachedWetDrySoilReflectance = LoadWetDrySoilReflectanData(DefaultSpecSoilDataPath);
@@ -303,6 +311,21 @@ namespace UnitTests.PROSAIL
                         alpha: testInput.Alpha
                     )
                 };
+                if (testInput.BrownN.HasValue)
+                {
+                    prospectInputs.Add(new ProspectInputs(
+                        n: testInput.BrownN.Value,
+                        cab: testInput.BrownCAB.Value,
+                        car: testInput.BrownCAR.Value,
+                        ant: testInput.BrownANT.Value,
+                        brown: testInput.BrownBROWN.Value,
+                        ewt: testInput.BrownEWT.Value,
+                        lma: testInput.BrownLMA.Value,
+                        prot: testInput.BrownPROT.Value,
+                        cbc: testInput.BrownCBC.Value,
+                        alpha: testInput.Alpha
+                    ));
+                }
 
                 SoilOptics soil = CalculateSoilReflectanceFromWetDry(cachedWetDrySoilReflectance,
                     testInput.Psoil);

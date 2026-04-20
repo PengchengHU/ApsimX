@@ -263,6 +263,26 @@ if (functionName == "PRO4SAIL") {
     params$SAILversion <- params$SailVersion
     params$SailVersion <- NULL
   }
+  # Convert inputProspectList (list of C# dicts) to a multi-row Input_PROSPECT dataframe.
+  # When two rows are present, R uses the second row as brown leaf optical properties.
+  if (!is.null(params$inputProspectList)) {
+    params$Input_PROSPECT <- do.call(rbind, lapply(params$inputProspectList, function(item) {
+      item$CHL   <- as.numeric(item$CAB)
+      item$CAB   <- NULL
+      item$N     <- as.numeric(item$N)
+      item$CAR   <- as.numeric(item$CAR)
+      item$ANT   <- as.numeric(item$ANT)
+      item$BROWN <- as.numeric(item$BROWN)
+      item$EWT   <- as.numeric(item$EWT)
+      item$LMA   <- as.numeric(item$LMA)
+      item$PROT  <- as.numeric(item$PROT)
+      item$CBC   <- as.numeric(item$CBC)
+      item$alpha <- as.numeric(item$Alpha)
+      item$Alpha <- NULL
+      as.data.frame(item)
+    }))
+    params$inputProspectList <- NULL
+  }
 }
 
 # Function Execution ####

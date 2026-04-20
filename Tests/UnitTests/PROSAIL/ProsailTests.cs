@@ -187,12 +187,23 @@ namespace UnitTests.PROSAIL
             public double ObserverZenithAngle { get; set; }
             public double RelativeAzimuthAngle { get; set; }
             public string SailVersion { get; set; }
+
+            // Brown leaf PROSPECT parameters (optional; when present, triggers 2-input mode for 4SAIL2)
+            public double? BrownN     { get; set; }
+            public double? BrownCAB   { get; set; }
+            public double? BrownCAR   { get; set; }
+            public double? BrownEWT   { get; set; }
+            public double? BrownLMA   { get; set; }
+            public double? BrownANT   { get; set; }
+            public double? BrownBROWN { get; set; }
+            public double? BrownPROT  { get; set; }
+            public double? BrownCBC   { get; set; }
         }
 
         [Test]
         public void ProsailValidationTest_fourSail()
         {
-            var testInputs = LoadTestInputs().ToList();
+            var testInputs = LoadTestInputs().Where(t => t.SailVersion == "4SAIL").ToList();
             LeafOpticalConsts leafConst = GetCachedLeafOpticalConstants();
             WetDrySoilReflectance cachedWetDrySoilReflectance = LoadWetDrySoilReflectanData(DefaultSpecSoilDataPath);
             
@@ -284,31 +295,51 @@ namespace UnitTests.PROSAIL
         [Test]
         public void ProsailValidationTest_fourSail2()
         {
-            //var testInputs = LoadTestInputs().Where(t => t.SailVersion == "4SAIL2").ToList();
-            var testInputs = LoadTestInputs().ToList();
+            var testInputs = LoadTestInputs().Where(t => t.SailVersion == "4SAIL2").ToList();
             LeafOpticalConsts leafConst = GetCachedLeafOpticalConstants();
             WetDrySoilReflectance cachedWetDrySoilReflectance = LoadWetDrySoilReflectanData(DefaultSpecSoilDataPath);
 
             foreach (var testInput in testInputs)
             {
                 Console.WriteLine($"Testing with input parameters: LAI={testInput.LAI:F2}, " +
-                    $"N ={testInput.N:F2}, CAB={testInput.CAB:F2}, CAR={testInput.CAR:F2}, " +
-                    $"LMA={testInput.LMA:F2}, " +
+                    $"N={testInput.N:F2}, CAB={testInput.CAB:F2}, CAR={testInput.CAR:F2}, LMA={testInput.LMA:F2}, " +
                     $"SunZenith={testInput.SunZenithAngle:F2}, ObserverZenith={testInput.ObserverZenithAngle:F2}, " +
                     $"RelativeAzimuth={testInput.RelativeAzimuthAngle:F2}, HotSpot={testInput.HotSpot:F2}, " +
-                    $"TypeLidf={testInput.TypeLidf}, LIDFa={testInput.LIDFa:F2}, FractionBrown={testInput.FractionBrown:F2}");
+                    $"TypeLidf={testInput.TypeLidf}, LIDFa={testInput.LIDFa:F2}, " +
+                    $"FractionBrown={testInput.FractionBrown:F2}, Diss={testInput.Dissociation:F2}, " +
+                    $"Cv={testInput.CrownCover:F2}, Zeta={testInput.TreeShape:F2}, " +
+                    $"BrownInputs={testInput.BrownN.HasValue}");
 
                 SoilOptics soil = CalculateSoilReflectanceFromWetDry(cachedWetDrySoilReflectance,
                     testInput.Psoil);
 
+                // Build PROSPECT input list; include brown leaf entry when brown parameters are provided
+                var inputProspectList = new List<ProspectInputs>
+                {
+                    new ProspectInputs(n: testInput.N, cab: testInput.CAB, car: testInput.CAR,
+                        ant: testInput.ANT, brown: testInput.BROWN, ewt: testInput.EWT,
+                        lma: testInput.LMA, prot: testInput.PROT, cbc: testInput.CBC,
+                        alpha: testInput.Alpha)
+                };
+                if (testInput.BrownN.HasValue)
+                {
+                    inputProspectList.Add(new ProspectInputs(
+                        n: testInput.BrownN.Value, cab: testInput.BrownCAB.Value,
+                        car: testInput.BrownCAR.Value, ant: testInput.BrownANT.Value,
+                        brown: testInput.BrownBROWN.Value, ewt: testInput.BrownEWT.Value,
+                        lma: testInput.BrownLMA.Value, prot: testInput.BrownPROT.Value,
+                        cbc: testInput.BrownCBC.Value, alpha: testInput.Alpha));
+                }
+
                 // C# implementation
                 var resultCS = ProsailCore.PRO4SAIL(
                     leafOpticalConstants: leafConst,
+                    inputProspectList: inputProspectList,
                     N: testInput.N,
                     CAB: testInput.CAB,
                     CAR: testInput.CAR,
                     ANT: testInput.ANT,
-                    BROWN: testInput.BROWN, 
+                    BROWN: testInput.BROWN,
                     EWT: testInput.EWT,
                     LMA: testInput.LMA,
                     PROT: testInput.PROT,
@@ -327,8 +358,31 @@ namespace UnitTests.PROSAIL
                     Cv: testInput.CrownCover,
                     Zeta: testInput.TreeShape,
                     SoilReflectance: soil,
-                    SailVersion: "4SAIL2"
+                    SailVersion: testInput.SailVersion
                 );
+
+                // Build R PROSPECT input list (green leaf always first; brown leaf second when provided)
+                var rProspectList = new List<Dictionary<string, object>>
+                {
+                    new Dictionary<string, object>
+                    {
+                        { "N", testInput.N }, { "CAB", testInput.CAB }, { "CAR", testInput.CAR },
+                        { "ANT", testInput.ANT }, { "BROWN", testInput.BROWN },
+                        { "EWT", testInput.EWT }, { "LMA", testInput.LMA },
+                        { "PROT", testInput.PROT }, { "CBC", testInput.CBC }, { "Alpha", testInput.Alpha }
+                    }
+                };
+                if (testInput.BrownN.HasValue)
+                {
+                    rProspectList.Add(new Dictionary<string, object>
+                    {
+                        { "N", testInput.BrownN.Value }, { "CAB", testInput.BrownCAB.Value },
+                        { "CAR", testInput.BrownCAR.Value }, { "ANT", testInput.BrownANT.Value },
+                        { "BROWN", testInput.BrownBROWN.Value }, { "EWT", testInput.BrownEWT.Value },
+                        { "LMA", testInput.BrownLMA.Value }, { "PROT", testInput.BrownPROT.Value },
+                        { "CBC", testInput.BrownCBC.Value }, { "Alpha", testInput.Alpha }
+                    });
+                }
 
                 // R implementation
                 var r_params = new Dictionary<string, object>
@@ -345,7 +399,7 @@ namespace UnitTests.PROSAIL
                     { "alpha", testInput.Alpha },
                     { "TypeLidf", testInput.TypeLidf },
                     { "LIDFa", testInput.LIDFa },
-                    { "LIDFb", testInput.LIDFb ?? 0.0 }, // Use 0 if null
+                    { "LIDFb", testInput.LIDFb ?? 0.0 },
                     { "lai", testInput.LAI },
                     { "q", testInput.HotSpot },
                     { "tts", testInput.SunZenithAngle },
@@ -356,8 +410,8 @@ namespace UnitTests.PROSAIL
                     { "Cv", testInput.CrownCover },
                     { "Zeta", testInput.TreeShape },
                     { "rsoil", soil.Reflectance },
-                    { "SailVersion", "4SAIL2" }
-                    
+                    { "SailVersion", testInput.SailVersion },
+                    { "inputProspectList", rProspectList }
                 };
                 var r_results = RunRImplementation("PRO4SAIL", r_params);
 
@@ -369,8 +423,6 @@ namespace UnitTests.PROSAIL
                 CompareArrays(ExtractDoubleArray(r_results["abs_hem"]), resultCS.Abs_hem, "abs_hem");
                 CompareArrays(ExtractDoubleArray(r_results["rsdstar"]), resultCS.Rsdstar, "rsdstar");
                 CompareArrays(ExtractDoubleArray(r_results["rddstar"]), resultCS.Rddstar, "rddstar");
-                //CompareArrays(ExtractDoubleArray(r_results["fCover"]), resultCS.FCover, "fCover");
-
             }
         }
     }
