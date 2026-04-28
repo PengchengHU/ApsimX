@@ -2,7 +2,6 @@
 using System.Collections.Generic;
 using System.Linq;
 using System.IO;
-using System.Text;
 using System.Data;
 using MathNet.Numerics.LinearAlgebra;
 using Models.Core;
@@ -135,6 +134,16 @@ namespace Models.PROSAIL.PROSPECT
         /// <summary>Current simulation name for database records</summary>
         private string simulationName = null;
 
+        /// <summary>Wavelengths to compute and write, cached once at simulation start</summary>
+        private double[] _cachedOutputWavelengths = null;
+
+        private static readonly List<string> ParamColumns = new List<string> {
+            "SimulationName", "Date", "N", "CAB", "CAR", "EWT", "LMA", "ANT", "BROWN", "PROT", "CBC", "Alpha"
+        };
+        private static readonly List<string> SpectraColumns = new List<string> {
+            "SimulationName", "Date", "WavelengthNM", "Reflectance", "Transmittance"
+        };
+
         /// <summary>Current parameter values after expression evaluation</summary>
         private Dictionary<string, double> CurrentParameterValues { get; set; } = new Dictionary<string, double>();
 
@@ -171,12 +180,17 @@ namespace Models.PROSAIL.PROSPECT
                 throw; // Halt simulation if data is missing
             }
 
+            // Cache the output wavelengths once — OutputWavelengthRange is static during a simulation
+            _cachedOutputWavelengths = ParseWavelengthRange().ToArray();
+            if (_cachedOutputWavelengths.Length == 0)
+                _cachedOutputWavelengths = cachedOpticalConstants.Value.Wavelength.ToArray();
+
             if (EnableSQLiteOutput)
             {
                 // Set default ProspectSQLiteDatabasePath based on simulation file name
                 string simulationFileName = Path.GetFileNameWithoutExtension(Simulation.FileName);
                 ProspectSQLiteDatabasePath = $"{simulationFileName}_Prospect.db";
-                
+
                 InitializeDatabase();
             }
         }
@@ -456,49 +470,22 @@ namespace Models.PROSAIL.PROSPECT
             {
                 dbConnection.ExecuteNonQuery("BEGIN TRANSACTION;");
 
-                // Parse wavelength range
-                List<double> outputWavelengths = ParseWavelengthRange();
-                if (outputWavelengths.Count == 0)
-                {
-                    WriteMessage(LogLevel.Warning, $"ProspectModel: No valid wavelengths to save, skipping database write.");
-                    return;
-                }
-
-                // Create a dictionary for fast lookup of output wavelengths
-                var outputWavelengthSet = new HashSet<double>(outputWavelengths);
-
                 string dateStr = date.ToString("yyyy-MM-dd");
 
                 // Parameters INSERT
-                string paramSql = $"INSERT OR REPLACE INTO Parameters (SimulationName, Date, N, CAB, CAR, EWT, LMA, ANT, BROWN, PROT, CBC, Alpha) VALUES " +
-                                 $"('{simulationName}', '{dateStr}', {CurrentParameterValues["N"]}, {CurrentParameterValues["CAB"]}, {CurrentParameterValues["CAR"]}, " +
-                                 $"{CurrentParameterValues["EWT"]}, {CurrentParameterValues["LMA"]}, {CurrentParameterValues["ANT"]}, {CurrentParameterValues["BROWN"]}, " +
-                                 $"{CurrentParameterValues["PROT"]}, {CurrentParameterValues["CBC"]}, {CurrentParameterValues["Alpha"]})";
-                dbConnection.ExecuteNonQuery(paramSql);
+                dbConnection.InsertRows("Parameters", ParamColumns, new List<object[]> { new object[] {
+                    simulationName, dateStr,
+                    CurrentParameterValues["N"], CurrentParameterValues["CAB"], CurrentParameterValues["CAR"],
+                    CurrentParameterValues["EWT"], CurrentParameterValues["LMA"], CurrentParameterValues["ANT"],
+                    CurrentParameterValues["BROWN"], CurrentParameterValues["PROT"], CurrentParameterValues["CBC"],
+                    CurrentParameterValues["Alpha"]
+                }});
 
                 // Spectra INSERT
-                StringBuilder spectraSql = new StringBuilder("INSERT OR REPLACE INTO Spectra (SimulationName, Date, WavelengthNM, Reflectance, Transmittance) VALUES ");
-                bool firstSpectra = true;
-
-                // Process all wavelengths
+                var spectraRows = new List<object[]>(usedWavelength.Length);
                 for (int i = 0; i < usedWavelength.Length; i++)
-                {
-                    double wavelength = usedWavelength[i];
-                    if (outputWavelengthSet.Contains(wavelength))
-                    {
-                        if (!firstSpectra)
-                            spectraSql.Append(",");
-                        spectraSql.Append($"('{simulationName}', '{dateStr}', {wavelength}, {reflectance[i]}, {transmittance[i]})");
-                        firstSpectra = false;
-                    }
-                }
-
-                if (!firstSpectra)
-                {
-                    spectraSql.Append(";");
-                    WriteMessage(LogLevel.Debug, $"ProspectModel: Executing Spectra INSERT with {spectraSql.Length} characters.");
-                    dbConnection.ExecuteNonQuery(spectraSql.ToString());
-                }
+                    spectraRows.Add(new object[] { simulationName, dateStr, usedWavelength[i], reflectance[i], transmittance[i] });
+                dbConnection.InsertRows("Spectra", SpectraColumns, spectraRows);
 
                 dbConnection.ExecuteNonQuery("COMMIT;");
 
@@ -679,11 +666,7 @@ namespace Models.PROSAIL.PROSPECT
             }
             CurrentParameterValues["Alpha"] = alphaValue;
 
-            // Parse the wavelength range from OutputWavelengthRange
-            double[] wavelengths = ParseWavelengthRange().ToArray();
-
-            // Determine the wavelengths to use for PROSPECT calculation
-            double[] inputWavelengths = wavelengths.Length > 0 ? wavelengths : cachedOpticalConstants.Value.Wavelength.ToArray();
+            double[] inputWavelengths = _cachedOutputWavelengths;
 
             // Run the PROSPECT model with the selected wavelengths
             LeafOptics results = ProspectCore.Prospect(

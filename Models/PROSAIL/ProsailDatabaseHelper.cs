@@ -2,7 +2,6 @@ using APSIM.Shared.Utilities;
 using System;
 using System.Collections.Generic;
 using System.IO;
-using System.Text;
 using static Models.PROSAIL.SAIL.SailUtilities;
 
 namespace Models.PROSAIL
@@ -12,6 +11,25 @@ namespace Models.PROSAIL
     /// </summary>
     public static class ProsailDatabaseHelper
     {
+        private static readonly List<string> ParameterColumns = new List<string> {
+            "SimulationName", "Date", "N", "CAB", "CAR", "EWT", "LMA", "ANT", "BROWN", "PROT", "CBC", "Alpha",
+            "LAI", "HotSpot", "TypeLidf", "LIDFa", "LIDFb", "FractionBrown", "Dissociation", "CrownCover", "TreeShape",
+            "WetDrySoilReflectancePath", "Psoil", "SunZenithAngle", "ObserverZenithAngle", "RelativeAzimuthAngle",
+            "SailVersion", "SensorType"
+        };
+        private static readonly List<string> CanopyOpticalVariableColumns = new List<string> {
+            "SimulationName", "Date", "Wavelength", "Rdot", "Rsot", "Rddt", "Rsdt", "fCover", "Abs_dir", "Abs_hem", "Rsdstar", "Rddstar"
+        };
+        private static readonly List<string> CanopyStateVariableColumns = new List<string> {
+            "SimulationName", "Date", "fAPAR", "fCover", "albedo"
+        };
+        private static readonly List<string> CanopyBRFColumns = new List<string> {
+            "SimulationName", "Date", "Wavelength", "BRF"
+        };
+        private static readonly List<string> ResampledColumns = new List<string> {
+            "SimulationName", "Date", "Wavelength", "BandName", "Reflectance"
+        };
+
         /// <summary>
         /// Gets the full path to the database file, resolving relative paths against the simulation directory.
         /// </summary>
@@ -200,68 +218,55 @@ namespace Models.PROSAIL
                 // Parameters INSERT
                 if (outputParameters)
                 {
-                    string paramSql = $@"
-            INSERT OR REPLACE INTO Parameters (
-                SimulationName, Date, N, CAB, CAR, EWT, LMA, ANT, BROWN, PROT, CBC, Alpha,
-                LAI, HotSpot, TypeLidf, LIDFa, LIDFb, FractionBrown, Dissociation, CrownCover, TreeShape,
-                WetDrySoilReflectancePath, Psoil, SunZenithAngle, ObserverZenithAngle, RelativeAzimuthAngle, SailVersion,
-                SensorType
-            ) VALUES (
-                '{simulationName}', '{dateStr}', {parameterValues["N"]}, {parameterValues["CAB"]},
-                {parameterValues["CAR"]}, {parameterValues["EWT"]}, {parameterValues["LMA"]},
-                {parameterValues["ANT"]}, {parameterValues["BROWN"]}, {parameterValues["PROT"]},
-                {parameterValues["CBC"]}, {parameterValues["Alpha"]},
-                {parameterValues["LAI"]}, {parameterValues["HotSpot"]}, {parameterValues["TypeLidf"]},
-                {parameterValues["LIDFa"]}, {parameterValues["LIDFb"]}, {parameterValues["FractionBrown"]},
-                {parameterValues["Dissociation"]}, {parameterValues["CrownCover"]}, {parameterValues["TreeShape"]},
-                '{wetDrySoilReflectancePath?.Replace("'", "''") ?? ""}', {parameterValues["Psoil"]},
-                {parameterValues["SunZenithAngle"]}, {parameterValues["ObserverZenithAngle"]},
-                {parameterValues["RelativeAzimuthAngle"]}, '{sailVersionString}', '{sensorTypeString}'
-            )";
-                    db.ExecuteNonQuery(paramSql);
+                    db.InsertRows("Parameters", ParameterColumns, new List<object[]> { new object[] {
+                        simulationName, dateStr,
+                        parameterValues["N"], parameterValues["CAB"], parameterValues["CAR"],
+                        parameterValues["EWT"], parameterValues["LMA"], parameterValues["ANT"],
+                        parameterValues["BROWN"], parameterValues["PROT"], parameterValues["CBC"],
+                        parameterValues["Alpha"], parameterValues["LAI"], parameterValues["HotSpot"],
+                        parameterValues["TypeLidf"], parameterValues["LIDFa"], parameterValues["LIDFb"],
+                        parameterValues["FractionBrown"], parameterValues["Dissociation"],
+                        parameterValues["CrownCover"], parameterValues["TreeShape"],
+                        wetDrySoilReflectancePath ?? "",
+                        parameterValues["Psoil"], parameterValues["SunZenithAngle"],
+                        parameterValues["ObserverZenithAngle"], parameterValues["RelativeAzimuthAngle"],
+                        sailVersionString, sensorTypeString
+                    }});
                 }
 
                 // CanopyOpticalVariable INSERT
                 if (outputCanopyOpticalVariable && canopyOptics?.Wavelength != null)
                 {
-                    double[] Rdot = canopyOptics.Rdot;
-                    double[] Rsot = canopyOptics.Rsot;
-                    double[] Rddt = canopyOptics.Rddt;
-                    double[] Rsdt = canopyOptics.Rsdt;
-                    double[] FCover = canopyOptics.FCover;
+                    double[] usedWavelength = canopyOptics.Wavelength;
+                    double[] Rdot    = canopyOptics.Rdot;
+                    double[] Rsot    = canopyOptics.Rsot;
+                    double[] Rddt    = canopyOptics.Rddt;
+                    double[] Rsdt    = canopyOptics.Rsdt;
+                    double[] FCover  = canopyOptics.FCover;
                     double[] Abs_dir = canopyOptics.Abs_dir;
                     double[] Abs_hem = canopyOptics.Abs_hem;
                     double[] Rsdstar = canopyOptics.Rsdstar;
                     double[] Rddstar = canopyOptics.Rddstar;
-                    double[] usedWavelength = canopyOptics.Wavelength;
 
-                    StringBuilder spectraSql = new StringBuilder("INSERT OR REPLACE INTO CanopyOpticalVariable (SimulationName, Date, Wavelength, Rdot, Rsot, Rddt, Rsdt, fCover, Abs_dir, Abs_hem, Rsdstar, Rddstar) VALUES ");
-                    bool firstSpectra = true;
+                    var rows = new List<object[]>(usedWavelength.Length);
                     for (int i = 0; i < usedWavelength.Length; i++)
-                    {
-                        if (!firstSpectra) spectraSql.Append(",");
-                        spectraSql.Append($"('{simulationName}', '{dateStr}', {usedWavelength[i]}, {Rdot[i]}, {Rsot[i]}, {Rddt[i]}, {Rsdt[i]}, {FCover[i]}," +
-                            $"{Abs_dir[i]}, {Abs_hem[i]}, {Rsdstar[i]}, {Rddstar[i]})");
-                        firstSpectra = false;
-                    }
-                    if (!firstSpectra)
-                    {
-                        spectraSql.Append(";");
-                        writeMessage(LogLevel.Debug, "ProsailModel: Executing CanopyOpticalVariable INSERT.");
-                        db.ExecuteNonQuery(spectraSql.ToString());
-                    }
+                        rows.Add(new object[] {
+                            simulationName, dateStr, usedWavelength[i],
+                            Rdot[i], Rsot[i], Rddt[i], Rsdt[i], FCover[i],
+                            Abs_dir[i], Abs_hem[i], Rsdstar[i], Rddstar[i]
+                        });
+
+                    writeMessage(LogLevel.Debug, "ProsailModel: Executing CanopyOpticalVariable INSERT.");
+                    db.InsertRows("CanopyOpticalVariable", CanopyOpticalVariableColumns, rows);
                 }
 
                 // CanopyStateVariable INSERT
                 if (outputCanopyStateVariable)
                 {
-                    string stateSql = $@"
-            INSERT OR REPLACE INTO CanopyStateVariable (
-                SimulationName, Date, fAPAR, fCover, albedo
-            ) VALUES (
-                '{simulationName}', '{dateStr}', {canopyStateVariables.fAPAR}, {canopyStateVariables.fcover}, {canopyStateVariables.albedo}
-            )";
-                    db.ExecuteNonQuery(stateSql);
+                    db.InsertRows("CanopyStateVariable", CanopyStateVariableColumns, new List<object[]> { new object[] {
+                        simulationName, dateStr,
+                        canopyStateVariables.fAPAR, canopyStateVariables.fcover, canopyStateVariables.albedo
+                    }});
                 }
 
                 // ReflectanceResampledToSensor INSERT
@@ -269,8 +274,7 @@ namespace Models.PROSAIL
                 {
                     try
                     {
-                        StringBuilder resampledSql = new StringBuilder("INSERT OR REPLACE INTO ReflectanceResampledToSensor (SimulationName, Date, Wavelength, BandName, Reflectance) VALUES ");
-                        bool firstRow = true;
+                        var rsRows = new List<object[]>();
                         for (int bandIndex = 0; bandIndex < spectralResamplingResult.Reflectance.Count; bandIndex++)
                         {
                             double[] bandReflectance = spectralResamplingResult.Reflectance[bandIndex];
@@ -283,17 +287,11 @@ namespace Models.PROSAIL
                                 continue;
                             }
                             foreach (double reflectance in bandReflectance)
-                            {
-                                if (!firstRow) resampledSql.Append(",");
-                                string escapedBandName = bandName.Replace("'", "''");
-                                resampledSql.Append($"('{simulationName}', '{dateStr}', {wavelength}, '{escapedBandName}', {reflectance})");
-                                firstRow = false;
-                            }
+                                rsRows.Add(new object[] { simulationName, dateStr, wavelength, bandName, reflectance });
                         }
-                        if (!firstRow)
+                        if (rsRows.Count > 0)
                         {
-                            resampledSql.Append(";");
-                            db.ExecuteNonQuery(resampledSql.ToString());
+                            db.InsertRows("ReflectanceResampledToSensor", ResampledColumns, rsRows);
                             writeMessage(LogLevel.Debug, $"ProsailModel: Successfully wrote resampled reflectance data to database for {dateStr}");
                         }
                     }
@@ -307,20 +305,12 @@ namespace Models.PROSAIL
                 // CanopyBRF INSERT
                 if (outputCanopyBRF && canopyBRF.Wavelength != null && canopyBRF.BRF != null)
                 {
-                    StringBuilder brfSql = new StringBuilder("INSERT OR REPLACE INTO CanopyBRF (SimulationName, Date, Wavelength, BRF) VALUES ");
-                    bool firstBRF = true;
+                    var brfRows = new List<object[]>(canopyBRF.Wavelength.Length);
                     for (int i = 0; i < canopyBRF.Wavelength.Length; i++)
-                    {
-                        if (!firstBRF) brfSql.Append(",");
-                        brfSql.Append($"('{simulationName}', '{dateStr}', {canopyBRF.Wavelength[i]}, {canopyBRF.BRF[i]})");
-                        firstBRF = false;
-                    }
-                    if (!firstBRF)
-                    {
-                        brfSql.Append(";");
-                        db.ExecuteNonQuery(brfSql.ToString());
-                        writeMessage(LogLevel.Debug, $"ProsailModel: Successfully wrote CanopyBRF data to database for {dateStr}");
-                    }
+                        brfRows.Add(new object[] { simulationName, dateStr, canopyBRF.Wavelength[i], canopyBRF.BRF[i] });
+
+                    db.InsertRows("CanopyBRF", CanopyBRFColumns, brfRows);
+                    writeMessage(LogLevel.Debug, $"ProsailModel: Successfully wrote CanopyBRF data to database for {dateStr}");
                 }
 
                 db.ExecuteNonQuery("COMMIT;");
