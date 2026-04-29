@@ -292,12 +292,24 @@ namespace Models.PROSAIL
 
         /// <summary>Whether to write the CanopyOpticalVariable table to the database.</summary>
         [Description("Save canopy Optical variable")]
-        [Tooltip("Save per-wavelength canopy optical variables (Rdot, Rsot, Rddt, Rsdt, FCover, Abs_dir, Abs_hem, Rsdstar, Rddstar) to the CanopyOpticalVariable table of the database.")]
+        [Tooltip("Save per-wavelength canopy optical variables to the CanopyOpticalVariable table of the database:\n" +
+            "• Rdot – Hemispherical-directional reflectance factor (diffuse illumination → directional sensor)\n" +
+            "• Rsot – Bi-directional reflectance factor (direct illumination → directional sensor)\n" +
+            "• Rddt – Bi-hemispherical reflectance (diffuse illumination → hemisphere)\n" +
+            "• Rsdt – Directional-hemispherical reflectance (direct illumination → hemisphere)\n" +
+            "• FCover – Fractional canopy cover\n" +
+            "• Abs_dir – Canopy absorptance under direct (beam) radiation\n" +
+            "• Abs_hem – Canopy absorptance under diffuse (hemispherical) radiation\n" +
+            "• Rsdstar – Canopy layer reflectance for direct illumination (excluding soil)\n" +
+            "• Rddstar – Canopy layer reflectance for diffuse illumination (excluding soil)")]
         public bool OutputCanopyOpticalVariable { get; set; } = true;
 
         /// <summary>Whether to compute and save canopy state variables (fAPAR, fCover, albedo).</summary>
         [Description("Compute and save canopy state variable")]
-        [Tooltip("Compute broadband fAPAR, fCover, and albedo and save them to the CanopyStateVariable table of the database.")]
+        [Tooltip("Compute broadband canopy state variables and save them to the CanopyStateVariable table of the database:\n" +
+            "• fAPAR – Fraction of Absorbed Photosynthetically Active Radiation\n" +
+            "• fCover – Fractional green canopy cover\n" +
+            "• albedo – Broadband canopy albedo")]
         public bool OutputCanopyStateVariable { get; set; } = true;
 
         /// <summary>Whether to compute and save canopy BRF.</summary>
