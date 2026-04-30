@@ -1,6 +1,7 @@
 ﻿using APSIM.Shared.Utilities;
 using MathNet.Numerics.LinearAlgebra;
 using Models.Core;
+using Models;
 using Models.Functions;
 using Models.PMF;
 using APSIM.Core;
@@ -52,6 +53,10 @@ namespace Models.PROSAIL
         #endregion
 
         #region PROSAIL Input Parameters (Expressions)
+        /// <summary>Getting-started notice shown at the top of the property panel.</summary>
+        [Description("ℹ️ Getting started")]
+        public string GettingStarted { get; set; } = "New to APSIM-PROSAIL? Click the Introduction node in the simulation tree for a model overview, usage guide, and citation guidelines.";
+
         /// <summary>The expression for N (Leaf structure parameter)</summary>
         [Separator("Expressions to link APSIM variables and PROSPECT inputs")]
         [Description("N - Leaf structure (unitless)")]
@@ -353,6 +358,7 @@ namespace Models.PROSAIL
         [Description("Logging level")]
         [Tooltip("Controls verbosity: Error (errors only), Warning (+ warnings), Info (+ informational), Debug (all messages).")]
         public LogLevel LoggingLevel { get; set; } = LogLevel.Info;
+
         #endregion
 
         #region Private Fields and Cached Data
@@ -686,6 +692,114 @@ namespace Models.PROSAIL
         }
 
         #region Event Handlers
+        /// <summary>Adds an Introduction memo child on first creation if one does not already exist.</summary>
+        public override void OnCreated()
+        {
+            base.OnCreated();
+            if (!Children.Exists(c => c is Memo && c.Name == "Introduction"))
+            {
+                Children.Insert(0, new Memo
+                {
+                    Name = "Introduction",
+                    Text =
+                        "# APSIM-PROSAIL framework\n\n" +
+                        "The **APSIM-PROSAIL** framework couples the **PROSAIL** (radiative transfer model) with the **APSIM** " +
+                        "(agricultural systems modelling and simulation platform). **PROSAIL** combines the **PROSPECT** leaf optical properties model with the " +
+                        "**SAIL** canopy reflectance model to simulate hyperspectral canopy reflectance from leaf biochemical " +
+                        "and canopy structural traits.\n\n" +
+                        "At each simulation timestep, plant traits computed by **APSIM** (e.g. LAI, leaf nitrogen) are passed " +
+                        "as inputs to **PROSAIL** via configurable expressions. The resulting per-wavelength canopy reflectance " +
+                        "and associated optical variables are written to a SQLite database for further analysis or " +
+                        "comparison with remote sensing observations.\n\n" +
+                        "This C# implementation of **PROSAIL** is based on the algorithms implemented in the R packages **prosail** (https://github.com/jbferet/prosail) and " + 
+                        "**prospect** (https://github.com/jbferet/prospect), and is used with the permission of the package author." + 
+                        "The C# implementation of BSM is based on the algorithm implemented in Matlab (https://github.com/Christiaanvandertol/SCOPE/blob/master/src/RTMs/BSM.m).\n\n" +
+                        "## How to use\n\n" +
+                        "### Step 1: PROSPECT leaf inputs\n\n" +
+                        "Set each leaf biochemical parameter either to a fixed value or to an APSIM expression that pulls the value from a crop model at runtime (e.g. `[Wheat].Leaf.LAI`). Key parameters and their typical ranges:\n\n" +
+                        "| Parameter | Description | Typical range |\n" +
+                        "|-----------|-------------|---------------|\n" +
+                        "| **N** | Leaf mesophyll structure (number of layers) | 1.0 – 2.6 |\n" +
+                        "| **CAB** | Chlorophyll a+b content (µg cm⁻²) | 10 – 80 |\n" +
+                        "| **CAR** | Carotenoid content (µg cm⁻²) | 1 – 24 |\n" +
+                        "| **ANT** | Anthocyanin content (µg cm⁻²) | 0 – 10 |\n" +
+                        "| **BROWN** | Brown (senescent) pigment fraction | 0 – 1 |\n" +
+                        "| **EWT** | Equivalent water thickness (cm) | 0.001 – 0.08 |\n" +
+                        "| **LMA** | Leaf dry matter per area (g cm⁻²) | 0.001 – 0.02 |\n" +
+                        "| **PROT** | Protein content (g cm⁻²) | 0 – 10 |\n" +
+                        "| **CBC** | Carbon-based constituents — cellulose + lignin (g cm⁻²) | 0 – 10 |\n" +
+                        "| **Alpha** | Incidence angle for refractive index (°) | 40 (default) |\n\n" +
+                        "Set **InputWavelengthRange** to the wavelengths PROSAIL should compute, e.g. `400-2500` for the full range or `650,750,800` for specific bands. Leave empty to use all wavelengths (400–2500 nm).\n\n" +
+                        "### Step 2: SAIL canopy properties\n\n" +
+                        "Choose **SailVersion**:\n\n" +
+                        "- `4SAIL`: single-layer homogeneous canopy. Suitable for most crops.\n" +
+                        "- `4SAIL2`: two-layer canopy (green + brown) with clumping effects. Required when **FractionBrown** > 0.\n\n" +
+                        "| Parameter | Description | Typical range |\n" +
+                        "|-----------|-------------|---------------|\n" +
+                        "| **LAI** | Leaf Area Index (m² m⁻²) | 0 – 10 |\n" +
+                        "| **HotSpot** | Hotspot parameter (leaf size / canopy height) | 0 – 1 |\n" +
+                        "| **TypeLidf** | Leaf angle distribution type: 1 = Verhoef (uses LIDFa + LIDFb), 2 = Campbell (uses LIDFa only) | 1 or 2 |\n" +
+                        "| **LIDFa** | LIDF parameter a (average inclination angle for type 1; ellipsoidal eccentricity for type 2) | −1 to 1 |\n" +
+                        "| **LIDFb** | LIDF parameter b — bimodality (type 1 only) | −1 to 1 |\n" +
+                        "| **FractionBrown** | Fraction of brown leaves in canopy (4SAIL2 only) | 0 – 1 |\n" +
+                        "| **Dissociation** | Degree of clumping between green and brown leaves (4SAIL2 only) | 0 – 1 |\n" +
+                        "| **CrownCover** | Crown cover fraction (4SAIL2 only) | 0 – 1 |\n" +
+                        "| **TreeShape** | Tree shape factor affecting gap fraction (4SAIL2 only) | > 0 |\n\n" +
+                        "### Step 3: Sun–observer geometry\n\n" +
+                        "| Parameter | Description | Typical range |\n" +
+                        "|-----------|-------------|---------------|\n" +
+                        "| **ObservationDates** | Comma-separated dates (e.g. `2023-01-15,2023-04-01`). Leave empty to run every simulation day. | |\n" +
+                        "| **SunZenithAngle** | Solar zenith angle (°) | 0 – 90 |\n" +
+                        "| **ObserverZenithAngle** | Sensor/observer zenith angle (°) | 0 – 90 |\n" +
+                        "| **RelativeAzimuthAngle** | Relative azimuth between sun and observer (°) | 0 – 360 |\n\n" +
+                        "When **ObservationDates** lists multiple dates, supply a matching comma-separated list of angles for each geometry parameter, or a single value applied to all dates.\n\n" +
+                        "### Step 4: Soil reflectance\n\n" +
+                        "Toggle **UseBSM** to choose the soil model:\n\n" +
+                        "**Wet/dry linear mixing model** (UseBSM = false):\n\n" +
+                        "- Leave **WetDrySoilReflectancePath** empty to use the built-in soil spectra, or provide a path to a custom CSV file with wet and dry soil reflectance spectra.\n" +
+                        "- Set **Psoil** to a value between 0 (fully wet) and 1 (fully dry), or link it to a soil moisture expression. Accepts a single value, comma-separated per-date list, or an APSIM expression.\n\n" +
+                        "**BSM (brightness–soil model)** (UseBSM = true):\n\n" +
+                        "| Parameter | Description | Typical range |\n" +
+                        "|-----------|-------------|---------------|\n" +
+                        "| **BsmBrightness** | Soil brightness factor | 0 – 1 |\n" +
+                        "| **BsmLat** | Latitude input to BSM (°) | 20 – 40 |\n" +
+                        "| **BsmLon** | Longitude input to BSM (°) | 45 – 65 |\n" +
+                        "| **SMp** | Volumetric soil moisture (%) | 5 – 55 |\n\n" +
+                        "### Step 5: Output and simulation control\n\n" +
+                        "The .db  file will receive results (relative to the simulation `.apsimx` file, e.g. `YourSimulationName_prosail.db`).\n\n" +
+                        "Enable the tables you need:\n\n" +
+                        "| Toggle | Contents |\n" +
+                        "|--------|----------|\n" +
+                        "| **OutputParameters** | Input parameter values logged per timestep |\n" +
+                        "| **OutputCanopyOpticalVariable** | Per-wavelength Rdot, Rsot, Rddt, Rsdt, fCover, Abs_dir, Abs_hem, Rsdstar, Rddstar |\n" +
+                        "| **OutputCanopyStateVariable** | Integrated fAPAR, fCover, albedo |\n" +
+                        "| **OutputCanopyBRF** | Per-wavelength bidirectional reflectance factor (BRF) |\n" +
+                        "| **OutputReflectanceResampledToSensor** | BRF convolved with sensor spectral response functions |\n\n" +
+                        "When **OutputReflectanceResampledToSensor** is enabled, choose a **SensorType** from the built-in list (Landsat 7/8/9, MODIS, Pleiades 1A/1B, Sentinel-2/2A/2B/2C, SPOT 6/7, Venus) or select *Custom* and supply a **CustomSRFPath** pointing to your spectral response function file.\n\n" +
+                        "Set **LoggingLevel** to control verbosity (Debug, Info, Warning, or Error).\n\n" +
+                        "## References\n\n" +
+                        "If you use the APSIM-PROSAIL in your work, please cite the relevant papers below.\n\n" +
+                        "### PROSPECT\n\n" +
+                        "- Féret, J.-B. & de Boissieu, F. (2024). `prospect`: an R package to link leaf optical properties with their chemical and structural properties with the leaf model PROSPECT. Journal of Open Source Software, 9(94), 6027, https://doi.org/10.21105/joss.06027\n" +
+                        "- Féret, J.-B., Berger, K., de Boissieu, F. & Malenovský, Z. (2021). PROSPECT-PRO for estimating content of nitrogen-containing leaf proteins and other carbon-based constituents. Remote Sensing of Environment. 252, 112173. https://doi.org/10.1016/j.rse.2020.112173\n" +
+                        "- Féret, J.-B., Gitelson, A.A., Noble, S.D. & Jacquemoud, S. (2017). PROSPECT-D: Towards modeling leaf optical properties through a complete lifecycle. Remote Sensing of Environment. 193, 204–215. http://dx.doi.org/10.1016/j.rse.2017.03.004\n" +
+                        "### 4SAIL and 4SAIL2\n\n" +
+                        "- Verhoef W & Bach H, 2007. Coupled soil–leaf-canopy and atmosphere radiative transfer modeling to simulate hyperspectral multi-angular surface reflectance and TOA radiance data. Remote Sensing of Environment, 109:166-182. https://doi.org/10.1016/j.rse.2006.12.013\n" +
+                        "- Verhoef W, Jia L, Xiao Q & Su Z, 2007. Unified optical-thermal four-stream radiative transfer theory for homogeneous vegetation canopies. IEEE Transactions in Geosciences and Remote Sensing, 45:1808–1822. https://doi.org/10.1109/TGRS.2007.89584\n" +
+                        "### PROSAIL\n\n" +
+                        "- Jacquemoud S, Verhoef W, Baret F, Bacour C, Zarco-Tejada PJ, Asner GP, François C & Ustin SL, 2009. PROSPECT+ SAIL models: A review of use for vegetation characterization. Remote Sensing of Environment, 113:S56–S66. https://doi.org/doi:10.1016/j.rse.2008.01.026\n" +
+                        "- Berger K, Atzberger C, Danner M, D’Urso G, Mauser W, Vuolo F & Hank T 2018. Evaluation of the PROSAIL Model Capabilities for Future Hyperspectral Model Environments: A Review Study. Remote Sensing, 10:85. https://doi.org/10.3390/rs10010085\n" +
+                        "### The APSIM-PROSAIL integration \n\n" +
+                        "- Holzworth, D.P., Huth, N.I., deVoil, P.G., Zurcher, E.J., Herrmann, N.I., McLean, G., Chenu, K., van Oosterom, E.J., Snow, V., Murphy, C., Moore, A.D., Brown, H., Whish, J.P.M., Verrall, S., Fainges, J., Bell, L.W., Peake, A.S., Poulton, P.L., Hochman, Z., Thorburn, P.J., Gaydon, D.S., Dalgliesh, N.P., Rodriguez, D., Cox, H., Chapman, S., Doherty, A., Teixeira, E., Sharp, J., Cichota, R., Vogeler, I., Li, F.Y., Wang, E., Hammer, G.L., Robertson, M.J., Dimes, J.P., Whitbread, A.M., Hunt, J., van Rees, H., McClelland, T., Carberry, P.S., Hargreaves, J.N.G., MacLeod, N., McDonald, C., Harsdorf, J., Wedgwood, S., Keating, B.A., 2014. APSIM – Evolution towards a new generation of agricultural systems simulation. Environmental Modelling & Software 62, 327–350. https://doi.org/10.1016/j.envsoft.2014.07.009\n" +
+                        "- Hu, P., Zheng, B., Chen, Q., Grunefeld, S., Choudhury, M.R., Fernandez, J., Potgieter, A., Chapman, S.C., 2024. Estimating aboveground biomass dynamics of wheat at small spatial scale by integrating crop growth and radiative transfer models with satellite remote sensing data. Remote Sensing of Environment 311, 114277. https://doi.org/10.1016/j.rse.2024.114277\n" +
+                        "- Chen, Q., Zheng, B., Chen, T., Chapman, S.C., 2022. Integrating a crop growth model and radiative transfer model to improve estimation of crop traits based on deep learning. Journal of Experimental Botany erac291. https://doi.org/10.1093/jxb/erac291\n" +
+                        "### BSM\n\n" +
+                        "- Verhoef, W., van der Tol, C., Middleton, E.M., 2018. Hyperspectral radiative transfer modeling to explore the combined retrieval of biophysical parameters and canopy fluorescence from FLEX – Sentinel-3 tandem mission multi-sensor data. Remote Sensing of Environment 204, 942–963. https://doi.org/10.1016/j.rse.2017.08.006\n" +
+                        "- Yang, P., van der Tol, C., Yin, T., Verhoef, W., 2020. The SPART model: A soil-plant-atmosphere radiative transfer model for satellite measurements in the solar spectrum. Remote Sensing of Environment 247, 111870. https://doi.org/10.1016/j.rse.2020.111870"
+                });
+            }
+        }
+
         /// <summary>Called when [simulation commencing].</summary>
         [EventSubscribe("Commencing")]
         private void OnCommencing(object sender, EventArgs e)
