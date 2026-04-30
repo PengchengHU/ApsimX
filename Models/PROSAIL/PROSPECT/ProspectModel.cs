@@ -22,7 +22,6 @@ namespace Models.PROSAIL.PROSPECT
     [Serializable]
     [ViewName("UserInterface.Views.PropertyView")]
     [PresenterName("UserInterface.Presenters.PropertyPresenter")]
-    [ValidParent(ParentType = typeof(Plant))]
     public class ProspectModel : Model, IStructureDependency
     {
         /// <summary> Link to the clock for daily outputs </summary>
