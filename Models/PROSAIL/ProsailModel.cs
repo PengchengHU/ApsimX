@@ -14,6 +14,7 @@ using System.Collections.Generic;
 using System.Data;
 using System.IO;
 using System.Linq;
+using System.Reflection;
 using static Models.Prosail.ProsailCore;
 using static Models.PROSAIL.PROSPECT.ProspectCore;
 using static Models.PROSAIL.SAIL.SailUtilities;
@@ -62,52 +63,62 @@ namespace Models.PROSAIL
         [Description("N - Leaf structure (unitless)")]
         [Tooltip("Leaf structure parameter. Can be a literal value or an APSIM expression" + 
         "(e.g., IIF([Wheat].Leaf.SpecificAreaCanopy * 10 <= 0.1, 1.6, (0.9 * [Wheat].Leaf.SpecificAreaCanopy * 10 + 0.025) / ([Wheat].Leaf.SpecificAreaCanopy * 10 - 0.1)) )." + 
-        "Typical range: 1.0-2.6.")]
+        "Typical range: 1.0-2.6. Evaluated daily only; does not support a per-observation-date list (see the Introduction node).")]
+        [Bounds(Lower = 1.0, Upper = 2.6)]
         public string N { get; set; } = "1.5";
 
         /// <summary>The expression for CAB (Chlorophyll a + b content)</summary>
         [Description("CAB - Chlorophyll a+b (\u03BCg/cm\u00B2)")]
-        [Tooltip("Chlorophyll a + b content. Can be a literal value or an APSIM expression (e.g., [Wheat].Leaf.SpecificNitrogen * 26 ). Typical range: 10-80 \u03BCg/cm\u00B2.")]
+        [Tooltip("Chlorophyll a + b content. Can be a literal value or an APSIM expression (e.g., [Wheat].Leaf.SpecificNitrogen * 26 ). Typical range: 10-80 \u03BCg/cm\u00B2. Evaluated daily only; does not support a per-observation-date list (see the Introduction node).")]
+        [Bounds(Lower = 10.0, Upper = 80.0)]
         public string CAB { get; set; } = "40.0";
 
         /// <summary>The expression for CAR (Carotenoid content)</summary>
         [Description("CAR - Carotenoid (\u03BCg/cm\u00B2)")]
-        [Tooltip("Carotenoid content. Can be a literal or APSIM expression (e.g., [Wheat].Leaf.SpecificNitrogen * 26 * 0.216 ). Typical range: 1-24 \u03BCg/cm\u00B2.")]
+        [Tooltip("Carotenoid content. Can be a literal or APSIM expression (e.g., [Wheat].Leaf.SpecificNitrogen * 26 * 0.216 ). Typical range: 1-24 \u03BCg/cm\u00B2. Evaluated daily only; does not support a per-observation-date list (see the Introduction node).")]
+        [Bounds(Lower = 1.0, Upper = 24.0)]
         public string CAR { get; set; } = "8.0";
 
         /// <summary>The expression for EWT (Equivalent Water Thickness)</summary>
         [Description("EWT - Water thickness (cm)")]
-        [Tooltip("Equivalent Water Thickness (CW). Can be a literal or APSIM expression. Typical range: 0.001-0.08 cm.")]
+        [Tooltip("Equivalent Water Thickness (CW). Can be a literal or APSIM expression. Typical range: 0.001-0.08 cm. Evaluated daily only; does not support a per-observation-date list (see the Introduction node).")]
+        [Bounds(Lower = 0.001, Upper = 0.08)]
         public string EWT { get; set; } = "0.01";
 
         /// <summary>The expression for LMA (Leaf Mass per Area)</summary>
         [Description("LMA - Dry matter (g/cm\u00B2)")]
-        [Tooltip("Leaf Mass per Area (CM). Can be a literal or APSIM expression (e.g., (1 / ([Wheat].Leaf.SpecificAreaCanopy + 0.0001)) * 10^(-4) ). Typical range: 0.001-0.02 g/cm\u00B2.")]
+        [Tooltip("Leaf Mass per Area (CM). Can be a literal or APSIM expression (e.g., (1 / ([Wheat].Leaf.SpecificAreaCanopy + 0.0001)) * 10^(-4) ). Typical range: 0.001-0.02 g/cm\u00B2. Evaluated daily only; does not support a per-observation-date list (see the Introduction node).")]
+        [Bounds(Lower = 0.001, Upper = 0.02)]
         public string LMA { get; set; } = "0.008";
 
         /// <summary>The expression for BROWN (Brown pigment content)</summary>
         [Description("BROWN - Brown pigment (unitless)")]
-        [Tooltip("Brown pigment content. Can be a literal or APSIM expression. Typical range: 0-1.")]
+        [Tooltip("Brown pigment content. Can be a literal or APSIM expression. Typical range: 0-1. Evaluated daily only; does not support a per-observation-date list (see the Introduction node).")]
+        [Bounds(Lower = 0.0, Upper = 1.0)]
         public string BROWN { get; set; } = "0.0";
 
         /// <summary>The expression for ANT (Anthocyanin content)</summary>
         [Description("ANT - Anthocyanin (\u03BCg/cm\u00B2)")]
-        [Tooltip("Anthocyanin content. Can be a literal or APSIM expression. Typical range: 0-10 \u03BCg/cm\u00B2.")]
+        [Tooltip("Anthocyanin content. Can be a literal or APSIM expression. Typical range: 0-10 \u03BCg/cm\u00B2. Evaluated daily only; does not support a per-observation-date list (see the Introduction node).")]
+        [Bounds(Lower = 0.0, Upper = 10.0)]
         public string ANT { get; set; } = "0.0";
 
         /// <summary>The expression for PROT (Protein content)</summary>
         [Description("PROT - Protein (g/cm\u00B2)")]
-        [Tooltip("Protein content. Can be a literal or APSIM expression. Typical range: 0-10 g/cm\u00B2.")]
+        [Tooltip("Protein content. Can be a literal or APSIM expression. Typical range: 0-10 g/cm\u00B2. Evaluated daily only; does not support a per-observation-date list (see the Introduction node).")]
+        [Bounds(Lower = 0.0, Upper = 10.0)]
         public string PROT { get; set; } = "0.0";
 
         /// <summary>The expression for CBC (NonProt Carbon-based constituent content)</summary>
         [Description("CBC - Carbon-based constituent (g/cm\u00B2)")]
-        [Tooltip("Non-protein carbon-based constituent content. Can be a literal or APSIM expression. Typical range: 0-10 g/cm\u00B2.")]
+        [Tooltip("Non-protein carbon-based constituent content. Can be a literal or APSIM expression. Typical range: 0-10 g/cm\u00B2. Evaluated daily only; does not support a per-observation-date list (see the Introduction node).")]
+        [Bounds(Lower = 0.0, Upper = 10.0)]
         public string CBC { get; set; } = "0.0";
 
         /// <summary>The expression for alpha (Incidence angle in degrees)</summary>
         [Description("Alpha - Incidence angle (\u00B0)")]
-        [Tooltip("Incidence angle in degrees. Can be a literal or APSIM expression. Typical range: 0-90\u00B0.")]
+        [Tooltip("Incidence angle in degrees. Can be a literal or APSIM expression. Typical range: 0-90\u00B0. Evaluated daily only; does not support a per-observation-date list (see the Introduction node).")]
+        [Bounds(Lower = 0.0, Upper = 90.0)]
         public string Alpha { get; set; } = "40.0";
 
         /// <summary>Spectral range to simulate (start-end in nm)</summary>
@@ -131,47 +142,55 @@ namespace Models.PROSAIL
 
         /// <summary>The expression for Leaf Area Index (LAI)</summary>
         [Description("LAI - Leaf Area Index (m\u00B2/m\u00B2)")]
-        [Tooltip("Leaf Area Index. Can be a literal or APSIM expression (e.g., [Wheat].Leaf.LAI). Typical range: 0-10 m\u00B2/m\u00B2.")]
+        [Tooltip("Leaf Area Index. Can be a literal or APSIM expression (e.g., [Wheat].Leaf.LAI). Typical range: 0-10 m\u00B2/m\u00B2. Evaluated daily only; does not support a per-observation-date list (see the Introduction node).")]
+        [Bounds(Lower = 0.0, Upper = 10.0)]
         public string LAI { get; set; } = "3.0";
 
         /// <summary>The expression for the Hot Spot parameter (q).</summary>
         [Description("q - Hot Spot (unitless)")]
-        [Tooltip("Hot Spot parameter. Can be a literal or APSIM expression. Typical range: 0-1.")]
+        [Tooltip("Hot Spot parameter. Can be a literal or APSIM expression. Typical range: 0-1. Evaluated daily only; does not support a per-observation-date list (see the Introduction node).")]
+        [Bounds(Lower = 0.0, Upper = 1.0)]
         public string HotSpot { get; set; } = "0.1";
 
         /// <summary>The expression for the LIDF type.</summary>
         [Description("TypeLidf - LIDF type")]
-        [Tooltip("1 for Verhoef (uses LIDFa and LIDFb), 2 for Campbell (uses LIDFa only as mean leaf angle).")]
+        [Tooltip("1 for Verhoef (uses LIDFa and LIDFb), 2 for Campbell (uses LIDFa only as mean leaf angle). Evaluated daily only; does not support a per-observation-date list (see the Introduction node).")]
+        [Bounds(Lower = 1.0, Upper = 2.0)]
         public string TypeLidf { get; set; } = "2";
 
         /// <summary>The expression for LIDF parameter 'a'.</summary>
         [Description("LIDFa - Average leaf slope/angle")]
-        [Tooltip("Average leaf slope (TypeLidf=1) or mean leaf angle in degrees (TypeLidf=2). Can be a literal or APSIM expression.")]
+        [Tooltip("Average leaf slope (TypeLidf=1, range -1 to 1) or mean leaf angle in degrees (TypeLidf=2, range -90 to 90). Can be a literal or APSIM expression. Evaluated daily only; does not support a per-observation-date list (see the Introduction node).")]
         public string LIDFa { get; set; } = "60.0";
 
         /// <summary>The expression for LIDF parameter 'b'.</summary>
         [Description("LIDFb - Bimodality")]
-        [Tooltip("Bimodality parameter for Verhoef LIDF (TypeLidf=1 only). Ignored for Campbell. Typical range: -1 to 1.")]
+        [Tooltip("Bimodality parameter for Verhoef LIDF (TypeLidf=1 only). Ignored for Campbell. Typical range: -1 to 1. Evaluated daily only; does not support a per-observation-date list (see the Introduction node).")]
+        [Bounds(Lower = -1.0, Upper = 1.0)]
         public string LIDFb { get; set; } = "-0.35";
 
         /// <summary>The expression for the fraction of brown leaf area.</summary>
         [Description("FractionBrown - Brown leaf fraction")]
-        [Tooltip("Fraction of brown/senesced leaf area (unitless, 0-1). Used with 4SAIL2 version.")]
+        [Tooltip("Fraction of brown/senesced leaf area (unitless, 0-1). Used with 4SAIL2 version. Evaluated daily only; does not support a per-observation-date list (see the Introduction node).")]
+        [Bounds(Lower = 0.0, Upper = 1.0)]
         public string FractionBrown { get; set; } = "0.0";
 
         /// <summary>The expression for the layer dissociation factor (diss).</summary>
         [Description("Diss - Dissociation factor")]
-        [Tooltip("Layer dissociation factor for green/brown leaves (unitless, 0-1). Used with 4SAIL2 version.")]
+        [Tooltip("Layer dissociation factor for green/brown leaves (unitless, 0-1). Used with 4SAIL2 version. Evaluated daily only; does not support a per-observation-date list (see the Introduction node).")]
+        [Bounds(Lower = 0.0, Upper = 1.0)]
         public string Dissociation { get; set; } = "0.0";
 
         /// <summary>The expression for the vertical crown cover percentage (cv).</summary>
         [Description("Cv - Crown cover")]
-        [Tooltip("Vertical crown cover percentage (unitless, 0-1).")]
+        [Tooltip("Vertical crown cover percentage (unitless, 0-1). Evaluated daily only; does not support a per-observation-date list (see the Introduction node).")]
+        [Bounds(Lower = 0.0, Upper = 1.0)]
         public string CrownCover { get; set; } = "1.0";
 
         /// <summary>The expression for the tree shape factor (zeta).</summary>
         [Description("Zeta - Tree shape factor")]
-        [Tooltip("Tree shape factor: crown diameter to height ratio (unitless).")]
+        [Tooltip("Tree shape factor: crown diameter to height ratio (unitless). Evaluated daily only; does not support a per-observation-date list (see the Introduction node).")]
+        [Bounds(Lower = 0.0, Upper = 10.0)]
         public string TreeShape { get; set; } = "1.0";
         #endregion
 
@@ -185,16 +204,19 @@ namespace Models.PROSAIL
         /// <summary>The expression or per-date list for the sun zenith angle (tts).</summary>
         [Description("TTS - Sun zenith angle (\u00B0)")]
         [Tooltip("Sun zenith angle (°, 0-90). Accepts: a single literal (e.g. 30) applied to all dates or a comma-separated list of one value per observation date (e.g. 25, 30, 35). Defaults to 90°.")]
+        [Bounds(Lower = 0.0, Upper = 90.0)]
         public string SunZenithAngle { get; set; } = "90";
 
         /// <summary>The expression or per-date list for the observer zenith angle (tto).</summary>
         [Description("TTO - Observer zenith angle (\u00B0)")]
         [Tooltip("Observer (sensor) zenith angle (°, 0-90). Accepts: a single literal (e.g. 0) or a comma-separated list of one value per observation date (e.g. 0, 30, 60). Defaults to 0°.")]
+        [Bounds(Lower = 0.0, Upper = 90.0)]
         public string ObserverZenithAngle { get; set; } = "0";
 
         /// <summary>The expression or per-date list for the relative azimuth angle (psi).</summary>
         [Description("PSI - Relative azimuth angle (\u00B0)")]
         [Tooltip("Relative azimuth angle between sun and observer (°, 0-360). Accepts: a single literal (e.g. 0) or a comma-separated list of one value per observation date (e.g. 0, 90, 180). Defaults to 0°.")]
+        [Bounds(Lower = 0.0, Upper = 360.0)]
         public string RelativeAzimuthAngle { get; set; } = "0";
 
         /// <summary>True when observation dates are specified in the UI and at least one is set.</summary>
@@ -221,23 +243,24 @@ namespace Models.PROSAIL
         [Description("Psoil - Soil dry-to-wet factor")]
         [Tooltip("Dry-to-wet mixing factor (0 = fully wet, 1 = fully dry). Accepts: a single literal (e.g., 0.5) applied to all dates; a comma-separated list of one value per observation date (e.g. 0.3, 0.5, 0.7); or an APSIM expression evaluated each day (e.g. 1 - [WaterBalance].SW[1]). Defaults to 1 \u2212 [WaterBalance].SW[1].")]
         [Display(VisibleCallback = nameof(IsNotBSM))]
+        [Bounds(Lower = 0.0, Upper = 1.0)]
         public string Psoil { get; set; } = "1 - [WaterBalance].SW[1]";
 
         /// <summary>BSM soil brightness parameter.</summary>
         [Description("BsmBrightness - Soil brightness (0-1)")]
-        [Tooltip("Soil brightness scaling factor (0\u20131) for BSM. Scales the magnitude of the dry soil spectrum. Enter a literal (e.g., 0.5).")]
+        [Tooltip("Soil brightness scaling factor (0\u20131) for BSM. Scales the magnitude of the dry soil spectrum. Enter a literal (e.g., 0.5). Evaluated daily only; does not support a per-observation-date list (see the Introduction node).")]
         [Display(VisibleCallback = nameof(UseBSM))]
         public string BsmBrightness { get; set; } = "0.5";
 
         /// <summary>BSM spectral shape latitude.</summary>
         [Description("BsmLat - Spectral shape latitude (20-40\u00B0)")]
-        [Tooltip("Spectral latitude for BSM (recommended 20\u201340\u00B0). Controls the spectral shape of the dry soil spectrum. Enter a literal (e.g., 25).")]
+        [Tooltip("Spectral latitude for BSM (recommended 20\u201340\u00B0). Controls the spectral shape of the dry soil spectrum. Enter a literal (e.g., 25). Evaluated daily only; does not support a per-observation-date list (see the Introduction node).")]
         [Display(VisibleCallback = nameof(UseBSM))]
         public string BsmLat { get; set; } = "25";
 
         /// <summary>BSM spectral shape longitude.</summary>
         [Description("BsmLon - Spectral shape longitude (45-65\u00B0)")]
-        [Tooltip("Spectral longitude for BSM (recommended 45\u201365\u00B0). Controls the spectral shape of the dry soil spectrum. Enter a literal (e.g., 45) or an APSIM expression.")]
+        [Tooltip("Spectral longitude for BSM (recommended 45\u201365\u00B0). Controls the spectral shape of the dry soil spectrum. Enter a literal (e.g., 45) or an APSIM expression. Evaluated daily only; does not support a per-observation-date list (see the Introduction node).")]
         [Display(VisibleCallback = nameof(UseBSM))]
         public string BsmLon { get; set; } = "45";
 
@@ -538,62 +561,67 @@ namespace Models.PROSAIL
         /// <summary>
         /// Validate the ranges of all PROSAIL parameters.
         /// </summary>
+        /// <summary>
+        /// Names of the parameters checked by <see cref="ValidateParameterRanges"/>. Numeric bounds for
+        /// all of these except LIDFa (whose valid range depends on TypeLidf - see below) live on the
+        /// corresponding property's [Bounds] attribute, not here, so there is one source of truth per bound.
+        /// </summary>
+        private static readonly string[] ValidatedParameterNames =
+        {
+            "N", "CAB", "CAR", "EWT", "LMA", "BROWN", "ANT", "PROT", "CBC", "Alpha",
+            "LAI", "HotSpot", "TypeLidf", "LIDFa", "LIDFb", "FractionBrown", "Dissociation",
+            "CrownCover", "TreeShape", "Psoil", "SunZenithAngle", "ObserverZenithAngle", "RelativeAzimuthAngle"
+        };
+
         private void ValidateParameterRanges()
         {
-            var ranges = new Dictionary<string, (double min, double max, string description)>
+            Type modelType = GetType();
+            foreach (string paramName in ValidatedParameterNames)
             {
-                { "N", (1.0, 2.6, "Leaf structure parameter (unitless)") },
-                { "CAB", (10.0, 80.0, "Chlorophyll a+b content (\u03BCg/cm\u00B2)") },
-                { "CAR", (1.0, 24.0, "Carotenoid content (\u03BCg/cm\u00B2)") },
-                { "EWT", (0.001, 0.08, "Equivalent Water Thickness (cm)") },
-                { "LMA", (0.001, 0.02, "Leaf Mass per Area (g/cm\u00B2)") },
-                { "BROWN", (0.0, 1.0, "Brown pigment content (unitless)") },
-                { "ANT", (0.0, 10.0, "Anthocyanin content (\u03BCg/cm\u00B2)") },
-                { "PROT", (0.0, 10.0, "Protein content (g/cm\u00B2)") },
-                { "CBC", (0.0, 10.0, "NonProt Carbon-based constituent content (g/cm\u00B2)") },
-                { "Alpha", (0.0, 90.0, "Incidence angle (degrees)") },
-                { "LAI", (0.0, 10.0, "Leaf Area Index (m\u00B2/m\u00B2)") },
-                { "HotSpot", (0.0, 1.0, "Hot Spot parameter (unitless)") },
-                { "TypeLidf", (1.0, 2.0, "LIDF type (1 or 2)") },
-                { "LIDFa", (-90.0, 90.0, "LIDF parameter a") },
-                { "LIDFb", (-1.0, 1.0, "LIDF parameter b") },
-                { "FractionBrown", (0.0, 1.0, "Fraction of brown leaf area") },
-                { "Dissociation", (0.0, 1.0, "Layer dissociation factor") },
-                { "CrownCover", (0.0, 1.0, "Vertical crown cover") },
-                { "TreeShape", (0.0, 10.0, "Tree shape factor") },
-                { "Psoil", (0.0, 1.0, "Soil water content factor") },
-                { "SunZenithAngle", (0.0, 90.0, "Sun zenith angle (degrees)") },
-                { "ObserverZenithAngle", (0.0, 90.0, "Observer zenith angle (degrees)") },
-                { "RelativeAzimuthAngle", (0.0, 360.0, "Relative azimuth angle (degrees)") }
-            };
-
-            foreach (var param in ranges)
-            {
-                if (CurrentParameterValues.TryGetValue(param.Key, out object value))
+                if (!CurrentParameterValues.TryGetValue(paramName, out object value))
                 {
-                    double numericValue;
-                    try
-                    {
-                        numericValue = Convert.ToDouble(value);
-                    }
-                    catch (Exception ex)
-                    {
-                        string msg = $"Parameter '{param.Key}' value '{value}' cannot be converted to a numeric value on {Clock?.Today:yyyy-MM-dd}. Error: {ex.Message}";
-                        WriteMessage(LogLevel.Error, msg);
-                        throw new InvalidOperationException(msg);
-                    }
+                    string missingMsg = $"Parameter '{paramName}' is missing from CurrentParameterValues on {Clock?.Today:yyyy-MM-dd}.";
+                    WriteMessage(LogLevel.Error, missingMsg);
+                    throw new InvalidOperationException(missingMsg);
+                }
 
-                    if (numericValue < param.Value.min || numericValue > param.Value.max)
-                    {
-                        string msg = $"Parameter '{param.Key}' value {numericValue} may be out of range [{param.Value.min}, {param.Value.max}] ({param.Value.description}) on {Clock?.Today:yyyy-MM-dd}. Check this paper: https://doi.org/10.3390/rs10010085";
-                        WriteMessage(LogLevel.Warning, msg);
-                    }
+                double numericValue;
+                try
+                {
+                    numericValue = Convert.ToDouble(value);
+                }
+                catch (Exception ex)
+                {
+                    string msg = $"Parameter '{paramName}' value '{value}' cannot be converted to a numeric value on {Clock?.Today:yyyy-MM-dd}. Error: {ex.Message}";
+                    WriteMessage(LogLevel.Error, msg);
+                    throw new InvalidOperationException(msg);
+                }
+
+                double lower, upper;
+                if (paramName == "LIDFa")
+                {
+                    // LIDFa's valid range depends on TypeLidf: -1 to 1 for Verhoef (TypeLidf=1, average
+                    // leaf slope), -90 to 90 for Campbell (TypeLidf=2, mean leaf angle in degrees). A
+                    // single static [Bounds] attribute cannot express this, so it is special-cased here.
+                    int typeLidfForLIDFa = Convert.ToInt32(CurrentParameterValues["TypeLidf"]);
+                    (lower, upper) = typeLidfForLIDFa == 1 ? (-1.0, 1.0) : (-90.0, 90.0);
                 }
                 else
                 {
-                    string msg = $"Parameter '{param.Key}' is missing from CurrentParameterValues on {Clock?.Today:yyyy-MM-dd}.";
-                    WriteMessage(LogLevel.Error, msg);
-                    throw new InvalidOperationException(msg);
+                    PropertyInfo prop = modelType.GetProperty(paramName);
+                    BoundsAttribute bounds = prop?.GetCustomAttribute<BoundsAttribute>();
+                    if (bounds == null)
+                        continue; // No declared bounds for this parameter - nothing to check.
+                    lower = bounds.Lower;
+                    upper = bounds.Upper;
+                }
+
+                if (numericValue < lower || numericValue > upper)
+                {
+                    PropertyInfo prop = modelType.GetProperty(paramName);
+                    string description = prop?.GetCustomAttribute<DescriptionAttribute>()?.ToString() ?? paramName;
+                    string msg = $"Parameter '{paramName}' value {numericValue} may be out of range [{lower}, {upper}] ({description}) on {Clock?.Today:yyyy-MM-dd}. Check this paper: https://doi.org/10.3390/rs10010085";
+                    WriteMessage(LogLevel.Warning, msg);
                 }
             }
 
@@ -701,102 +729,24 @@ namespace Models.PROSAIL
                 Children.Insert(0, new Memo
                 {
                     Name = "Introduction",
-                    Text =
-                        "# APSIM-PROSAIL framework\n\n" +
-                        "The **APSIM-PROSAIL** framework couples the **PROSAIL** (radiative transfer model) with the **APSIM** " +
-                        "(agricultural systems modelling and simulation platform). **PROSAIL** combines the **PROSPECT** leaf optical properties model with the " +
-                        "**SAIL** canopy reflectance model to simulate hyperspectral canopy reflectance from leaf biochemical " +
-                        "and canopy structural traits.\n\n" +
-                        "At each simulation timestep, plant traits computed by **APSIM** (e.g. LAI, leaf nitrogen) are passed " +
-                        "as inputs to **PROSAIL** via configurable expressions. The resulting per-wavelength canopy reflectance " +
-                        "and associated optical variables are written to a SQLite database for further analysis or " +
-                        "comparison with remote sensing observations.\n\n" +
-                        "This C# implementation of **PROSAIL** is based on the algorithms implemented in the R packages **prosail** (https://github.com/jbferet/prosail) and " + 
-                        "**prospect** (https://github.com/jbferet/prospect), and is used with the permission of the package author." + 
-                        "The C# implementation of BSM is based on the algorithm implemented in Matlab (https://github.com/Christiaanvandertol/SCOPE/blob/master/src/RTMs/BSM.m).\n\n" +
-                        "## How to use\n\n" +
-                        "### Step 1: PROSPECT leaf inputs\n\n" +
-                        "Set each leaf biochemical parameter either to a fixed value or to an APSIM expression that pulls the value from a crop model at runtime (e.g. `[Wheat].Leaf.LAI`). Key parameters and their typical ranges:\n\n" +
-                        "| Parameter | Description | Typical range |\n" +
-                        "|-----------|-------------|---------------|\n" +
-                        "| **N** | Leaf mesophyll structure (number of layers) | 1.0 – 2.6 |\n" +
-                        "| **CAB** | Chlorophyll a+b content (µg cm⁻²) | 10 – 80 |\n" +
-                        "| **CAR** | Carotenoid content (µg cm⁻²) | 1 – 24 |\n" +
-                        "| **ANT** | Anthocyanin content (µg cm⁻²) | 0 – 10 |\n" +
-                        "| **BROWN** | Brown (senescent) pigment fraction | 0 – 1 |\n" +
-                        "| **EWT** | Equivalent water thickness (cm) | 0.001 – 0.08 |\n" +
-                        "| **LMA** | Leaf dry matter per area (g cm⁻²) | 0.001 – 0.02 |\n" +
-                        "| **PROT** | Protein content (g cm⁻²) | 0 – 10 |\n" +
-                        "| **CBC** | Carbon-based constituents — cellulose + lignin (g cm⁻²) | 0 – 10 |\n" +
-                        "| **Alpha** | Incidence angle for refractive index (°) | 40 (default) |\n\n" +
-                        "Set **InputWavelengthRange** to the wavelengths PROSAIL should compute, e.g. `400-2500` for the full range or `650,750,800` for specific bands. Leave empty to use all wavelengths (400–2500 nm).\n\n" +
-                        "### Step 2: SAIL canopy properties\n\n" +
-                        "Choose **SailVersion**:\n\n" +
-                        "- `4SAIL`: single-layer homogeneous canopy. Suitable for most crops.\n" +
-                        "- `4SAIL2`: two-layer canopy (green + brown) with clumping effects. Required when **FractionBrown** > 0.\n\n" +
-                        "| Parameter | Description | Typical range |\n" +
-                        "|-----------|-------------|---------------|\n" +
-                        "| **LAI** | Leaf Area Index (m² m⁻²) | 0 – 10 |\n" +
-                        "| **HotSpot** | Hotspot parameter (leaf size / canopy height) | 0 – 1 |\n" +
-                        "| **TypeLidf** | Leaf angle distribution type: 1 = Verhoef (uses LIDFa + LIDFb), 2 = Campbell (uses LIDFa only) | 1 or 2 |\n" +
-                        "| **LIDFa** | LIDF parameter a (average inclination angle for type 1; ellipsoidal eccentricity for type 2) | −1 to 1 |\n" +
-                        "| **LIDFb** | LIDF parameter b — bimodality (type 1 only) | −1 to 1 |\n" +
-                        "| **FractionBrown** | Fraction of brown leaves in canopy (4SAIL2 only) | 0 – 1 |\n" +
-                        "| **Dissociation** | Degree of clumping between green and brown leaves (4SAIL2 only) | 0 – 1 |\n" +
-                        "| **CrownCover** | Crown cover fraction (4SAIL2 only) | 0 – 1 |\n" +
-                        "| **TreeShape** | Tree shape factor affecting gap fraction (4SAIL2 only) | > 0 |\n\n" +
-                        "### Step 3: Sun–observer geometry\n\n" +
-                        "| Parameter | Description | Typical range |\n" +
-                        "|-----------|-------------|---------------|\n" +
-                        "| **ObservationDates** | Comma-separated dates (e.g. `2023-01-15,2023-04-01`). Leave empty to run every simulation day. | |\n" +
-                        "| **SunZenithAngle** | Solar zenith angle (°) | 0 – 90 |\n" +
-                        "| **ObserverZenithAngle** | Sensor/observer zenith angle (°) | 0 – 90 |\n" +
-                        "| **RelativeAzimuthAngle** | Relative azimuth between sun and observer (°) | 0 – 360 |\n\n" +
-                        "When **ObservationDates** lists multiple dates, supply a matching comma-separated list of angles for each geometry parameter, or a single value applied to all dates.\n\n" +
-                        "### Step 4: Soil reflectance\n\n" +
-                        "Toggle **UseBSM** to choose the soil model:\n\n" +
-                        "**Wet/dry linear mixing model** (UseBSM = false):\n\n" +
-                        "- Leave **WetDrySoilReflectancePath** empty to use the built-in soil spectra, or provide a path to a custom CSV file with wet and dry soil reflectance spectra.\n" +
-                        "- Set **Psoil** to a value between 0 (fully wet) and 1 (fully dry), or link it to a soil moisture expression. Accepts a single value, comma-separated per-date list, or an APSIM expression.\n\n" +
-                        "**BSM (brightness–soil model)** (UseBSM = true):\n\n" +
-                        "| Parameter | Description | Typical range |\n" +
-                        "|-----------|-------------|---------------|\n" +
-                        "| **BsmBrightness** | Soil brightness factor | 0 – 1 |\n" +
-                        "| **BsmLat** | Latitude input to BSM (°) | 20 – 40 |\n" +
-                        "| **BsmLon** | Longitude input to BSM (°) | 45 – 65 |\n" +
-                        "| **SMp** | Volumetric soil moisture (%) | 5 – 55 |\n\n" +
-                        "### Step 5: Output and simulation control\n\n" +
-                        "The .db  file will receive results (relative to the simulation `.apsimx` file, e.g. `YourSimulationName_prosail.db`).\n\n" +
-                        "Enable the tables you need:\n\n" +
-                        "| Toggle | Contents |\n" +
-                        "|--------|----------|\n" +
-                        "| **OutputParameters** | Input parameter values logged per timestep |\n" +
-                        "| **OutputCanopyOpticalVariable** | Per-wavelength Rdot, Rsot, Rddt, Rsdt, fCover, Abs_dir, Abs_hem, Rsdstar, Rddstar |\n" +
-                        "| **OutputCanopyStateVariable** | Integrated fAPAR, fCover, albedo |\n" +
-                        "| **OutputCanopyBRF** | Per-wavelength bidirectional reflectance factor (BRF) |\n" +
-                        "| **OutputReflectanceResampledToSensor** | BRF convolved with sensor spectral response functions |\n\n" +
-                        "When **OutputReflectanceResampledToSensor** is enabled, choose a **SensorType** from the built-in list (Landsat 7/8/9, MODIS, Pleiades 1A/1B, Sentinel-2/2A/2B/2C, SPOT 6/7, Venus) or select *Custom* and supply a **CustomSRFPath** pointing to your spectral response function file.\n\n" +
-                        "Set **LoggingLevel** to control verbosity (Debug, Info, Warning, or Error).\n\n" +
-                        "## References\n\n" +
-                        "If you use the APSIM-PROSAIL in your work, please cite the relevant papers below.\n\n" +
-                        "### PROSPECT\n\n" +
-                        "- Féret, J.-B. & de Boissieu, F. (2024). `prospect`: an R package to link leaf optical properties with their chemical and structural properties with the leaf model PROSPECT. Journal of Open Source Software, 9(94), 6027, https://doi.org/10.21105/joss.06027\n" +
-                        "- Féret, J.-B., Berger, K., de Boissieu, F. & Malenovský, Z. (2021). PROSPECT-PRO for estimating content of nitrogen-containing leaf proteins and other carbon-based constituents. Remote Sensing of Environment. 252, 112173. https://doi.org/10.1016/j.rse.2020.112173\n" +
-                        "- Féret, J.-B., Gitelson, A.A., Noble, S.D. & Jacquemoud, S. (2017). PROSPECT-D: Towards modeling leaf optical properties through a complete lifecycle. Remote Sensing of Environment. 193, 204–215. http://dx.doi.org/10.1016/j.rse.2017.03.004\n" +
-                        "### 4SAIL and 4SAIL2\n\n" +
-                        "- Verhoef W & Bach H, 2007. Coupled soil–leaf-canopy and atmosphere radiative transfer modeling to simulate hyperspectral multi-angular surface reflectance and TOA radiance data. Remote Sensing of Environment, 109:166-182. https://doi.org/10.1016/j.rse.2006.12.013\n" +
-                        "- Verhoef W, Jia L, Xiao Q & Su Z, 2007. Unified optical-thermal four-stream radiative transfer theory for homogeneous vegetation canopies. IEEE Transactions in Geosciences and Remote Sensing, 45:1808–1822. https://doi.org/10.1109/TGRS.2007.89584\n" +
-                        "### PROSAIL\n\n" +
-                        "- Jacquemoud S, Verhoef W, Baret F, Bacour C, Zarco-Tejada PJ, Asner GP, François C & Ustin SL, 2009. PROSPECT+ SAIL models: A review of use for vegetation characterization. Remote Sensing of Environment, 113:S56–S66. https://doi.org/doi:10.1016/j.rse.2008.01.026\n" +
-                        "- Berger K, Atzberger C, Danner M, D’Urso G, Mauser W, Vuolo F & Hank T 2018. Evaluation of the PROSAIL Model Capabilities for Future Hyperspectral Model Environments: A Review Study. Remote Sensing, 10:85. https://doi.org/10.3390/rs10010085\n" +
-                        "### The APSIM-PROSAIL integration \n\n" +
-                        "- Holzworth, D.P., Huth, N.I., deVoil, P.G., Zurcher, E.J., Herrmann, N.I., McLean, G., Chenu, K., van Oosterom, E.J., Snow, V., Murphy, C., Moore, A.D., Brown, H., Whish, J.P.M., Verrall, S., Fainges, J., Bell, L.W., Peake, A.S., Poulton, P.L., Hochman, Z., Thorburn, P.J., Gaydon, D.S., Dalgliesh, N.P., Rodriguez, D., Cox, H., Chapman, S., Doherty, A., Teixeira, E., Sharp, J., Cichota, R., Vogeler, I., Li, F.Y., Wang, E., Hammer, G.L., Robertson, M.J., Dimes, J.P., Whitbread, A.M., Hunt, J., van Rees, H., McClelland, T., Carberry, P.S., Hargreaves, J.N.G., MacLeod, N., McDonald, C., Harsdorf, J., Wedgwood, S., Keating, B.A., 2014. APSIM – Evolution towards a new generation of agricultural systems simulation. Environmental Modelling & Software 62, 327–350. https://doi.org/10.1016/j.envsoft.2014.07.009\n" +
-                        "- Hu, P., Zheng, B., Chen, Q., Grunefeld, S., Choudhury, M.R., Fernandez, J., Potgieter, A., Chapman, S.C., 2024. Estimating aboveground biomass dynamics of wheat at small spatial scale by integrating crop growth and radiative transfer models with satellite remote sensing data. Remote Sensing of Environment 311, 114277. https://doi.org/10.1016/j.rse.2024.114277\n" +
-                        "- Chen, Q., Zheng, B., Chen, T., Chapman, S.C., 2022. Integrating a crop growth model and radiative transfer model to improve estimation of crop traits based on deep learning. Journal of Experimental Botany erac291. https://doi.org/10.1093/jxb/erac291\n" +
-                        "### BSM\n\n" +
-                        "- Verhoef, W., van der Tol, C., Middleton, E.M., 2018. Hyperspectral radiative transfer modeling to explore the combined retrieval of biophysical parameters and canopy fluorescence from FLEX – Sentinel-3 tandem mission multi-sensor data. Remote Sensing of Environment 204, 942–963. https://doi.org/10.1016/j.rse.2017.08.006\n" +
-                        "- Yang, P., van der Tol, C., Yin, T., Verhoef, W., 2020. The SPART model: A soil-plant-atmosphere radiative transfer model for satellite measurements in the solar spectrum. Remote Sensing of Environment 247, 111870. https://doi.org/10.1016/j.rse.2020.111870"
+                    Text = LoadIntroductionText()
                 });
+            }
+        }
+
+        /// <summary>Loads the Introduction memo markdown from the embedded resource file.</summary>
+        private static string LoadIntroductionText()
+        {
+            const string resourceName = "Models.Resources.PROSAIL.Introduction.md";
+            Assembly assembly = Assembly.GetExecutingAssembly();
+            using (Stream stream = assembly.GetManifestResourceStream(resourceName))
+            {
+                if (stream == null)
+                    throw new InvalidOperationException(
+                        $"Embedded resource '{resourceName}' not found. Ensure Introduction.md exists " +
+                        "under Models/Resources/PROSAIL and is packaged as an EmbeddedResource.");
+                using (StreamReader reader = new StreamReader(stream))
+                    return reader.ReadToEnd();
             }
         }
 
