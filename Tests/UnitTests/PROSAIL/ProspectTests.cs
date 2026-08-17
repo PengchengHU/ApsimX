@@ -36,8 +36,12 @@ namespace UnitTests.PROSAIL
             public double N { get; set; }
             public double CAB { get; set; }
             public double CAR { get; set; }
+            public double ANT { get; set; }
+            public double BROWN { get; set; }
             public double EWT { get; set; }
             public double LMA { get; set; }
+            public double PROT { get; set; }
+            public double CBC { get; set; }
             public double Alpha { get; set; }
         }
 
@@ -68,7 +72,8 @@ namespace UnitTests.PROSAIL
         {
             try
             {
-                return Prospect(N: testCase.N, CAB: testCase.CAB, CAR: testCase.CAR, EWT: testCase.EWT, LMA: testCase.LMA, Alpha: testCase.Alpha);
+                return Prospect(N: testCase.N, CAB: testCase.CAB, CAR: testCase.CAR, ANT: testCase.ANT, BROWN: testCase.BROWN,
+                                EWT: testCase.EWT, LMA: testCase.LMA, PROT: testCase.PROT, CBC: testCase.CBC, Alpha: testCase.Alpha);
             }
             catch (Exception ex)
             {

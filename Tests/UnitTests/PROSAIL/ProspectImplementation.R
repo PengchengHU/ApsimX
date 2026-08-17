@@ -21,11 +21,16 @@ specPROSPECT$SAC_CHL <- as.numeric(specPROSPECT$SAC_CAB); specPROSPECT$SAC_CAB <
 input_file <- args[1]
 output_file <- args[2]
 
+`%||%` <- function(x, default) if (is.null(x)) default else x
+
 if (!exists("run_prospect_r")) {
   run_prospect_r <- function(params) {
     res <- PROSPECT(SpecPROSPECT = specPROSPECT,
                     N = params$N, CHL = params$CAB, CAR = params$CAR,
-                    EWT = params$EWT, LMA = params$LMA, alpha = params$Alpha)
+                    ANT = params$ANT %||% 0.0, BROWN = params$BROWN %||% 0.0,
+                    EWT = params$EWT, LMA = params$LMA,
+                    PROT = params$PROT %||% 0.0, CBC = params$CBC %||% 0.0,
+                    alpha = params$Alpha)
 
     list(
       Reflectance = res$Reflectance,

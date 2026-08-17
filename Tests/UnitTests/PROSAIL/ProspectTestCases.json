@@ -22,6 +22,58 @@
       "Reflectance": [0.08, 0.1, 0.07],
       "Transmittance": [0.06, 0.07, 0.05]
     }
+  },
+  {
+    "Name": "Anthocyanin_StressedLeaf",
+    "N": 1.8,
+    "CAB": 25.0,
+    "CAR": 6.0,
+    "ANT": 5.0,
+    "BROWN": 0.0,
+    "EWT": 0.015,
+    "LMA": 0.01,
+    "PROT": 0.0,
+    "CBC": 0.0,
+    "Alpha": 40.0
+  },
+  {
+    "Name": "Brown_SenescingLeaf",
+    "N": 1.6,
+    "CAB": 15.0,
+    "CAR": 6.0,
+    "ANT": 0.0,
+    "BROWN": 0.5,
+    "EWT": 0.01,
+    "LMA": 0.009,
+    "PROT": 0.0,
+    "CBC": 0.0,
+    "Alpha": 40.0
+  },
+  {
+    "Name": "ProspectPRO_ProteinCBC",
+    "N": 1.5,
+    "CAB": 35.0,
+    "CAR": 7.0,
+    "ANT": 0.0,
+    "BROWN": 0.0,
+    "EWT": 0.012,
+    "LMA": 0.0,
+    "PROT": 0.0015,
+    "CBC": 0.0075,
+    "Alpha": 40.0
+  },
+  {
+    "Name": "Combined_AntBrownProtCbc",
+    "N": 2.0,
+    "CAB": 10.0,
+    "CAR": 4.0,
+    "ANT": 3.0,
+    "BROWN": 0.3,
+    "EWT": 0.008,
+    "LMA": 0.0,
+    "PROT": 0.001,
+    "CBC": 0.006,
+    "Alpha": 40.0
   }
 ]
 
