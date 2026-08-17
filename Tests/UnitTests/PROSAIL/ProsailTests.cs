@@ -1,3 +1,4 @@
+using APSIM.Core;
 using APSIM.Shared.Utilities;
 using DocumentFormat.OpenXml.Wordprocessing;
 using MathNet.Numerics.LinearAlgebra;
@@ -15,6 +16,7 @@ using System.Collections.Generic;
 using System.Diagnostics;
 using System.IO;
 using System.Linq;
+using System.Reflection;
 using static Models.Prosail.ProsailCore;
 using static Models.PROSAIL.PROSPECT.ProspectCore;
 using static Models.PROSAIL.SAIL.SailUtilities;
@@ -446,6 +448,65 @@ namespace UnitTests.PROSAIL
             model.OnCreated();
             var memo = model.Children.OfType<Memo>().First(m => m.Name == "Introduction");
             Assert.That(memo.Text, Does.Contain("APSIM-PROSAIL framework"));
+        }
+
+        /// <summary>
+        /// Minimal IStructure stub for testing expression evaluation without a full APSIM
+        /// simulation. Only Get() is meaningful; other members are unused by EvaluateExpression.
+        /// </summary>
+        private class FakeStructure : IStructure
+        {
+            public Dictionary<string, object> Values = new();
+
+            public object Get(string namePath, LocatorFlags flags = LocatorFlags.None, INodeModel relativeTo = null)
+                => Values.TryGetValue(namePath, out object v) ? v : null;
+
+            public string FileName { get => throw new NotImplementedException(); set => throw new NotImplementedException(); }
+            public string Name => throw new NotImplementedException();
+            public string FullNameAndPath => throw new NotImplementedException();
+            public void AddChild(INodeModel childModel) => throw new NotImplementedException();
+            public void ClearEntry(string path) => throw new NotImplementedException();
+            public void ClearLocator() => throw new NotImplementedException();
+            public T Find<T>(string name = null, INodeModel relativeTo = null) => throw new NotImplementedException();
+            public IEnumerable<T> FindAll<T>(string name = null, INodeModel relativeTo = null) => throw new NotImplementedException();
+            public T FindChild<T>(string name = null, bool recurse = false, INodeModel relativeTo = null) => throw new NotImplementedException();
+            public IEnumerable<T> FindChildren<T>(string name = null, bool recurse = false, INodeModel relativeTo = null) => throw new NotImplementedException();
+            public T FindParent<T>(string name = null, bool recurse = false, INodeModel relativeTo = null) => throw new NotImplementedException();
+            public IEnumerable<T> FindParents<T>(string name = null, INodeModel relativeTo = null) => throw new NotImplementedException();
+            public T FindSibling<T>(string name = null, INodeModel relativeTo = null) => throw new NotImplementedException();
+            public IEnumerable<T> FindSiblings<T>(string name = null, INodeModel relativeTo = null) => throw new NotImplementedException();
+            public VariableComposite GetObject(string namePath, LocatorFlags flags, INodeModel relativeTo = null) => throw new NotImplementedException();
+            public void InsertChild(int index, INodeModel childModel) => throw new NotImplementedException();
+            public void RemoveChild(INodeModel childModel) => throw new NotImplementedException();
+            public void Rename(string name) => throw new NotImplementedException();
+            public void ReplaceChild(INodeModel oldModel, INodeModel newModel) => throw new NotImplementedException();
+            public void Set(string namePath, object value, INodeModel relativeTo = null) => throw new NotImplementedException();
+        }
+
+        /// <summary>
+        /// Verifies that an expression parameter referencing a live model property (e.g.
+        /// "[Wheat].Leaf.LAI") is re-resolved to the current value on every call, not just the
+        /// first. This is a regression guard for any future caching of parsed expressions: the
+        /// parsed expression's syntax tree may safely be cached (the text never changes), but the
+        /// resolved *value* must never be - this test would fail if a caching change accidentally
+        /// cached the whole result instead of just the parse step.
+        /// </summary>
+        [Test]
+        public void ExpressionParameter_ReEvaluatesLiveValueEveryCall()
+        {
+            var model = new ProsailModel();
+            var structure = new FakeStructure();
+            model.Structure = structure;
+            MethodInfo evaluateExpression = typeof(ProsailModel).GetMethod("EvaluateExpression", BindingFlags.NonPublic | BindingFlags.Instance);
+
+            structure.Values["[Wheat].Leaf.LAI"] = 2.0;
+            Assert.That((double)evaluateExpression.Invoke(model, new object[] { "[Wheat].Leaf.LAI" }), Is.EqualTo(2.0));
+
+            structure.Values["[Wheat].Leaf.LAI"] = 3.5; // simulates the value changing on a later day
+            Assert.That((double)evaluateExpression.Invoke(model, new object[] { "[Wheat].Leaf.LAI" }), Is.EqualTo(3.5));
+
+            structure.Values["[Wheat].Leaf.LAI"] = 1.25; // third distinct value, rules out a naive 2-slot cache
+            Assert.That((double)evaluateExpression.Invoke(model, new object[] { "[Wheat].Leaf.LAI" }), Is.EqualTo(1.25));
         }
     }
 }

@@ -88,7 +88,7 @@ namespace Models.Functions
         /// <param name="arrayIndex">The array index</param>
         /// <param name="structure">Structure instance</param>
         /// <exception cref="System.Exception">Cannot find variable:  + sym.m_name +  in function:  + RelativeTo.Name</exception>
-        private static void FillVariableNames(ExpressionEvaluator fn, Model RelativeTo, int arrayIndex, IStructure structure)
+        internal static void FillVariableNames(ExpressionEvaluator fn, Model RelativeTo, int arrayIndex, IStructure structure)
         {
             List<Symbol> varUnfilled = fn.Variables;
             List<Symbol> varFilled = new List<Symbol>();
@@ -128,7 +128,7 @@ namespace Models.Functions
         /// <summary>Evaluates the specified function.</summary>
         /// <param name="fn">The function.</param>
         /// <exception cref="System.Exception"></exception>
-        private static void Evaluate(ExpressionEvaluator fn)
+        internal static void Evaluate(ExpressionEvaluator fn)
         {
             fn.EvaluatePostfix();
             if (fn.Error)

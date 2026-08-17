@@ -415,6 +415,13 @@ namespace Models.PROSAIL
         /// <summary>Cached PROSAIL results for the current day</summary>
         private CanopyOptics cachedProsailOutputs = null;
 
+        /// <summary>
+        /// Cache of parsed (but not yet variable-filled) expressions, keyed by expression text, so
+        /// EvaluateExpression only re-parses a given expression string once per simulation instead
+        /// of on every call. Variable values are always re-resolved fresh on every call regardless.
+        /// </summary>
+        private readonly Dictionary<string, ExpressionEvaluator> parsedExpressionCache = new Dictionary<string, ExpressionEvaluator>();
+
         /// <summary>The date of the last cached results</summary>
         private DateTime? lastCalculationDate = null;
 
@@ -477,7 +484,16 @@ namespace Models.PROSAIL
                     return result;
                 }
 
-                object value = ExpressionFunction.Evaluate(expression, this, Structure);
+                if (!parsedExpressionCache.TryGetValue(expression, out ExpressionEvaluator fn))
+                {
+                    fn = new ExpressionEvaluator();
+                    fn.Parse(expression.Trim());
+                    fn.Infix2Postfix();
+                    parsedExpressionCache[expression] = fn;
+                }
+                ExpressionFunction.FillVariableNames(fn, this, -1, Structure);
+                ExpressionFunction.Evaluate(fn);
+                object value = fn.Results != null ? (object)fn.Results : fn.Result;
                 if (value == null)
                 {
                     WriteMessage(LogLevel.Error, $"Parameter expression '{expression}' evaluated to null on {Clock?.Today:yyyy-MM-dd}.");
@@ -573,9 +589,30 @@ namespace Models.PROSAIL
             "CrownCover", "TreeShape", "Psoil", "SunZenithAngle", "ObserverZenithAngle", "RelativeAzimuthAngle"
         };
 
+        /// <summary>
+        /// Cached [Bounds]/[Description] attribute lookups for <see cref="ValidatedParameterNames"/>,
+        /// built once since these are compile-time constants on the class - no need to re-resolve
+        /// them via reflection every day. LIDFa is excluded (special-cased in ValidateParameterRanges).
+        /// </summary>
+        private static readonly Dictionary<string, (BoundsAttribute Bounds, string Description)> ParameterAttributeCache =
+            BuildParameterAttributeCache();
+
+        private static Dictionary<string, (BoundsAttribute, string)> BuildParameterAttributeCache()
+        {
+            var cache = new Dictionary<string, (BoundsAttribute, string)>();
+            Type modelType = typeof(ProsailModel);
+            foreach (string paramName in ValidatedParameterNames)
+            {
+                if (paramName == "LIDFa") continue; // special-cased in ValidateParameterRanges, no static Bounds
+                PropertyInfo prop = modelType.GetProperty(paramName);
+                cache[paramName] = (prop?.GetCustomAttribute<BoundsAttribute>(),
+                                     prop?.GetCustomAttribute<DescriptionAttribute>()?.ToString() ?? paramName);
+            }
+            return cache;
+        }
+
         private void ValidateParameterRanges()
         {
-            Type modelType = GetType();
             foreach (string paramName in ValidatedParameterNames)
             {
                 if (!CurrentParameterValues.TryGetValue(paramName, out object value))
@@ -608,8 +645,7 @@ namespace Models.PROSAIL
                 }
                 else
                 {
-                    PropertyInfo prop = modelType.GetProperty(paramName);
-                    BoundsAttribute bounds = prop?.GetCustomAttribute<BoundsAttribute>();
+                    BoundsAttribute bounds = ParameterAttributeCache[paramName].Bounds;
                     if (bounds == null)
                         continue; // No declared bounds for this parameter - nothing to check.
                     lower = bounds.Lower;
@@ -618,8 +654,7 @@ namespace Models.PROSAIL
 
                 if (numericValue < lower || numericValue > upper)
                 {
-                    PropertyInfo prop = modelType.GetProperty(paramName);
-                    string description = prop?.GetCustomAttribute<DescriptionAttribute>()?.ToString() ?? paramName;
+                    string description = ParameterAttributeCache[paramName].Description;
                     string msg = $"Parameter '{paramName}' value {numericValue} may be out of range [{lower}, {upper}] ({description}) on {Clock?.Today:yyyy-MM-dd}. Check this paper: https://doi.org/10.3390/rs10010085";
                     WriteMessage(LogLevel.Warning, msg);
                 }
@@ -671,7 +706,10 @@ namespace Models.PROSAIL
                 PROT: Convert.ToDouble(CurrentParameterValues["PROT"]),
                 CBC: Convert.ToDouble(CurrentParameterValues["CBC"]),
                 Alpha: Convert.ToDouble(CurrentParameterValues["Alpha"]),
-                Wavelengths: inputWavelengths,
+                // cachedLeafOpticalConstants is already subset to inputWavelengths (done once in
+                // OnCommencing), so passing null here avoids ProspectCore.Prospect redundantly
+                // rebuilding an identical wavelength subset from scratch every day.
+                Wavelengths: null,
                 SailVersion: SailVersionValue,
                 LAI: Convert.ToDouble(CurrentParameterValues["LAI"]),
                 HotSpot: Convert.ToDouble(CurrentParameterValues["HotSpot"]),
