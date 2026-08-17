@@ -19,7 +19,7 @@ namespace UnitTests.PROSAIL
     public class SailUtilitiesTests
     {
         #region setup
-        private readonly string RScriptPath = @"C:\Program Files\R\R-4.4.1\bin\Rscript.exe";
+        private readonly string RScriptPath = RScriptLocator.FindRscriptPath();
 
         // SailUtilitiesWrapper.R path
         private static readonly string RelativeRSailScriptWrapperPath = "..\\..\\..\\Tests\\UnitTests\\PROSAIL\\SailUtilitiesWrapper.R";

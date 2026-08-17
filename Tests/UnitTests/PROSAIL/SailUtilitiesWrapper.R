@@ -33,31 +33,41 @@ functionName <- args[1]
 inputJsonPath <- args[2]
 outputJsonPath <- args[3]
 
-# Define the path to the core SAIL functions script
-# Assumes Lib_PROSAIL.R is in the same directory as this wrapper script.
+# Define the path to the core SAIL/PROSPECT function scripts.
+# Assumes Lib_PROSAIL.R and Lib_PROSPECT.R are in the same directory as this wrapper script.
 scriptDir <- dirname(normalizePath(sub("^--file=", "", grep("^--file=", commandArgs(), value = TRUE)[1])))
+# Exposed as a global so get_default_SpecPROSPECT() (Lib_PROSPECT.R) can locate
+# SpecPROSPECT_FullRange.json without needing its own path introspection.
+PROSAIL_SCRIPT_DIR <- scriptDir
+libProspectPath <- file.path(scriptDir, "Lib_PROSPECT.R")
 libProsailPath <- file.path(scriptDir, "Lib_PROSAIL.R")
 
-# Check if Lib_PROSAIL.R exists
+# Check both scripts exist
+if (!file.exists(libProspectPath)) {
+  stop(paste("Error: Lib_PROSPECT.R not found at:", libProspectPath), call. = FALSE)
+}
 if (!file.exists(libProsailPath)) {
   stop(paste("Error: Lib_PROSAIL.R not found at:", libProsailPath), call. = FALSE)
 }
 
-# Source the core SAIL functions script
-# Sourcing within tryCatch to handle potential errors during sourcing
+# Source Lib_PROSPECT.R first (Lib_PROSAIL.R's adjust_PROSPECT_2_SAIL() calls its
+# PROSPECT()/define_Input_PROSPECT() functions directly, so they must already be
+# defined), then Lib_PROSAIL.R. Sourcing within tryCatch to handle potential errors.
 sourceSuccessful <- FALSE
 tryCatch(
   {
+    source(libProspectPath)
+    cat("Successfully sourced:", libProspectPath, "\n") # Log success
     source(libProsailPath)
     sourceSuccessful <- TRUE
     cat("Successfully sourced:", libProsailPath, "\n") # Log success
   },
   error = function(e) {
-    stop(paste("Error sourcing Lib_PROSAIL.R:", e$message), call. = FALSE)
+    stop(paste("Error sourcing Lib_PROSPECT.R/Lib_PROSAIL.R:", e$message), call. = FALSE)
   }
 )
 if (!sourceSuccessful) {
-  stop("Failed to source Lib_PROSAIL.R. Check script integrity and path.", call. = FALSE)
+  stop("Failed to source Lib_PROSPECT.R/Lib_PROSAIL.R. Check script integrity and path.", call. = FALSE)
 }
 
 # Input Processing ####

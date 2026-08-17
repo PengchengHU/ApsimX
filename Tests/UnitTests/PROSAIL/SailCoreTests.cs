@@ -28,7 +28,7 @@ namespace UnitTests.PROSAIL
         private static string DefaultSpecSoilDataPath => PathUtilities.GetAbsolutePath(RelativeSpecSoilDataPath, AppDomain.CurrentDomain.BaseDirectory);
 
         // Path to Rscript executable
-        private readonly string RScriptPath = @"C:\Program Files\R\R-4.4.1\bin\Rscript.exe";
+        private readonly string RScriptPath = RScriptLocator.FindRscriptPath();
 
         // SailUtilitiesWrapper.R path
         private static readonly string RelativeRSailScriptWrapperPath = "..\\..\\..\\Tests\\UnitTests\\PROSAIL\\SailUtilitiesWrapper.R";
@@ -36,6 +36,12 @@ namespace UnitTests.PROSAIL
 
 
         private readonly double Tolerance = 1e-3;
+
+        [OneTimeSetUp]
+        public void CheckRSetup()
+        {
+            Assert.That(File.Exists(RScriptPath), $"Rscript executable not found. Install R to run these tests.");
+        }
 
         // Helper to load test inputs
         private static List<FourSailTestInput> LoadTestInputs()

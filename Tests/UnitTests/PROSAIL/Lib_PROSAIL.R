@@ -166,8 +166,19 @@ Compute_albedo  <- function(rsdstar, rddstar, tts, SpecATM_Sensor,
 #' rsot: bi-directional reflectance factor
 #' rsdt: directional-hemispherical reflectance factor for solar incident flux
 #' rddt: bi-hemispherical reflectance factor
-#' @import prospect
 #' @export
+#'
+#' Loads the local SpecSOIL.json (dry soil reflectance) as a fallback when no
+#' rsoil is supplied, instead of relying on the external 'prosail' package.
+get_default_DrySoil <- function(specDir = if (exists("PROSAIL_SCRIPT_DIR")) PROSAIL_SCRIPT_DIR else NULL) {
+  if (is.null(specDir))
+    stop("get_default_DrySoil: no directory supplied and PROSAIL_SCRIPT_DIR is not set.")
+  soilPath <- file.path(specDir, "SpecSOIL.json")
+  if (!file.exists(soilPath))
+    stop(paste("Default soil reflectance file not found at:", soilPath))
+  as.numeric(jsonlite::fromJSON(soilPath)$Dry_Soil)
+}
+
 PRO4SAIL <- function(Spec_Sensor = NULL, Input_PROSPECT = NULL, N = 1.5,
                      CHL = 40.0, CAR = 8.0, ANT = 0.0, BROWN = 0.0, EWT = 0.01,
                      LMA = NULL, PROT = 0.0, CBC = 0.0, alpha = 40.0,
@@ -176,8 +187,8 @@ PRO4SAIL <- function(Spec_Sensor = NULL, Input_PROSPECT = NULL, N = 1.5,
                      fraction_brown = 0.0, diss = 0.0, Cv = 1, Zeta = 1,
                      SAILversion = '4SAIL', BrownLOP = NULL){
 
-  if (is.null(Spec_Sensor)) Spec_Sensor <- prospect::SpecPROSPECT_FullRange
-  if (is.null(rsoil)) rsoil <- prosail::SpecSOIL$Dry_Soil
+  if (is.null(Spec_Sensor)) Spec_Sensor <- get_default_SpecPROSPECT()
+  if (is.null(rsoil)) rsoil <- get_default_DrySoil()
   #	PROSPECT: LEAF OPTICAL PROPERTIES
   LOP <- adjust_PROSPECT_2_SAIL(SAILversion = SAILversion,
                                 Spec_Sensor = Spec_Sensor,
@@ -1348,13 +1359,13 @@ adjust_PROSPECT_2_SAIL <- function(SAILversion, Spec_Sensor, Input_PROSPECT,
                                    BrownLOP = NULL){
 
   # for all versions of 4SAIL: get green vegetation
-  inprospect_green <- prospect::define_Input_PROSPECT(Input_PROSPECT[1,],
-                                                      CHL[1], CAR[1], ANT[1],
-                                                      BROWN[1], EWT[1], LMA[1],
-                                                      PROT[1], CBC[1], N[1],
-                                                      alpha[1])
-  GreenLOP <- prospect::PROSPECT(SpecPROSPECT = Spec_Sensor,
-                                 Input_PROSPECT = inprospect_green)
+  inprospect_green <- define_Input_PROSPECT(Input_PROSPECT[1,],
+                                            CHL[1], CAR[1], ANT[1],
+                                            BROWN[1], EWT[1], LMA[1],
+                                            PROT[1], CBC[1], N[1],
+                                            alpha[1])
+  GreenLOP <- PROSPECT(SpecPROSPECT = Spec_Sensor,
+                       Input_PROSPECT = inprospect_green)
   if (SAILversion =='4SAIL2'){
     if (is.null(Input_PROSPECT)){
       Input_PROSPECT <- data.frame('CHL' = CHL, 'CAR' = CAR, 'ANT' = ANT,
@@ -1379,9 +1390,9 @@ adjust_PROSPECT_2_SAIL <- function(SAILversion, Spec_Sensor, Input_PROSPECT,
           message('Currently one set is defined. will run 4SAIL instead of 4SAIL2')
           SAILversion <- '4SAIL'
         } else {
-          inprospect_brown <- prospect::define_Input_PROSPECT(Input_PROSPECT[2,])
-          BrownLOP <- prospect::PROSPECT(SpecPROSPECT = Spec_Sensor,
-                                         Input_PROSPECT = inprospect_brown)
+          inprospect_brown <- define_Input_PROSPECT(Input_PROSPECT[2,])
+          BrownLOP <- PROSPECT(SpecPROSPECT = Spec_Sensor,
+                               Input_PROSPECT = inprospect_brown)
         }
       }
     }

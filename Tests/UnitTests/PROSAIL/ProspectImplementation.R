@@ -2,21 +2,31 @@
 #!/usr/bin/env Rscript
 args <- commandArgs(trailingOnly = TRUE)
 
-# source('D:/ApsimX/Tests/UnitTests/Lib_PROSPECT.R')
 library(jsonlite)
+
+# Source the local, self-contained PROSPECT implementation instead of relying on
+# the (deprecated/breaking-API) external 'prospect' package.
+scriptDir <- dirname(normalizePath(sub("^--file=", "", grep("^--file=", commandArgs(), value = TRUE)[1])))
+source(file.path(scriptDir, "Lib_PROSPECT.R"))
+
+# Load the local leaf spectral constants (same file/format used by SailUtilitiesWrapper.R)
+# and rename fields from the C#-facing JSON convention to what Lib_PROSPECT.R expects.
+specPROSPECT <- jsonlite::fromJSON(file.path(scriptDir, "SpecPROSPECT_FullRange.json"))
+specPROSPECT$lambda <- as.numeric(specPROSPECT$Wavelength); specPROSPECT$Wavelength <- NULL
+specPROSPECT$nrefrac <- as.numeric(specPROSPECT$RefractiveIndex); specPROSPECT$RefractiveIndex <- NULL
+specPROSPECT$calctav_40 <- as.numeric(specPROSPECT$Tav40); specPROSPECT$Tav40 <- NULL
+specPROSPECT$calctav_90 <- as.numeric(specPROSPECT$Tav90); specPROSPECT$Tav90 <- NULL
+specPROSPECT$SAC_CHL <- as.numeric(specPROSPECT$SAC_CAB); specPROSPECT$SAC_CAB <- NULL
 
 input_file <- args[1]
 output_file <- args[2]
 
 if (!exists("run_prospect_r")) {
   run_prospect_r <- function(params) {
-    wavelengths <- 400:2500
-    reflectance <- rep(0.1, length(wavelengths))
-    transmittance <- rep(0.1, length(wavelengths))
-    
-    res <- prospect::PROSPECT(N = params$N, CHL = params$CAB, CAR = params$CAR, 
-                              EWT = params$EWT, LMA = params$LMA, alpha = params$Alpha)
-    
+    res <- PROSPECT(SpecPROSPECT = specPROSPECT,
+                    N = params$N, CHL = params$CAB, CAR = params$CAR,
+                    EWT = params$EWT, LMA = params$LMA, alpha = params$Alpha)
+
     list(
       Reflectance = res$Reflectance,
       Transmittance = res$Transmittance

@@ -38,6 +38,33 @@
 #' @importFrom expint expint
 #' @export
 #'
+library(expint)
+
+#' Loads the local SpecPROSPECT_FullRange.json (same file used by the C#/R test
+#' harness) and renames its fields to the SpecPROSPECT convention expected by
+#' PROSPECT()/PRO4SAIL(), so callers don't need the external 'prospect' package's
+#' bundled defaults (which are not guaranteed to stay exported across versions).
+#'
+#' @param specDir character. Directory containing SpecPROSPECT_FullRange.json.
+#'   Defaults to the global PROSAIL_SCRIPT_DIR set by the calling wrapper script.
+#'
+#' @return list. Spectral constants (lambda, nrefrac, calctav_40, calctav_90,
+#'   SAC_CHL, SAC_CAR, SAC_ANT, SAC_BROWN, SAC_EWT, SAC_LMA, SAC_PROT, SAC_CBC).
+get_default_SpecPROSPECT <- function(specDir = if (exists("PROSAIL_SCRIPT_DIR")) PROSAIL_SCRIPT_DIR else NULL) {
+  if (is.null(specDir))
+    stop("get_default_SpecPROSPECT: no directory supplied and PROSAIL_SCRIPT_DIR is not set.")
+  specPath <- file.path(specDir, "SpecPROSPECT_FullRange.json")
+  if (!file.exists(specPath))
+    stop(paste("Default spectral constants file not found at:", specPath))
+  spec <- jsonlite::fromJSON(specPath)
+  spec$lambda <- as.numeric(spec$Wavelength); spec$Wavelength <- NULL
+  spec$nrefrac <- as.numeric(spec$RefractiveIndex); spec$RefractiveIndex <- NULL
+  spec$calctav_40 <- as.numeric(spec$Tav40); spec$Tav40 <- NULL
+  spec$calctav_90 <- as.numeric(spec$Tav90); spec$Tav90 <- NULL
+  spec$SAC_CHL <- as.numeric(spec$SAC_CAB); spec$SAC_CAB <- NULL
+  spec
+}
+
 PROSPECT <- function(SpecPROSPECT = NULL, Input_PROSPECT = NULL,
                      N = 1.5, CHL = 40.0, CAR = 8.0, ANT = 0.0, BROWN = 0.0,
                      EWT = 0.01, LMA = NULL, PROT = 0, CBC = 0, alpha = 40.0,
@@ -51,7 +78,7 @@ PROSPECT <- function(SpecPROSPECT = NULL, Input_PROSPECT = NULL,
   #                                                    ANT, BROWN, EWT, LMA, PROT,
   #                                                    CBC, N, alpha)
   # default: simulates leaf optics using full spectral range
-  if (is.null(SpecPROSPECT)) SpecPROSPECT <- prospect::SpecPROSPECT_FullRange
+  if (is.null(SpecPROSPECT)) SpecPROSPECT <- get_default_SpecPROSPECT()
   # compute total absorption corresponding to each homogeneous layer
   Kall <- (Input_PROSPECT$CHL * SpecPROSPECT$SAC_CHL +
              Input_PROSPECT$CAR * SpecPROSPECT$SAC_CAR +
@@ -197,7 +224,7 @@ check_version_prospect <- function(LMA, PROT, CBC){
   # if calling PROSPECT-PRO (protein content or CBC defined by user)
   # then set LMA to 0 in any case
   if (!LMA==0 & (PROT > 0 | CBC > 0)) {
-    print_msg('version_PROSPECT')
+    message('Both LMA and PROT/CBC were provided; forcing LMA to 0 to run PROSPECT-PRO.')
     LMA <- 0
   }
   return(list('LMA' = LMA, 'PROT' = PROT, 'CBC' = CBC))
@@ -234,7 +261,7 @@ define_Input_PROSPECT <- function(Input_PROSPECT, CHL = NULL, CAR = NULL,
                                  'PROT'= 0.0, 'CBC' = 0.0, 'N' = 1.5,
                                  'alpha' = 40.0)
   if (is.null(Input_PROSPECT)){
-    dm_val <- prospect::check_version_prospect(LMA, PROT, CBC)
+    dm_val <- check_version_prospect(LMA, PROT, CBC)
     Input_PROSPECT <- data.frame('CHL' = CHL, 'CAR' = CAR, 'ANT' = ANT,
                                  'BROWN' = BROWN, 'EWT' = EWT, 'LMA' = dm_val$LMA,
                                  'PROT'= dm_val$PROT, 'CBC' = dm_val$CBC,
@@ -242,9 +269,9 @@ define_Input_PROSPECT <- function(Input_PROSPECT, CHL = NULL, CAR = NULL,
   } else if (!is.null(Input_PROSPECT)){
     missing <- which(!names(default_PROSPECT)%in%names(Input_PROSPECT))
     if (length(missing)>0) Input_PROSPECT <- cbind(Input_PROSPECT, default_PROSPECT[missing])
-    dm_val <- prospect::check_version_prospect(Input_PROSPECT$LMA,
-                                               Input_PROSPECT$PROT,
-                                               Input_PROSPECT$CBC)
+    dm_val <- check_version_prospect(Input_PROSPECT$LMA,
+                                     Input_PROSPECT$PROT,
+                                     Input_PROSPECT$CBC)
     Input_PROSPECT$LMA <- dm_val$LMA
     Input_PROSPECT$PROT <- dm_val$PROT
     Input_PROSPECT$CBC <- dm_val$CBC

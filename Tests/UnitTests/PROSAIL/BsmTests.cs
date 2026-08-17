@@ -19,12 +19,18 @@ namespace UnitTests.PROSAIL
         private static readonly string RelativeBsmDataPath = "..\\..\\..\\Models\\PROSAIL\\InputProperties\\SpectralData\\BSM_GSV.json";
         private static string DefaultBsmDataPath => PathUtilities.GetAbsolutePath(RelativeBsmDataPath, AppDomain.CurrentDomain.BaseDirectory);
 
-        private readonly string RScriptPath = @"C:\Program Files\R\R-4.4.1\bin\Rscript.exe";
+        private readonly string RScriptPath = RScriptLocator.FindRscriptPath();
 
         private static readonly string RelativeRBsmWrapperPath = "..\\..\\..\\Tests\\UnitTests\\PROSAIL\\BSMWrapper.R";
         private static string RBsmWrapperPath => PathUtilities.GetAbsolutePath(RelativeRBsmWrapperPath, AppDomain.CurrentDomain.BaseDirectory);
 
         private readonly double Tolerance = 1e-3;
+
+        [OneTimeSetUp]
+        public void CheckRSetup()
+        {
+            Assert.That(File.Exists(RScriptPath), $"Rscript executable not found. Install R to run these tests.");
+        }
 
         public class BsmTestInput
         {

@@ -6,6 +6,7 @@ using System.Collections.Generic;
 using System.Linq;
 using MathNet.Numerics.LinearAlgebra;
 using Newtonsoft.Json;
+using APSIM.Shared.Utilities;
 using static Models.PROSAIL.PROSPECT.ProspectCore;
 
 namespace UnitTests.PROSAIL
@@ -13,10 +14,21 @@ namespace UnitTests.PROSAIL
     [TestFixture]
     public class ProspecCoreTests
     {
-        private readonly string RScriptPath = @"C:\Program Files\R\R-4.4.1\bin\Rscript.exe";
-        private readonly string RProspectScript = @"D:\ApsimX\Tests\UnitTests\PROSAIL\ProspectImplementation.R";
-        private readonly string TestCasesFile = @"D:\ApsimX\Tests\UnitTests\\PROSAIL\ProspectTestCases.json";
+        private readonly string RScriptPath = RScriptLocator.FindRscriptPath();
+
+        private static readonly string RelativeProspectScriptPath = "..\\..\\..\\Tests\\UnitTests\\PROSAIL\\ProspectImplementation.R";
+        private static string RProspectScript => PathUtilities.GetAbsolutePath(RelativeProspectScriptPath, AppDomain.CurrentDomain.BaseDirectory);
+
+        private static readonly string RelativeTestCasesFilePath = "..\\..\\..\\Tests\\UnitTests\\PROSAIL\\ProspectTestCases.json";
+        private static string TestCasesFile => PathUtilities.GetAbsolutePath(RelativeTestCasesFilePath, AppDomain.CurrentDomain.BaseDirectory);
+
         private readonly double Tolerance = 1e-2;
+
+        [OneTimeSetUp]
+        public void CheckRSetup()
+        {
+            Assert.That(File.Exists(RScriptPath), $"Rscript executable not found. Install R to run these tests.");
+        }
 
         public class ProspectTestCase
         {
