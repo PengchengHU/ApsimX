@@ -446,7 +446,7 @@ namespace UnitTests.PROSAIL
         {
             var model = new ProsailModel();
             model.OnCreated();
-            var memo = model.Children.OfType<Memo>().First(m => m.Name == "Introduction");
+            var memo = model.Children.OfType<Memo>().First(m => m.Name == "\U0001F4D6 Start Here - Introduction");
             Assert.That(memo.Text, Does.Contain("APSIM-PROSAIL framework"));
         }
 

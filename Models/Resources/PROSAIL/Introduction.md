@@ -14,6 +14,13 @@ Every PROSAIL/PROSPECT/SAIL parameter accepts either a **literal value** or an *
 
 Five parameters — **Psoil**, **SMp**, **SunZenithAngle**, **ObserverZenithAngle**, and **RelativeAzimuthAngle** — additionally accept a **comma-separated per-observation-date list** (one value per date in **ObservationDates**). This third mode exists because these particular inputs are usually tied to specific, independently-known satellite overpass events (the sun-sensor geometry and soil-moisture reading recorded at acquisition time) rather than a continuously-simulated state, so they are commonly supplied as a fixed table of per-date observations instead of a daily-evaluated expression.
 
+### Model Configuration
+
+Two switches at the top of the property panel determine which of the other sections below actually apply — set these first:
+
+- **SailVersion**: `4SAIL` (single-layer, most crops) or `4SAIL2` (two-layer green+brown canopy). Selecting `4SAIL2` reveals the brown-leaf properties in Step 1 and the `FractionBrown`/`Dissociation`/`CrownCover`/`TreeShape` properties in Step 2; under `4SAIL` those are all hidden.
+- **SoilReflectanceModel**: `WetDryMixing` or `BSM` — chooses the soil reflectance model used in Step 4. Selecting one reveals only that model's properties in Step 4; the other model's properties are hidden.
+
 ### Step 1: PROSPECT leaf inputs
 
 Set each leaf biochemical parameter either to a fixed value or to an APSIM expression that pulls the value from a crop model at runtime (e.g. `[Wheat].Leaf.LAI`). Key parameters and their typical ranges:
@@ -36,8 +43,8 @@ Set **InputWavelengthRange** to the wavelengths PROSAIL should compute, e.g. `40
 **Brown leaf class (4SAIL2 only)**: each of the 10 parameters above has a `...Brown` counterpart
 (`NBrown`, `CABBrown`, `CARBrown`, `ANTBrown`, `BROWNBrown`, `EWTBrown`, `LMABrown`, `PROTBrown`,
 `CBCBrown`, `AlphaBrown`) describing a second, independently-parameterized brown/senesced leaf
-class. These are only visible and only evaluated when **SailVersion** (Step 2) is set to
-`4SAIL2` — under plain `4SAIL` there is only ever one leaf class, so they're hidden entirely.
+class. These are only visible and only evaluated when **SailVersion** (Model Configuration) is set
+to `4SAIL2` — under plain `4SAIL` there is only ever one leaf class, so they're hidden entirely.
 They default to the same values as their green counterparts, so an unconfigured brown leaf starts
 out optically identical to green. `BROWNBrown` is the brown-pigment content *of the brown leaf
 class itself* — a second, independent pigment loading, distinct from the leaf class it belongs to
@@ -45,16 +52,10 @@ already being "the brown one" in the green/brown canopy mix.
 
 ### Step 2: SAIL canopy properties
 
-Choose **SailVersion**:
-
-- `4SAIL`: single-layer homogeneous canopy. Suitable for most crops.
-- `4SAIL2`: two-layer canopy (green + brown) with clumping effects. Use when a genuine mix of
-  green and senesced/brown leaf area needs to be represented (e.g. a partially-senesced canopy).
-
 **`FractionBrown`, `Dissociation`, `CrownCover`, `TreeShape`, and all 10 `...Brown` leaf
-properties (Step 1) are used only when `SailVersion="4SAIL2"`.** They're hidden in the property
-panel and simply not evaluated under plain `4SAIL` — there's nothing to configure for them there.
-Under `4SAIL2`:
+properties (Step 1) are used only when `SailVersion` (Model Configuration) is set to `4SAIL2`.**
+They're hidden in the property panel and simply not evaluated under plain `4SAIL` — there's
+nothing to configure for them there. Under `4SAIL2`:
 - **FractionBrown** sets how much of the LAI is attributed to the brown leaf class vs. the green one.
 - **Dissociation** controls how "layered" vs. "mixed" the two leaf classes are: `1` gives a clean
   two-layer stack (green on top, brown below); `0` fully mixes green and brown optics into one
@@ -88,14 +89,14 @@ When **ObservationDates** lists multiple dates, supply a matching comma-separate
 
 ### Step 4: Soil reflectance
 
-Toggle **UseBSM** to choose the soil model:
+**SoilReflectanceModel** (Model Configuration) chooses the soil model used here:
 
-**Wet/dry linear mixing model** (UseBSM = false):
+**Wet/dry linear mixing model** (SoilReflectanceModel = WetDryMixing):
 
 - Leave **WetDrySoilReflectancePath** empty to use the built-in soil spectra, or provide a path to a custom CSV file with wet and dry soil reflectance spectra.
 - Set **Psoil** to a value between 0 (fully wet) and 1 (fully dry), or link it to a soil moisture expression. Accepts a single value, comma-separated per-date list, or an APSIM expression.
 
-**BSM (brightness–soil model)** (UseBSM = true):
+**BSM (brightness–soil model)** (SoilReflectanceModel = BSM):
 
 | Parameter | Description | Typical range |
 |-----------|-------------|---------------|

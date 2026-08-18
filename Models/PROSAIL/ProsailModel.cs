@@ -53,172 +53,9 @@ namespace Models.PROSAIL
 
         #endregion
 
-        #region PROSAIL Input Parameters (Expressions)
-        /// <summary>Getting-started notice shown at the top of the property panel.</summary>
-        [Description("ℹ️ Getting started")]
-        public string GettingStarted { get; set; } = "New to APSIM-PROSAIL? Click the Introduction node in the simulation tree for a model overview, usage guide, and citation guidelines.";
-
-        /// <summary>The expression for N (Leaf structure parameter)</summary>
-        [Separator("Expressions to link APSIM variables and PROSPECT inputs")]
-        [Description("N - Leaf structure (unitless)")]
-        [Tooltip("Leaf structure parameter. Can be a literal value or an APSIM expression" +
-        "(e.g., IIF([Wheat].Leaf.SpecificAreaCanopy * 10 <= 0.1, 1.6, (0.9 * [Wheat].Leaf.SpecificAreaCanopy * 10 + 0.025) / ([Wheat].Leaf.SpecificAreaCanopy * 10 - 0.1)) )." +
-        "Typical range: 1.0-2.6. Evaluated daily only; does not support a per-observation-date list (see the Introduction node).")]
-        [Bounds(Lower = 1.0, Upper = 2.6)]
-        public string N { get; set; } = "1.5";
-
-        /// <summary>The expression for N of the brown/senesced leaf class (4SAIL2 only).</summary>
-        [Description("NBrown - Leaf structure of the brown leaf class (unitless)")]
-        [Tooltip("Leaf structure parameter for the brown/senesced leaf class. Only used when SailVersion=4SAIL2 " +
-        "and FractionBrown > 0. Can be a literal value or an APSIM expression. Typical range: 1.0-2.6. " +
-        "Evaluated daily only; does not support a per-observation-date list (see the Introduction node).")]
-        [Bounds(Lower = 1.0, Upper = 2.6)]
-        [Display(VisibleCallback = nameof(IsFourSAIL2))]
-        public string NBrown { get; set; } = "1.5";
-
-        /// <summary>The expression for CAB (Chlorophyll a + b content)</summary>
-        [Description("CAB - Chlorophyll a+b (\u03BCg/cm\u00B2)")]
-        [Tooltip("Chlorophyll a + b content. Can be a literal value or an APSIM expression (e.g., [Wheat].Leaf.SpecificNitrogen * 26 ). Typical range: 10-80 \u03BCg/cm\u00B2. Evaluated daily only; does not support a per-observation-date list (see the Introduction node).")]
-        [Bounds(Lower = 10.0, Upper = 80.0)]
-        public string CAB { get; set; } = "40.0";
-
-        /// <summary>The expression for CAB of the brown/senesced leaf class (4SAIL2 only).</summary>
-        [Description("CABBrown - Chlorophyll a+b of the brown leaf class (\u03BCg/cm\u00B2)")]
-        [Tooltip("Chlorophyll a + b content for the brown/senesced leaf class. Only used when SailVersion=4SAIL2 " +
-        "and FractionBrown > 0. Can be a literal or APSIM expression. Typical range: 10-80 \u03BCg/cm\u00B2. " +
-        "Evaluated daily only; does not support a per-observation-date list (see the Introduction node).")]
-        [Bounds(Lower = 10.0, Upper = 80.0)]
-        [Display(VisibleCallback = nameof(IsFourSAIL2))]
-        public string CABBrown { get; set; } = "40.0";
-
-        /// <summary>The expression for CAR (Carotenoid content)</summary>
-        [Description("CAR - Carotenoid (\u03BCg/cm\u00B2)")]
-        [Tooltip("Carotenoid content. Can be a literal or APSIM expression (e.g., [Wheat].Leaf.SpecificNitrogen * 26 * 0.216 ). Typical range: 1-24 \u03BCg/cm\u00B2. Evaluated daily only; does not support a per-observation-date list (see the Introduction node).")]
-        [Bounds(Lower = 1.0, Upper = 24.0)]
-        public string CAR { get; set; } = "8.0";
-
-        /// <summary>The expression for CAR of the brown/senesced leaf class (4SAIL2 only).</summary>
-        [Description("CARBrown - Carotenoid of the brown leaf class (\u03BCg/cm\u00B2)")]
-        [Tooltip("Carotenoid content for the brown/senesced leaf class. Only used when SailVersion=4SAIL2 " +
-        "and FractionBrown > 0. Can be a literal or APSIM expression. Typical range: 1-24 \u03BCg/cm\u00B2. " +
-        "Evaluated daily only; does not support a per-observation-date list (see the Introduction node).")]
-        [Bounds(Lower = 1.0, Upper = 24.0)]
-        [Display(VisibleCallback = nameof(IsFourSAIL2))]
-        public string CARBrown { get; set; } = "8.0";
-
-        /// <summary>The expression for EWT (Equivalent Water Thickness)</summary>
-        [Description("EWT - Water thickness (cm)")]
-        [Tooltip("Equivalent Water Thickness (CW). Can be a literal or APSIM expression. Typical range: 0.001-0.08 cm. Evaluated daily only; does not support a per-observation-date list (see the Introduction node).")]
-        [Bounds(Lower = 0.001, Upper = 0.08)]
-        public string EWT { get; set; } = "0.01";
-
-        /// <summary>The expression for EWT of the brown/senesced leaf class (4SAIL2 only).</summary>
-        [Description("EWTBrown - Water thickness of the brown leaf class (cm)")]
-        [Tooltip("Equivalent Water Thickness for the brown/senesced leaf class. Only used when SailVersion=4SAIL2 " +
-        "and FractionBrown > 0. Can be a literal or APSIM expression. Typical range: 0.001-0.08 cm. " +
-        "Evaluated daily only; does not support a per-observation-date list (see the Introduction node).")]
-        [Bounds(Lower = 0.001, Upper = 0.08)]
-        [Display(VisibleCallback = nameof(IsFourSAIL2))]
-        public string EWTBrown { get; set; } = "0.01";
-
-        /// <summary>The expression for LMA (Leaf Mass per Area)</summary>
-        [Description("LMA - Dry matter (g/cm\u00B2)")]
-        [Tooltip("Leaf Mass per Area (CM). Can be a literal or APSIM expression (e.g., (1 / ([Wheat].Leaf.SpecificAreaCanopy + 0.0001)) * 10^(-4) ). Typical range: 0.001-0.02 g/cm\u00B2. Evaluated daily only; does not support a per-observation-date list (see the Introduction node).")]
-        [Bounds(Lower = 0.001, Upper = 0.02)]
-        public string LMA { get; set; } = "0.008";
-
-        /// <summary>The expression for LMA of the brown/senesced leaf class (4SAIL2 only).</summary>
-        [Description("LMABrown - Dry matter of the brown leaf class (g/cm\u00B2)")]
-        [Tooltip("Leaf Mass per Area for the brown/senesced leaf class. Only used when SailVersion=4SAIL2 " +
-        "and FractionBrown > 0. Can be a literal or APSIM expression. Typical range: 0.001-0.02 g/cm\u00B2. " +
-        "Evaluated daily only; does not support a per-observation-date list (see the Introduction node).")]
-        [Bounds(Lower = 0.001, Upper = 0.02)]
-        [Display(VisibleCallback = nameof(IsFourSAIL2))]
-        public string LMABrown { get; set; } = "0.008";
-
-        /// <summary>The expression for BROWN (Brown pigment content)</summary>
-        [Description("BROWN - Brown pigment (unitless)")]
-        [Tooltip("Brown pigment content. Can be a literal or APSIM expression. Typical range: 0-1. Evaluated daily only; does not support a per-observation-date list (see the Introduction node).")]
-        [Bounds(Lower = 0.0, Upper = 1.0)]
-        public string BROWN { get; set; } = "0.0";
-
-        /// <summary>The expression for the brown pigment content of the brown/senesced leaf class itself (4SAIL2 only).</summary>
-        [Description("BROWNBrown - Brown pigment of the brown leaf class (unitless)")]
-        [Tooltip("Brown pigment content of the brown/senesced leaf class itself (a second, independent brown-pigment " +
-        "loading on top of that leaf class already being the 'brown' one in the green/brown mix). Only used when " +
-        "SailVersion=4SAIL2 and FractionBrown > 0. Can be a literal or APSIM expression. Typical range: 0-1. " +
-        "Evaluated daily only; does not support a per-observation-date list (see the Introduction node).")]
-        [Bounds(Lower = 0.0, Upper = 1.0)]
-        [Display(VisibleCallback = nameof(IsFourSAIL2))]
-        public string BROWNBrown { get; set; } = "0.0";
-
-        /// <summary>The expression for ANT (Anthocyanin content)</summary>
-        [Description("ANT - Anthocyanin (\u03BCg/cm\u00B2)")]
-        [Tooltip("Anthocyanin content. Can be a literal or APSIM expression. Typical range: 0-10 \u03BCg/cm\u00B2. Evaluated daily only; does not support a per-observation-date list (see the Introduction node).")]
-        [Bounds(Lower = 0.0, Upper = 10.0)]
-        public string ANT { get; set; } = "0.0";
-
-        /// <summary>The expression for ANT of the brown/senesced leaf class (4SAIL2 only).</summary>
-        [Description("ANTBrown - Anthocyanin of the brown leaf class (\u03BCg/cm\u00B2)")]
-        [Tooltip("Anthocyanin content for the brown/senesced leaf class. Only used when SailVersion=4SAIL2 " +
-        "and FractionBrown > 0. Can be a literal or APSIM expression. Typical range: 0-10 \u03BCg/cm\u00B2. " +
-        "Evaluated daily only; does not support a per-observation-date list (see the Introduction node).")]
-        [Bounds(Lower = 0.0, Upper = 10.0)]
-        [Display(VisibleCallback = nameof(IsFourSAIL2))]
-        public string ANTBrown { get; set; } = "0.0";
-
-        /// <summary>The expression for PROT (Protein content)</summary>
-        [Description("PROT - Protein (g/cm\u00B2)")]
-        [Tooltip("Protein content. Can be a literal or APSIM expression. Typical range: 0-10 g/cm\u00B2. Evaluated daily only; does not support a per-observation-date list (see the Introduction node).")]
-        [Bounds(Lower = 0.0, Upper = 10.0)]
-        public string PROT { get; set; } = "0.0";
-
-        /// <summary>The expression for PROT of the brown/senesced leaf class (4SAIL2 only).</summary>
-        [Description("PROTBrown - Protein of the brown leaf class (g/cm\u00B2)")]
-        [Tooltip("Protein content for the brown/senesced leaf class. Only used when SailVersion=4SAIL2 " +
-        "and FractionBrown > 0. Can be a literal or APSIM expression. Typical range: 0-10 g/cm\u00B2. " +
-        "Evaluated daily only; does not support a per-observation-date list (see the Introduction node).")]
-        [Bounds(Lower = 0.0, Upper = 10.0)]
-        [Display(VisibleCallback = nameof(IsFourSAIL2))]
-        public string PROTBrown { get; set; } = "0.0";
-
-        /// <summary>The expression for CBC (NonProt Carbon-based constituent content)</summary>
-        [Description("CBC - Carbon-based constituent (g/cm\u00B2)")]
-        [Tooltip("Non-protein carbon-based constituent content. Can be a literal or APSIM expression. Typical range: 0-10 g/cm\u00B2. Evaluated daily only; does not support a per-observation-date list (see the Introduction node).")]
-        [Bounds(Lower = 0.0, Upper = 10.0)]
-        public string CBC { get; set; } = "0.0";
-
-        /// <summary>The expression for CBC of the brown/senesced leaf class (4SAIL2 only).</summary>
-        [Description("CBCBrown - Carbon-based constituent of the brown leaf class (g/cm\u00B2)")]
-        [Tooltip("Non-protein carbon-based constituent content for the brown/senesced leaf class. Only used when " +
-        "SailVersion=4SAIL2 and FractionBrown > 0. Can be a literal or APSIM expression. Typical range: 0-10 g/cm\u00B2. " +
-        "Evaluated daily only; does not support a per-observation-date list (see the Introduction node).")]
-        [Bounds(Lower = 0.0, Upper = 10.0)]
-        [Display(VisibleCallback = nameof(IsFourSAIL2))]
-        public string CBCBrown { get; set; } = "0.0";
-
-        /// <summary>The expression for alpha (Incidence angle in degrees)</summary>
-        [Description("Alpha - Incidence angle (\u00B0)")]
-        [Tooltip("Incidence angle in degrees. Can be a literal or APSIM expression. Typical range: 0-90\u00B0. Evaluated daily only; does not support a per-observation-date list (see the Introduction node).")]
-        [Bounds(Lower = 0.0, Upper = 90.0)]
-        public string Alpha { get; set; } = "40.0";
-
-        /// <summary>The expression for alpha of the brown/senesced leaf class (4SAIL2 only).</summary>
-        [Description("AlphaBrown - Incidence angle of the brown leaf class (\u00B0)")]
-        [Tooltip("Incidence angle in degrees for the brown/senesced leaf class. Only used when SailVersion=4SAIL2 " +
-        "and FractionBrown > 0. Can be a literal or APSIM expression. Typical range: 0-90\u00B0. " +
-        "Evaluated daily only; does not support a per-observation-date list (see the Introduction node).")]
-        [Bounds(Lower = 0.0, Upper = 90.0)]
-        [Display(VisibleCallback = nameof(IsFourSAIL2))]
-        public string AlphaBrown { get; set; } = "40.0";
-
-        /// <summary>Spectral range to simulate (start-end in nm)</summary>
-        [Description("Spectral range (nm)")]
-        [Tooltip("Supports ranges (e.g., '400-500'), lists (e.g., '400, 500, 600'), and mixed formats (e.g., '400, 500-600, 700'). Default: 400-2500.")]
-        public string InputWavelengthRange { get; set; } = "400-2500";
-
+        #region Model Configuration
         /// <summary>SAIL model version selection</summary>
-        [Separator("Canopy Properties (SAIL)")]
+        [Separator("Model Configuration")]
         [Description("SAIL version")]
         [Tooltip("4SAIL: single layer canopy model. 4SAIL2: two layer canopy model (green + brown leaves).")]
         public SailVersionTypes SailVersion
@@ -234,7 +71,182 @@ namespace Models.PROSAIL
         /// <summary>True when the two-layer green/brown canopy model (4SAIL2) is selected.</summary>
         public bool IsFourSAIL2 => SailVersion == SailVersionTypes.FourSAIL2;
 
+        /// <summary>Soil reflectance model selection.</summary>
+        [Description("Soil reflectance model")]
+        [Tooltip("WetDryMixing: linear mix of wet/dry soil reflectance spectra weighted by Psoil. BSM: Brightness Soil Model (Verhoef et al. 2018) driven by BsmBrightness/BsmLat/BsmLon/SMp.")]
+        public SoilReflectanceModelTypes SoilReflectanceModel { get; set; } = SoilReflectanceModelTypes.WetDryMixing;
+
+        /// <summary>Returns true when BSM is selected.</summary>
+        public bool IsBSM => SoilReflectanceModel == SoilReflectanceModelTypes.BSM;
+
+        /// <summary>Returns true when BSM is NOT selected.</summary>
+        public bool IsNotBSM => !IsBSM;
+
+        /// <summary>Spectral range to simulate (start-end in nm)</summary>
+        [Description("Spectral range (nm)")]
+        [Tooltip("Supports ranges (e.g., '400-500'), lists (e.g., '400, 500, 600'), and mixed formats (e.g., '400, 500-600, 700'). Default: 400-2500.")]
+        public string InputWavelengthRange { get; set; } = "400-2500";
+        #endregion
+
+        #region PROSAIL Input Parameters (Expressions)
+        /// <summary>The expression for N (Leaf structure parameter)</summary>
+        [Separator("Leaf Properties (PROSPECT)")]
+        [Separator("Green Leaf")]
+        [Description("N - Leaf structure (unitless)")]
+        [Tooltip("Leaf structure parameter. Can be a literal value or an APSIM expression" +
+        "(e.g., IIF([Wheat].Leaf.SpecificAreaCanopy * 10 <= 0.1, 1.6, (0.9 * [Wheat].Leaf.SpecificAreaCanopy * 10 + 0.025) / ([Wheat].Leaf.SpecificAreaCanopy * 10 - 0.1)) )." +
+        "Typical range: 1.0-2.6. Evaluated daily only; does not support a per-observation-date list (see the Introduction node).")]
+        [Bounds(Lower = 1.0, Upper = 2.6)]
+        public string N { get; set; } = "1.5";
+
+        /// <summary>The expression for CAB (Chlorophyll a + b content)</summary>
+        [Description("CAB - Chlorophyll a+b (\u03BCg/cm\u00B2)")]
+        [Tooltip("Chlorophyll a + b content. Can be a literal value or an APSIM expression (e.g., [Wheat].Leaf.SpecificNitrogen * 26 ). Typical range: 10-80 \u03BCg/cm\u00B2. Evaluated daily only; does not support a per-observation-date list (see the Introduction node).")]
+        [Bounds(Lower = 10.0, Upper = 80.0)]
+        public string CAB { get; set; } = "40.0";
+
+        /// <summary>The expression for CAR (Carotenoid content)</summary>
+        [Description("CAR - Carotenoid (\u03BCg/cm\u00B2)")]
+        [Tooltip("Carotenoid content. Can be a literal or APSIM expression (e.g., [Wheat].Leaf.SpecificNitrogen * 26 * 0.216 ). Typical range: 1-24 \u03BCg/cm\u00B2. Evaluated daily only; does not support a per-observation-date list (see the Introduction node).")]
+        [Bounds(Lower = 1.0, Upper = 24.0)]
+        public string CAR { get; set; } = "8.0";
+
+        /// <summary>The expression for EWT (Equivalent Water Thickness)</summary>
+        [Description("EWT - Water thickness (cm)")]
+        [Tooltip("Equivalent Water Thickness (CW). Can be a literal or APSIM expression. Typical range: 0.001-0.08 cm. Evaluated daily only; does not support a per-observation-date list (see the Introduction node).")]
+        [Bounds(Lower = 0.001, Upper = 0.08)]
+        public string EWT { get; set; } = "0.01";
+
+        /// <summary>The expression for LMA (Leaf Mass per Area)</summary>
+        [Description("LMA - Dry matter (g/cm\u00B2)")]
+        [Tooltip("Leaf Mass per Area (CM). Can be a literal or APSIM expression (e.g., (1 / ([Wheat].Leaf.SpecificAreaCanopy + 0.0001)) * 10^(-4) ). Typical range: 0.001-0.02 g/cm\u00B2. Evaluated daily only; does not support a per-observation-date list (see the Introduction node).")]
+        [Bounds(Lower = 0.001, Upper = 0.02)]
+        public string LMA { get; set; } = "0.008";
+
+        /// <summary>The expression for BROWN (Brown pigment content)</summary>
+        [Description("BROWN - Brown pigment (unitless)")]
+        [Tooltip("Brown pigment content. Can be a literal or APSIM expression. Typical range: 0-1. Evaluated daily only; does not support a per-observation-date list (see the Introduction node).")]
+        [Bounds(Lower = 0.0, Upper = 1.0)]
+        public string BROWN { get; set; } = "0.0";
+
+        /// <summary>The expression for ANT (Anthocyanin content)</summary>
+        [Description("ANT - Anthocyanin (\u03BCg/cm\u00B2)")]
+        [Tooltip("Anthocyanin content. Can be a literal or APSIM expression. Typical range: 0-10 \u03BCg/cm\u00B2. Evaluated daily only; does not support a per-observation-date list (see the Introduction node).")]
+        [Bounds(Lower = 0.0, Upper = 10.0)]
+        public string ANT { get; set; } = "0.0";
+
+        /// <summary>The expression for PROT (Protein content)</summary>
+        [Description("PROT - Protein (g/cm\u00B2)")]
+        [Tooltip("Protein content. Can be a literal or APSIM expression. Typical range: 0-10 g/cm\u00B2. Evaluated daily only; does not support a per-observation-date list (see the Introduction node).")]
+        [Bounds(Lower = 0.0, Upper = 10.0)]
+        public string PROT { get; set; } = "0.0";
+
+        /// <summary>The expression for CBC (NonProt Carbon-based constituent content)</summary>
+        [Description("CBC - Carbon-based constituent (g/cm\u00B2)")]
+        [Tooltip("Non-protein carbon-based constituent content. Can be a literal or APSIM expression. Typical range: 0-10 g/cm\u00B2. Evaluated daily only; does not support a per-observation-date list (see the Introduction node).")]
+        [Bounds(Lower = 0.0, Upper = 10.0)]
+        public string CBC { get; set; } = "0.0";
+
+        /// <summary>The expression for alpha (Incidence angle in degrees)</summary>
+        [Description("Alpha - Incidence angle (\u00B0)")]
+        [Tooltip("Incidence angle in degrees. Can be a literal or APSIM expression. Typical range: 0-90\u00B0. Evaluated daily only; does not support a per-observation-date list (see the Introduction node).")]
+        [Bounds(Lower = 0.0, Upper = 90.0)]
+        public string Alpha { get; set; } = "40.0";
+
+        /// <summary>The expression for N of the brown/senesced leaf class (4SAIL2 only).</summary>
+        [Separator("Brown Leaf")]
+        [Description("NBrown - Leaf structure of the brown leaf class (unitless)")]
+        [Tooltip("Leaf structure parameter for the brown/senesced leaf class. Only used when SailVersion=4SAIL2 " +
+        "and FractionBrown > 0. Can be a literal value or an APSIM expression. Typical range: 1.0-2.6. " +
+        "Evaluated daily only; does not support a per-observation-date list (see the Introduction node).")]
+        [Bounds(Lower = 1.0, Upper = 2.6)]
+        [Display(VisibleCallback = nameof(IsFourSAIL2))]
+        public string NBrown { get; set; } = "1.5";
+
+        /// <summary>The expression for CAB of the brown/senesced leaf class (4SAIL2 only).</summary>
+        [Description("CABBrown - Chlorophyll a+b of the brown leaf class (\u03BCg/cm\u00B2)")]
+        [Tooltip("Chlorophyll a + b content for the brown/senesced leaf class. Only used when SailVersion=4SAIL2 " +
+        "and FractionBrown > 0. Can be a literal or APSIM expression. Typical range: 10-80 \u03BCg/cm\u00B2. " +
+        "Evaluated daily only; does not support a per-observation-date list (see the Introduction node).")]
+        [Bounds(Lower = 10.0, Upper = 80.0)]
+        [Display(VisibleCallback = nameof(IsFourSAIL2))]
+        public string CABBrown { get; set; } = "40.0";
+
+        /// <summary>The expression for CAR of the brown/senesced leaf class (4SAIL2 only).</summary>
+        [Description("CARBrown - Carotenoid of the brown leaf class (\u03BCg/cm\u00B2)")]
+        [Tooltip("Carotenoid content for the brown/senesced leaf class. Only used when SailVersion=4SAIL2 " +
+        "and FractionBrown > 0. Can be a literal or APSIM expression. Typical range: 1-24 \u03BCg/cm\u00B2. " +
+        "Evaluated daily only; does not support a per-observation-date list (see the Introduction node).")]
+        [Bounds(Lower = 1.0, Upper = 24.0)]
+        [Display(VisibleCallback = nameof(IsFourSAIL2))]
+        public string CARBrown { get; set; } = "8.0";
+
+        /// <summary>The expression for EWT of the brown/senesced leaf class (4SAIL2 only).</summary>
+        [Description("EWTBrown - Water thickness of the brown leaf class (cm)")]
+        [Tooltip("Equivalent Water Thickness for the brown/senesced leaf class. Only used when SailVersion=4SAIL2 " +
+        "and FractionBrown > 0. Can be a literal or APSIM expression. Typical range: 0.001-0.08 cm. " +
+        "Evaluated daily only; does not support a per-observation-date list (see the Introduction node).")]
+        [Bounds(Lower = 0.001, Upper = 0.08)]
+        [Display(VisibleCallback = nameof(IsFourSAIL2))]
+        public string EWTBrown { get; set; } = "0.01";
+
+        /// <summary>The expression for LMA of the brown/senesced leaf class (4SAIL2 only).</summary>
+        [Description("LMABrown - Dry matter of the brown leaf class (g/cm\u00B2)")]
+        [Tooltip("Leaf Mass per Area for the brown/senesced leaf class. Only used when SailVersion=4SAIL2 " +
+        "and FractionBrown > 0. Can be a literal or APSIM expression. Typical range: 0.001-0.02 g/cm\u00B2. " +
+        "Evaluated daily only; does not support a per-observation-date list (see the Introduction node).")]
+        [Bounds(Lower = 0.001, Upper = 0.02)]
+        [Display(VisibleCallback = nameof(IsFourSAIL2))]
+        public string LMABrown { get; set; } = "0.008";
+
+        /// <summary>The expression for the brown pigment content of the brown/senesced leaf class itself (4SAIL2 only).</summary>
+        [Description("BROWNBrown - Brown pigment of the brown leaf class (unitless)")]
+        [Tooltip("Brown pigment content of the brown/senesced leaf class itself (a second, independent brown-pigment " +
+        "loading on top of that leaf class already being the 'brown' one in the green/brown mix). Only used when " +
+        "SailVersion=4SAIL2 and FractionBrown > 0. Can be a literal or APSIM expression. Typical range: 0-1. " +
+        "Evaluated daily only; does not support a per-observation-date list (see the Introduction node).")]
+        [Bounds(Lower = 0.0, Upper = 1.0)]
+        [Display(VisibleCallback = nameof(IsFourSAIL2))]
+        public string BROWNBrown { get; set; } = "0.0";
+
+        /// <summary>The expression for ANT of the brown/senesced leaf class (4SAIL2 only).</summary>
+        [Description("ANTBrown - Anthocyanin of the brown leaf class (\u03BCg/cm\u00B2)")]
+        [Tooltip("Anthocyanin content for the brown/senesced leaf class. Only used when SailVersion=4SAIL2 " +
+        "and FractionBrown > 0. Can be a literal or APSIM expression. Typical range: 0-10 \u03BCg/cm\u00B2. " +
+        "Evaluated daily only; does not support a per-observation-date list (see the Introduction node).")]
+        [Bounds(Lower = 0.0, Upper = 10.0)]
+        [Display(VisibleCallback = nameof(IsFourSAIL2))]
+        public string ANTBrown { get; set; } = "0.0";
+
+        /// <summary>The expression for PROT of the brown/senesced leaf class (4SAIL2 only).</summary>
+        [Description("PROTBrown - Protein of the brown leaf class (g/cm\u00B2)")]
+        [Tooltip("Protein content for the brown/senesced leaf class. Only used when SailVersion=4SAIL2 " +
+        "and FractionBrown > 0. Can be a literal or APSIM expression. Typical range: 0-10 g/cm\u00B2. " +
+        "Evaluated daily only; does not support a per-observation-date list (see the Introduction node).")]
+        [Bounds(Lower = 0.0, Upper = 10.0)]
+        [Display(VisibleCallback = nameof(IsFourSAIL2))]
+        public string PROTBrown { get; set; } = "0.0";
+
+        /// <summary>The expression for CBC of the brown/senesced leaf class (4SAIL2 only).</summary>
+        [Description("CBCBrown - Carbon-based constituent of the brown leaf class (g/cm\u00B2)")]
+        [Tooltip("Non-protein carbon-based constituent content for the brown/senesced leaf class. Only used when " +
+        "SailVersion=4SAIL2 and FractionBrown > 0. Can be a literal or APSIM expression. Typical range: 0-10 g/cm\u00B2. " +
+        "Evaluated daily only; does not support a per-observation-date list (see the Introduction node).")]
+        [Bounds(Lower = 0.0, Upper = 10.0)]
+        [Display(VisibleCallback = nameof(IsFourSAIL2))]
+        public string CBCBrown { get; set; } = "0.0";
+
+        /// <summary>The expression for alpha of the brown/senesced leaf class (4SAIL2 only).</summary>
+        [Description("AlphaBrown - Incidence angle of the brown leaf class (\u00B0)")]
+        [Tooltip("Incidence angle in degrees for the brown/senesced leaf class. Only used when SailVersion=4SAIL2 " +
+        "and FractionBrown > 0. Can be a literal or APSIM expression. Typical range: 0-90\u00B0. " +
+        "Evaluated daily only; does not support a per-observation-date list (see the Introduction node).")]
+        [Bounds(Lower = 0.0, Upper = 90.0)]
+        [Display(VisibleCallback = nameof(IsFourSAIL2))]
+        public string AlphaBrown { get; set; } = "40.0";
+
         /// <summary>The expression for Leaf Area Index (LAI)</summary>
+        [Separator("Canopy Properties (SAIL)")]
         [Description("LAI - Leaf Area Index (m\u00B2/m\u00B2)")]
         [Tooltip("Leaf Area Index. Can be a literal or APSIM expression (e.g., [Wheat].Leaf.LAI). Typical range: 0-10 m\u00B2/m\u00B2. Evaluated daily only; does not support a per-observation-date list (see the Introduction node).")]
         [Bounds(Lower = 0.0, Upper = 10.0)]
@@ -322,16 +334,8 @@ namespace Models.PROSAIL
         #endregion
 
         #region Soil Reflectance
-        /// <summary>Use BSM (Brightness Soil Model) for soil reflectance instead of wet/dry interpolation.</summary>
-        [Separator("Soil reflectance")]
-        [Description("Use BSM for soil reflectance")]
-        [Tooltip("If enabled, uses the Brightness Soil Model (BSM; Verhoef et al. 2018) to simulate soil reflectance from BsmBrightness, BsmLat, BsmLon, and SMp. If disabled, reflectance is a linear mix of dry and wet spectra weighted by Psoil.")]
-        public bool UseBSM { get; set; } = false;
-
-        /// <summary>Returns true when BSM is NOT selected.</summary>
-        public bool IsNotBSM => !UseBSM;
-
         /// <summary>Path to wet/dry soil reflectance data file.</summary>
+        [Separator("Soil Reflectance")]
         [Description("Wet/dry soil reflectance file")]
         [Tooltip("Optional CSV file (columns: Wavelength, Dry_Soil, Wet_Soil) to override the built-in SpecSOIL.json data. Leave empty to use the built-in default.")]
         [Display(Type = DisplayType.FileName, VisibleCallback = nameof(IsNotBSM))]
@@ -345,27 +349,28 @@ namespace Models.PROSAIL
         public string Psoil { get; set; } = "1 - [WaterBalance].SW[1]";
 
         /// <summary>BSM soil brightness parameter.</summary>
+        [Separator("Soil Reflectance")]
         [Description("BsmBrightness - Soil brightness (0-1)")]
         [Tooltip("Soil brightness scaling factor (0\u20131) for BSM. Scales the magnitude of the dry soil spectrum. Enter a literal (e.g., 0.5). Evaluated daily only; does not support a per-observation-date list (see the Introduction node).")]
-        [Display(VisibleCallback = nameof(UseBSM))]
+        [Display(VisibleCallback = nameof(IsBSM))]
         public string BsmBrightness { get; set; } = "0.5";
 
         /// <summary>BSM spectral shape latitude.</summary>
         [Description("BsmLat - Spectral shape latitude (20-40\u00B0)")]
         [Tooltip("Spectral latitude for BSM (recommended 20\u201340\u00B0). Controls the spectral shape of the dry soil spectrum. Enter a literal (e.g., 25). Evaluated daily only; does not support a per-observation-date list (see the Introduction node).")]
-        [Display(VisibleCallback = nameof(UseBSM))]
+        [Display(VisibleCallback = nameof(IsBSM))]
         public string BsmLat { get; set; } = "25";
 
         /// <summary>BSM spectral shape longitude.</summary>
         [Description("BsmLon - Spectral shape longitude (45-65\u00B0)")]
         [Tooltip("Spectral longitude for BSM (recommended 45\u201365\u00B0). Controls the spectral shape of the dry soil spectrum. Enter a literal (e.g., 45) or an APSIM expression. Evaluated daily only; does not support a per-observation-date list (see the Introduction node).")]
-        [Display(VisibleCallback = nameof(UseBSM))]
+        [Display(VisibleCallback = nameof(IsBSM))]
         public string BsmLon { get; set; } = "45";
 
         /// <summary>SMp — soil moisture percentage, per-date list, or APSIM expression.</summary>
         [Description("SMp - Soil moisture percentage (5-55%)")]
         [Tooltip("Soil moisture volume percentage (5\u201355%) for BSM. Accepts: a single literal (e.g., 25) applied to all dates; a comma-separated list of one value per observation date (e.g. 20, 25, 30); or an APSIM expression evaluated each day (e.g. [WaterBalance].SW[1] * 100). Defaults to [WaterBalance].SW[1] * 100.")]
-        [Display(VisibleCallback = nameof(UseBSM))]
+        [Display(VisibleCallback = nameof(IsBSM))]
         public string SMp { get; set; } = "[WaterBalance].SW[1] * 100";
         #endregion
 
@@ -507,7 +512,7 @@ namespace Models.PROSAIL
         /// <summary>The cached wet and dry soil reflectance at simulation start</summary>
         private WetDrySoilReflectance? cachedWetDrySoilReflectance = null;
 
-        /// <summary>The cached BSM spectral data (loaded if UseBSM = true)</summary>
+        /// <summary>The cached BSM spectral data (loaded if SoilReflectanceModel = BSM)</summary>
         private BsmSpectralData? cachedBsmData = null;
 
         /// <summary>Cached PROSAIL results for the current day</summary>
@@ -935,11 +940,11 @@ namespace Models.PROSAIL
         public override void OnCreated()
         {
             base.OnCreated();
-            if (!Children.Exists(c => c is Memo && c.Name == "Introduction"))
+            if (!Children.Exists(c => c is Memo && c.Name == "\U0001F4D6 Start Here - Introduction"))
             {
                 Children.Insert(0, new Memo
                 {
-                    Name = "Introduction",
+                    Name = "\U0001F4D6 Start Here - Introduction",
                     Text = LoadIntroductionText()
                 });
             }
@@ -980,7 +985,7 @@ namespace Models.PROSAIL
             }
 
             // Load soil reflectance data
-            if (UseBSM)
+            if (IsBSM)
             {
                 try
                 {
@@ -1034,7 +1039,7 @@ namespace Models.PROSAIL
 
             // Subset spectral data to input wavelengths
             cachedLeafOpticalConstants = cachedLeafOpticalConstants.Value.SubsetByWavelengths(inputWavelengths);
-            if (!UseBSM)
+            if (!IsBSM)
                 cachedWetDrySoilReflectance = cachedWetDrySoilReflectance.Value.SubsetByWavelengths(inputWavelengths);
             cachedAtmosphericSpectralData = cachedAtmosphericSpectralData.SubsetByWavelengths(inputWavelengths);
 
@@ -1130,7 +1135,7 @@ namespace Models.PROSAIL
 
             // Compute soil reflectance (BSM or wet/dry interpolation)
             double psoilValue;
-            if (UseBSM)
+            if (IsBSM)
             {
                 double bVal = EvaluateExpression(BsmBrightness);
                 double latVal = EvaluateExpression(BsmLat);

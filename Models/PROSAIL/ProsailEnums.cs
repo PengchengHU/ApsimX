@@ -9,6 +9,15 @@ namespace Models.PROSAIL
         FourSAIL2
     }
 
+    /// <summary>Soil reflectance model selection.</summary>
+    public enum SoilReflectanceModelTypes
+    {
+        /// <summary>Linear mixing of wet and dry soil reflectance spectra, weighted by Psoil.</summary>
+        WetDryMixing,
+        /// <summary>Brightness Soil Model (Verhoef et al. 2018).</summary>
+        BSM
+    }
+
     /// <summary>Enum for supported sensors.</summary>
     public enum SensorTypes
     {
