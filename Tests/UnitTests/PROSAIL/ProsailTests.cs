@@ -508,5 +508,63 @@ namespace UnitTests.PROSAIL
             structure.Values["[Wheat].Leaf.LAI"] = 1.25; // third distinct value, rules out a naive 2-slot cache
             Assert.That((double)evaluateExpression.Invoke(model, new object[] { "[Wheat].Leaf.LAI" }), Is.EqualTo(1.25));
         }
+
+        /// <summary>
+        /// Verifies that 4SAIL2 brown-leaf mixing actually happens end-to-end (EvaluateAllParameters
+        /// -> ValidateParameterRanges -> CalculateProsail) once distinct green/brown leaf properties
+        /// are set, rather than silently falling back to a green-only result the way it used to when
+        /// ProsailModel never built a second PROSPECT leaf-parameter set.
+        /// </summary>
+        [Test]
+        public void FourSail2_BrownLeafMixing_ProducesDistinctResultFromGreenOnly()
+        {
+            LeafOpticalConsts fullConstants = GetCachedLeafOpticalConstants();
+            double[] testWavelengths = { 500.0, 650.0, 800.0, 1000.0, 1500.0 };
+            LeafOpticalConsts subsetConstants = fullConstants.SubsetByWavelengths(testWavelengths);
+            SoilOptics soil = new SoilOptics(
+                Vector<double>.Build.DenseOfArray(testWavelengths),
+                Vector<double>.Build.Dense(testWavelengths.Length, 0.15));
+
+            CanopyOptics RunModel(string fractionBrown)
+            {
+                var model = new ProsailModel { LoggingLevel = LogLevel.Error };
+                typeof(ProsailModel).GetField("cachedLeafOpticalConstants", BindingFlags.NonPublic | BindingFlags.Instance)
+                    .SetValue(model, subsetConstants);
+                model.inputWavelengths = testWavelengths;
+                model.SoilReflectance = soil;
+
+                model.SailVersion = SailVersionTypes.FourSAIL2;
+                model.CAB = "40"; model.CABBrown = "10";
+                model.CAR = "8"; model.CARBrown = "3";
+                model.FractionBrown = fractionBrown;
+                model.Dissociation = "1.0";
+
+                MethodInfo evaluateAll = typeof(ProsailModel).GetMethod("EvaluateAllParameters", BindingFlags.NonPublic | BindingFlags.Instance);
+                MethodInfo validate = typeof(ProsailModel).GetMethod("ValidateParameterRanges", BindingFlags.NonPublic | BindingFlags.Instance);
+                evaluateAll.Invoke(model, null);
+
+                // Geometry/soil parameters are normally resolved in OnDoEndOfDay (via
+                // ProsailInputLoader.ResolveObservationParameter), not EvaluateAllParameters - fill
+                // them in directly so ValidateParameterRanges doesn't report them as missing.
+                var currentParameterValues = (Dictionary<string, object>)typeof(ProsailModel)
+                    .GetProperty("CurrentParameterValues", BindingFlags.NonPublic | BindingFlags.Instance)
+                    .GetValue(model);
+                currentParameterValues["Psoil"] = 0.5;
+                currentParameterValues["SunZenithAngle"] = 30.0;
+                currentParameterValues["ObserverZenithAngle"] = 0.0;
+                currentParameterValues["RelativeAzimuthAngle"] = 0.0;
+
+                validate.Invoke(model, null);
+                return model.CalculateProsail();
+            }
+
+            CanopyOptics greenOnly = RunModel("0.0");
+            CanopyOptics mixed = RunModel("0.3");
+
+            double maxDiff = mixed.Rdot.Zip(greenOnly.Rdot, (a, b) => Math.Abs(a - b)).Max();
+            Assert.That(maxDiff, Is.GreaterThan(1e-6),
+                "FractionBrown > 0 under 4SAIL2 should produce a different result than FractionBrown = 0 - " +
+                "if this fails, brown-leaf mixing has silently fallen back to a green-only result again.");
+        }
     }
 }

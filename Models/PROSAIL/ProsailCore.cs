@@ -125,9 +125,13 @@ namespace Models.Prosail
                   fractionBrown: FractionBrown, 
                   brownLOP: BrownLOP.HasValue ? BrownLOP: null);
 
-            // Run SAIL simulation based on version
+            // Run SAIL simulation based on version. AdjustProspectToSail may have fallen back to
+            // a green-only result (e.g. 4SAIL2 requested but only one PROSPECT input set was
+            // available to build a brown LOP) - honour that fallback here too, rather than
+            // trusting the originally-requested SailVersion, otherwise BrownLOP would be null
+            // and the cast below would throw.
             CanopyOptics result;
-            if (SailVersion == "4SAIL")
+            if (SailVersion == "4SAIL" || !adjustedResults.BrownLOP.HasValue)
             {
                 result = SailCore.FourSAIL(
                     leafOptics: adjustedResults.GreenLOP,
@@ -145,7 +149,7 @@ namespace Models.Prosail
             {
                 result = SailCore.FourSAIL2(
                     leafGreen: adjustedResults.GreenLOP,
-                    leafBrown: (LeafOptics)adjustedResults.BrownLOP,
+                    leafBrown: adjustedResults.BrownLOP.Value,
                     typeLidf: TypeLidf,
                     lidfA: LIDFa,
                     lidfB: LIDFb,

@@ -61,11 +61,20 @@ namespace Models.PROSAIL
         /// <summary>The expression for N (Leaf structure parameter)</summary>
         [Separator("Expressions to link APSIM variables and PROSPECT inputs")]
         [Description("N - Leaf structure (unitless)")]
-        [Tooltip("Leaf structure parameter. Can be a literal value or an APSIM expression" + 
-        "(e.g., IIF([Wheat].Leaf.SpecificAreaCanopy * 10 <= 0.1, 1.6, (0.9 * [Wheat].Leaf.SpecificAreaCanopy * 10 + 0.025) / ([Wheat].Leaf.SpecificAreaCanopy * 10 - 0.1)) )." + 
+        [Tooltip("Leaf structure parameter. Can be a literal value or an APSIM expression" +
+        "(e.g., IIF([Wheat].Leaf.SpecificAreaCanopy * 10 <= 0.1, 1.6, (0.9 * [Wheat].Leaf.SpecificAreaCanopy * 10 + 0.025) / ([Wheat].Leaf.SpecificAreaCanopy * 10 - 0.1)) )." +
         "Typical range: 1.0-2.6. Evaluated daily only; does not support a per-observation-date list (see the Introduction node).")]
         [Bounds(Lower = 1.0, Upper = 2.6)]
         public string N { get; set; } = "1.5";
+
+        /// <summary>The expression for N of the brown/senesced leaf class (4SAIL2 only).</summary>
+        [Description("NBrown - Leaf structure of the brown leaf class (unitless)")]
+        [Tooltip("Leaf structure parameter for the brown/senesced leaf class. Only used when SailVersion=4SAIL2 " +
+        "and FractionBrown > 0. Can be a literal value or an APSIM expression. Typical range: 1.0-2.6. " +
+        "Evaluated daily only; does not support a per-observation-date list (see the Introduction node).")]
+        [Bounds(Lower = 1.0, Upper = 2.6)]
+        [Display(VisibleCallback = nameof(IsFourSAIL2))]
+        public string NBrown { get; set; } = "1.5";
 
         /// <summary>The expression for CAB (Chlorophyll a + b content)</summary>
         [Description("CAB - Chlorophyll a+b (\u03BCg/cm\u00B2)")]
@@ -73,11 +82,29 @@ namespace Models.PROSAIL
         [Bounds(Lower = 10.0, Upper = 80.0)]
         public string CAB { get; set; } = "40.0";
 
+        /// <summary>The expression for CAB of the brown/senesced leaf class (4SAIL2 only).</summary>
+        [Description("CABBrown - Chlorophyll a+b of the brown leaf class (\u03BCg/cm\u00B2)")]
+        [Tooltip("Chlorophyll a + b content for the brown/senesced leaf class. Only used when SailVersion=4SAIL2 " +
+        "and FractionBrown > 0. Can be a literal or APSIM expression. Typical range: 10-80 \u03BCg/cm\u00B2. " +
+        "Evaluated daily only; does not support a per-observation-date list (see the Introduction node).")]
+        [Bounds(Lower = 10.0, Upper = 80.0)]
+        [Display(VisibleCallback = nameof(IsFourSAIL2))]
+        public string CABBrown { get; set; } = "40.0";
+
         /// <summary>The expression for CAR (Carotenoid content)</summary>
         [Description("CAR - Carotenoid (\u03BCg/cm\u00B2)")]
         [Tooltip("Carotenoid content. Can be a literal or APSIM expression (e.g., [Wheat].Leaf.SpecificNitrogen * 26 * 0.216 ). Typical range: 1-24 \u03BCg/cm\u00B2. Evaluated daily only; does not support a per-observation-date list (see the Introduction node).")]
         [Bounds(Lower = 1.0, Upper = 24.0)]
         public string CAR { get; set; } = "8.0";
+
+        /// <summary>The expression for CAR of the brown/senesced leaf class (4SAIL2 only).</summary>
+        [Description("CARBrown - Carotenoid of the brown leaf class (\u03BCg/cm\u00B2)")]
+        [Tooltip("Carotenoid content for the brown/senesced leaf class. Only used when SailVersion=4SAIL2 " +
+        "and FractionBrown > 0. Can be a literal or APSIM expression. Typical range: 1-24 \u03BCg/cm\u00B2. " +
+        "Evaluated daily only; does not support a per-observation-date list (see the Introduction node).")]
+        [Bounds(Lower = 1.0, Upper = 24.0)]
+        [Display(VisibleCallback = nameof(IsFourSAIL2))]
+        public string CARBrown { get; set; } = "8.0";
 
         /// <summary>The expression for EWT (Equivalent Water Thickness)</summary>
         [Description("EWT - Water thickness (cm)")]
@@ -85,11 +112,29 @@ namespace Models.PROSAIL
         [Bounds(Lower = 0.001, Upper = 0.08)]
         public string EWT { get; set; } = "0.01";
 
+        /// <summary>The expression for EWT of the brown/senesced leaf class (4SAIL2 only).</summary>
+        [Description("EWTBrown - Water thickness of the brown leaf class (cm)")]
+        [Tooltip("Equivalent Water Thickness for the brown/senesced leaf class. Only used when SailVersion=4SAIL2 " +
+        "and FractionBrown > 0. Can be a literal or APSIM expression. Typical range: 0.001-0.08 cm. " +
+        "Evaluated daily only; does not support a per-observation-date list (see the Introduction node).")]
+        [Bounds(Lower = 0.001, Upper = 0.08)]
+        [Display(VisibleCallback = nameof(IsFourSAIL2))]
+        public string EWTBrown { get; set; } = "0.01";
+
         /// <summary>The expression for LMA (Leaf Mass per Area)</summary>
         [Description("LMA - Dry matter (g/cm\u00B2)")]
         [Tooltip("Leaf Mass per Area (CM). Can be a literal or APSIM expression (e.g., (1 / ([Wheat].Leaf.SpecificAreaCanopy + 0.0001)) * 10^(-4) ). Typical range: 0.001-0.02 g/cm\u00B2. Evaluated daily only; does not support a per-observation-date list (see the Introduction node).")]
         [Bounds(Lower = 0.001, Upper = 0.02)]
         public string LMA { get; set; } = "0.008";
+
+        /// <summary>The expression for LMA of the brown/senesced leaf class (4SAIL2 only).</summary>
+        [Description("LMABrown - Dry matter of the brown leaf class (g/cm\u00B2)")]
+        [Tooltip("Leaf Mass per Area for the brown/senesced leaf class. Only used when SailVersion=4SAIL2 " +
+        "and FractionBrown > 0. Can be a literal or APSIM expression. Typical range: 0.001-0.02 g/cm\u00B2. " +
+        "Evaluated daily only; does not support a per-observation-date list (see the Introduction node).")]
+        [Bounds(Lower = 0.001, Upper = 0.02)]
+        [Display(VisibleCallback = nameof(IsFourSAIL2))]
+        public string LMABrown { get; set; } = "0.008";
 
         /// <summary>The expression for BROWN (Brown pigment content)</summary>
         [Description("BROWN - Brown pigment (unitless)")]
@@ -97,11 +142,30 @@ namespace Models.PROSAIL
         [Bounds(Lower = 0.0, Upper = 1.0)]
         public string BROWN { get; set; } = "0.0";
 
+        /// <summary>The expression for the brown pigment content of the brown/senesced leaf class itself (4SAIL2 only).</summary>
+        [Description("BROWNBrown - Brown pigment of the brown leaf class (unitless)")]
+        [Tooltip("Brown pigment content of the brown/senesced leaf class itself (a second, independent brown-pigment " +
+        "loading on top of that leaf class already being the 'brown' one in the green/brown mix). Only used when " +
+        "SailVersion=4SAIL2 and FractionBrown > 0. Can be a literal or APSIM expression. Typical range: 0-1. " +
+        "Evaluated daily only; does not support a per-observation-date list (see the Introduction node).")]
+        [Bounds(Lower = 0.0, Upper = 1.0)]
+        [Display(VisibleCallback = nameof(IsFourSAIL2))]
+        public string BROWNBrown { get; set; } = "0.0";
+
         /// <summary>The expression for ANT (Anthocyanin content)</summary>
         [Description("ANT - Anthocyanin (\u03BCg/cm\u00B2)")]
         [Tooltip("Anthocyanin content. Can be a literal or APSIM expression. Typical range: 0-10 \u03BCg/cm\u00B2. Evaluated daily only; does not support a per-observation-date list (see the Introduction node).")]
         [Bounds(Lower = 0.0, Upper = 10.0)]
         public string ANT { get; set; } = "0.0";
+
+        /// <summary>The expression for ANT of the brown/senesced leaf class (4SAIL2 only).</summary>
+        [Description("ANTBrown - Anthocyanin of the brown leaf class (\u03BCg/cm\u00B2)")]
+        [Tooltip("Anthocyanin content for the brown/senesced leaf class. Only used when SailVersion=4SAIL2 " +
+        "and FractionBrown > 0. Can be a literal or APSIM expression. Typical range: 0-10 \u03BCg/cm\u00B2. " +
+        "Evaluated daily only; does not support a per-observation-date list (see the Introduction node).")]
+        [Bounds(Lower = 0.0, Upper = 10.0)]
+        [Display(VisibleCallback = nameof(IsFourSAIL2))]
+        public string ANTBrown { get; set; } = "0.0";
 
         /// <summary>The expression for PROT (Protein content)</summary>
         [Description("PROT - Protein (g/cm\u00B2)")]
@@ -109,17 +173,44 @@ namespace Models.PROSAIL
         [Bounds(Lower = 0.0, Upper = 10.0)]
         public string PROT { get; set; } = "0.0";
 
+        /// <summary>The expression for PROT of the brown/senesced leaf class (4SAIL2 only).</summary>
+        [Description("PROTBrown - Protein of the brown leaf class (g/cm\u00B2)")]
+        [Tooltip("Protein content for the brown/senesced leaf class. Only used when SailVersion=4SAIL2 " +
+        "and FractionBrown > 0. Can be a literal or APSIM expression. Typical range: 0-10 g/cm\u00B2. " +
+        "Evaluated daily only; does not support a per-observation-date list (see the Introduction node).")]
+        [Bounds(Lower = 0.0, Upper = 10.0)]
+        [Display(VisibleCallback = nameof(IsFourSAIL2))]
+        public string PROTBrown { get; set; } = "0.0";
+
         /// <summary>The expression for CBC (NonProt Carbon-based constituent content)</summary>
         [Description("CBC - Carbon-based constituent (g/cm\u00B2)")]
         [Tooltip("Non-protein carbon-based constituent content. Can be a literal or APSIM expression. Typical range: 0-10 g/cm\u00B2. Evaluated daily only; does not support a per-observation-date list (see the Introduction node).")]
         [Bounds(Lower = 0.0, Upper = 10.0)]
         public string CBC { get; set; } = "0.0";
 
+        /// <summary>The expression for CBC of the brown/senesced leaf class (4SAIL2 only).</summary>
+        [Description("CBCBrown - Carbon-based constituent of the brown leaf class (g/cm\u00B2)")]
+        [Tooltip("Non-protein carbon-based constituent content for the brown/senesced leaf class. Only used when " +
+        "SailVersion=4SAIL2 and FractionBrown > 0. Can be a literal or APSIM expression. Typical range: 0-10 g/cm\u00B2. " +
+        "Evaluated daily only; does not support a per-observation-date list (see the Introduction node).")]
+        [Bounds(Lower = 0.0, Upper = 10.0)]
+        [Display(VisibleCallback = nameof(IsFourSAIL2))]
+        public string CBCBrown { get; set; } = "0.0";
+
         /// <summary>The expression for alpha (Incidence angle in degrees)</summary>
         [Description("Alpha - Incidence angle (\u00B0)")]
         [Tooltip("Incidence angle in degrees. Can be a literal or APSIM expression. Typical range: 0-90\u00B0. Evaluated daily only; does not support a per-observation-date list (see the Introduction node).")]
         [Bounds(Lower = 0.0, Upper = 90.0)]
         public string Alpha { get; set; } = "40.0";
+
+        /// <summary>The expression for alpha of the brown/senesced leaf class (4SAIL2 only).</summary>
+        [Description("AlphaBrown - Incidence angle of the brown leaf class (\u00B0)")]
+        [Tooltip("Incidence angle in degrees for the brown/senesced leaf class. Only used when SailVersion=4SAIL2 " +
+        "and FractionBrown > 0. Can be a literal or APSIM expression. Typical range: 0-90\u00B0. " +
+        "Evaluated daily only; does not support a per-observation-date list (see the Introduction node).")]
+        [Bounds(Lower = 0.0, Upper = 90.0)]
+        [Display(VisibleCallback = nameof(IsFourSAIL2))]
+        public string AlphaBrown { get; set; } = "40.0";
 
         /// <summary>Spectral range to simulate (start-end in nm)</summary>
         [Description("Spectral range (nm)")]
@@ -139,6 +230,9 @@ namespace Models.PROSAIL
 
         /// <summary>Returns the SAIL version string used internally by the model core.</summary>
         private string SailVersionString => SailVersion == SailVersionTypes.FourSAIL2 ? "4SAIL2" : "4SAIL";
+
+        /// <summary>True when the two-layer green/brown canopy model (4SAIL2) is selected.</summary>
+        public bool IsFourSAIL2 => SailVersion == SailVersionTypes.FourSAIL2;
 
         /// <summary>The expression for Leaf Area Index (LAI)</summary>
         [Description("LAI - Leaf Area Index (m\u00B2/m\u00B2)")]
@@ -173,24 +267,28 @@ namespace Models.PROSAIL
         [Description("FractionBrown - Brown leaf fraction")]
         [Tooltip("Fraction of brown/senesced leaf area (unitless, 0-1). Used with 4SAIL2 version. Evaluated daily only; does not support a per-observation-date list (see the Introduction node).")]
         [Bounds(Lower = 0.0, Upper = 1.0)]
+        [Display(VisibleCallback = nameof(IsFourSAIL2))]
         public string FractionBrown { get; set; } = "0.0";
 
         /// <summary>The expression for the layer dissociation factor (diss).</summary>
         [Description("Diss - Dissociation factor")]
         [Tooltip("Layer dissociation factor for green/brown leaves (unitless, 0-1). Used with 4SAIL2 version. Evaluated daily only; does not support a per-observation-date list (see the Introduction node).")]
         [Bounds(Lower = 0.0, Upper = 1.0)]
+        [Display(VisibleCallback = nameof(IsFourSAIL2))]
         public string Dissociation { get; set; } = "0.0";
 
         /// <summary>The expression for the vertical crown cover percentage (cv).</summary>
         [Description("Cv - Crown cover")]
-        [Tooltip("Vertical crown cover percentage (unitless, 0-1). Evaluated daily only; does not support a per-observation-date list (see the Introduction node).")]
+        [Tooltip("Vertical crown cover percentage (unitless, 0-1). Used with 4SAIL2 version. Evaluated daily only; does not support a per-observation-date list (see the Introduction node).")]
         [Bounds(Lower = 0.0, Upper = 1.0)]
+        [Display(VisibleCallback = nameof(IsFourSAIL2))]
         public string CrownCover { get; set; } = "1.0";
 
         /// <summary>The expression for the tree shape factor (zeta).</summary>
         [Description("Zeta - Tree shape factor")]
-        [Tooltip("Tree shape factor: crown diameter to height ratio (unitless). Evaluated daily only; does not support a per-observation-date list (see the Introduction node).")]
+        [Tooltip("Tree shape factor: crown diameter to height ratio (unitless). Used with 4SAIL2 version. Evaluated daily only; does not support a per-observation-date list (see the Introduction node).")]
         [Bounds(Lower = 0.0, Upper = 10.0)]
+        [Display(VisibleCallback = nameof(IsFourSAIL2))]
         public string TreeShape { get; set; } = "1.0";
         #endregion
 
@@ -567,10 +665,28 @@ namespace Models.PROSAIL
 
             CurrentParameterValues["LIDFa"] = EvaluateExpression(LIDFa);
             CurrentParameterValues["LIDFb"] = EvaluateExpression(LIDFb);
-            CurrentParameterValues["FractionBrown"] = EvaluateExpression(FractionBrown);
-            CurrentParameterValues["Dissociation"] = EvaluateExpression(Dissociation);
-            CurrentParameterValues["CrownCover"] = EvaluateExpression(CrownCover);
-            CurrentParameterValues["TreeShape"] = EvaluateExpression(TreeShape);
+
+            // 4SAIL2-only parameters: only evaluated when actually selected, since they're hidden
+            // in the UI and unused otherwise (see IsFourSAIL2).
+            if (IsFourSAIL2)
+            {
+                CurrentParameterValues["FractionBrown"] = EvaluateExpression(FractionBrown);
+                CurrentParameterValues["Dissociation"] = EvaluateExpression(Dissociation);
+                CurrentParameterValues["CrownCover"] = EvaluateExpression(CrownCover);
+                CurrentParameterValues["TreeShape"] = EvaluateExpression(TreeShape);
+
+                CurrentParameterValues["NBrown"] = EvaluateExpression(NBrown);
+                CurrentParameterValues["CABBrown"] = EvaluateExpression(CABBrown);
+                CurrentParameterValues["CARBrown"] = EvaluateExpression(CARBrown);
+                CurrentParameterValues["EWTBrown"] = EvaluateExpression(EWTBrown);
+                CurrentParameterValues["LMABrown"] = EvaluateExpression(LMABrown);
+                CurrentParameterValues["BROWNBrown"] = EvaluateExpression(BROWNBrown);
+                CurrentParameterValues["ANTBrown"] = EvaluateExpression(ANTBrown);
+                CurrentParameterValues["PROTBrown"] = EvaluateExpression(PROTBrown);
+                CurrentParameterValues["CBCBrown"] = EvaluateExpression(CBCBrown);
+                CurrentParameterValues["AlphaBrown"] = EvaluateExpression(AlphaBrown);
+            }
+
             CurrentParameterValues["WetDrySoilReflectancePath"] = WetDrySoilReflectancePath;
         }
 
@@ -586,7 +702,22 @@ namespace Models.PROSAIL
         {
             "N", "CAB", "CAR", "EWT", "LMA", "BROWN", "ANT", "PROT", "CBC", "Alpha",
             "LAI", "HotSpot", "TypeLidf", "LIDFa", "LIDFb", "FractionBrown", "Dissociation",
-            "CrownCover", "TreeShape", "Psoil", "SunZenithAngle", "ObserverZenithAngle", "RelativeAzimuthAngle"
+            "CrownCover", "TreeShape", "Psoil", "SunZenithAngle", "ObserverZenithAngle", "RelativeAzimuthAngle",
+            "NBrown", "CABBrown", "CARBrown", "EWTBrown", "LMABrown", "BROWNBrown", "ANTBrown", "PROTBrown",
+            "CBCBrown", "AlphaBrown"
+        };
+
+        /// <summary>
+        /// Names of parameters that are only populated in <see cref="CurrentParameterValues"/> (by
+        /// <see cref="EvaluateAllParameters"/>) when <see cref="IsFourSAIL2"/> is true - the 10 brown-leaf
+        /// properties plus the 4 existing 4SAIL2-only canopy properties. Skipped by
+        /// <see cref="ValidateParameterRanges"/> otherwise, since they simply weren't evaluated.
+        /// </summary>
+        private static readonly HashSet<string> FourSAIL2OnlyParameterNames = new HashSet<string>
+        {
+            "FractionBrown", "Dissociation", "CrownCover", "TreeShape",
+            "NBrown", "CABBrown", "CARBrown", "EWTBrown", "LMABrown", "BROWNBrown", "ANTBrown", "PROTBrown",
+            "CBCBrown", "AlphaBrown"
         };
 
         /// <summary>
@@ -615,6 +746,9 @@ namespace Models.PROSAIL
         {
             foreach (string paramName in ValidatedParameterNames)
             {
+                if (!IsFourSAIL2 && FourSAIL2OnlyParameterNames.Contains(paramName))
+                    continue; // Not evaluated this call (see EvaluateAllParameters) - nothing to check.
+
                 if (!CurrentParameterValues.TryGetValue(paramName, out object value))
                 {
                     string missingMsg = $"Parameter '{paramName}' is missing from CurrentParameterValues on {Clock?.Today:yyyy-MM-dd}.";
@@ -694,8 +828,43 @@ namespace Models.PROSAIL
             int TypeLidfValue = Convert.ToInt32(CurrentParameterValues["TypeLidf"]);
             string SailVersionValue = SailVersionString;
 
+            // Always build the leaf-parameter list explicitly (rather than letting PRO4SAIL build
+            // an implicit single-element one from the scalar args below), and always pass
+            // wavelengths: inputWavelengths on every ProspectInputs. This matters even for plain
+            // 4SAIL: AdjustProspectToSail (called unconditionally by PRO4SAIL regardless of
+            // SailVersion) builds GreenLOP via the ProspectInputs-based Prospect() overload, which
+            // uses ProspectInputs.Wavelengths - and that defaults to the full 400-2500nm range
+            // whenever wavelengths isn't supplied, regardless of what's passed to PRO4SAIL's own
+            // Wavelengths parameter (left null below). Without this, a user who narrows
+            // InputWavelengthRange away from the full default would hit "Wavelength ... is not in
+            // OpticalConstants.Wavelength" here even under plain 4SAIL.
+            List<ProspectInputs> inputProspectList = new List<ProspectInputs>
+            {
+                new ProspectInputs(
+                    n: Convert.ToDouble(CurrentParameterValues["N"]), cab: Convert.ToDouble(CurrentParameterValues["CAB"]),
+                    car: Convert.ToDouble(CurrentParameterValues["CAR"]), ant: Convert.ToDouble(CurrentParameterValues["ANT"]),
+                    brown: Convert.ToDouble(CurrentParameterValues["BROWN"]), ewt: Convert.ToDouble(CurrentParameterValues["EWT"]),
+                    lma: Convert.ToDouble(CurrentParameterValues["LMA"]), prot: Convert.ToDouble(CurrentParameterValues["PROT"]),
+                    cbc: Convert.ToDouble(CurrentParameterValues["CBC"]), alpha: Convert.ToDouble(CurrentParameterValues["Alpha"]),
+                    wavelengths: inputWavelengths)
+            };
+            // When 4SAIL2 is selected, add a genuine second (brown) leaf-parameter set so
+            // AdjustProspectToSail can actually produce a distinct BrownLOP instead of falling
+            // back to green-only.
+            if (IsFourSAIL2)
+            {
+                inputProspectList.Add(new ProspectInputs(
+                    n: Convert.ToDouble(CurrentParameterValues["NBrown"]), cab: Convert.ToDouble(CurrentParameterValues["CABBrown"]),
+                    car: Convert.ToDouble(CurrentParameterValues["CARBrown"]), ant: Convert.ToDouble(CurrentParameterValues["ANTBrown"]),
+                    brown: Convert.ToDouble(CurrentParameterValues["BROWNBrown"]), ewt: Convert.ToDouble(CurrentParameterValues["EWTBrown"]),
+                    lma: Convert.ToDouble(CurrentParameterValues["LMABrown"]), prot: Convert.ToDouble(CurrentParameterValues["PROTBrown"]),
+                    cbc: Convert.ToDouble(CurrentParameterValues["CBCBrown"]), alpha: Convert.ToDouble(CurrentParameterValues["AlphaBrown"]),
+                    wavelengths: inputWavelengths));
+            }
+
             CanopyOptics results = ProsailCore.PRO4SAIL(
                 leafOpticalConstants: cachedLeafOpticalConstants,
+                inputProspectList: inputProspectList,
                 N: Convert.ToDouble(CurrentParameterValues["N"]),
                 CAB: Convert.ToDouble(CurrentParameterValues["CAB"]),
                 CAR: Convert.ToDouble(CurrentParameterValues["CAR"]),
@@ -716,10 +885,14 @@ namespace Models.PROSAIL
                 TypeLidf: TypeLidfValue,
                 LIDFa: Convert.ToDouble(CurrentParameterValues["LIDFa"]),
                 LIDFb: Convert.ToDouble(CurrentParameterValues["LIDFb"]),
-                FractionBrown: Convert.ToDouble(CurrentParameterValues["FractionBrown"]),
-                Diss: Convert.ToDouble(CurrentParameterValues["Dissociation"]),
-                Cv: Convert.ToDouble(CurrentParameterValues["CrownCover"]),
-                Zeta: Convert.ToDouble(CurrentParameterValues["TreeShape"]),
+                // FractionBrown/Diss/Cv/Zeta are only populated in CurrentParameterValues when
+                // IsFourSAIL2 (see EvaluateAllParameters); otherwise fall back to the same literal
+                // defaults these properties and PRO4SAIL itself already use - safe because
+                // AdjustProspectToSail's BrownLOP output is simply unused when SailVersion is 4SAIL.
+                FractionBrown: IsFourSAIL2 ? Convert.ToDouble(CurrentParameterValues["FractionBrown"]) : 0.0,
+                Diss: IsFourSAIL2 ? Convert.ToDouble(CurrentParameterValues["Dissociation"]) : 0.0,
+                Cv: IsFourSAIL2 ? Convert.ToDouble(CurrentParameterValues["CrownCover"]) : 1.0,
+                Zeta: IsFourSAIL2 ? Convert.ToDouble(CurrentParameterValues["TreeShape"]) : 1.0,
                 SoilReflectance: SoilReflectance,
                 TTS: Convert.ToDouble(CurrentParameterValues["SunZenithAngle"]),
                 TTO: Convert.ToDouble(CurrentParameterValues["ObserverZenithAngle"]),

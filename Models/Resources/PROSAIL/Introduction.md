@@ -33,12 +33,35 @@ Set each leaf biochemical parameter either to a fixed value or to an APSIM expre
 
 Set **InputWavelengthRange** to the wavelengths PROSAIL should compute, e.g. `400-2500` for the full range or `650,750,800` for specific bands. Leave empty to use all wavelengths (400–2500 nm).
 
+**Brown leaf class (4SAIL2 only)**: each of the 10 parameters above has a `...Brown` counterpart
+(`NBrown`, `CABBrown`, `CARBrown`, `ANTBrown`, `BROWNBrown`, `EWTBrown`, `LMABrown`, `PROTBrown`,
+`CBCBrown`, `AlphaBrown`) describing a second, independently-parameterized brown/senesced leaf
+class. These are only visible and only evaluated when **SailVersion** (Step 2) is set to
+`4SAIL2` — under plain `4SAIL` there is only ever one leaf class, so they're hidden entirely.
+They default to the same values as their green counterparts, so an unconfigured brown leaf starts
+out optically identical to green. `BROWNBrown` is the brown-pigment content *of the brown leaf
+class itself* — a second, independent pigment loading, distinct from the leaf class it belongs to
+already being "the brown one" in the green/brown canopy mix.
+
 ### Step 2: SAIL canopy properties
 
 Choose **SailVersion**:
 
 - `4SAIL`: single-layer homogeneous canopy. Suitable for most crops.
-- `4SAIL2`: two-layer canopy (green + brown) with clumping effects. Required when **FractionBrown** > 0.
+- `4SAIL2`: two-layer canopy (green + brown) with clumping effects. Use when a genuine mix of
+  green and senesced/brown leaf area needs to be represented (e.g. a partially-senesced canopy).
+
+**`FractionBrown`, `Dissociation`, `CrownCover`, `TreeShape`, and all 10 `...Brown` leaf
+properties (Step 1) are used only when `SailVersion="4SAIL2"`.** They're hidden in the property
+panel and simply not evaluated under plain `4SAIL` — there's nothing to configure for them there.
+Under `4SAIL2`:
+- **FractionBrown** sets how much of the LAI is attributed to the brown leaf class vs. the green one.
+- **Dissociation** controls how "layered" vs. "mixed" the two leaf classes are: `1` gives a clean
+  two-layer stack (green on top, brown below); `0` fully mixes green and brown optics into one
+  effective layer. Intermediate values blend between the two.
+- **CrownCover** and **TreeShape** are independent of the green/brown mix — they describe
+  crown-level clumping/gap-fraction geometry (e.g. discontinuous row or tree canopies), applied
+  after the two-layer radiative transfer is solved.
 
 | Parameter | Description | Typical range |
 |-----------|-------------|---------------|
@@ -47,8 +70,8 @@ Choose **SailVersion**:
 | **TypeLidf** | Leaf angle distribution type: 1 = Verhoef (uses LIDFa + LIDFb), 2 = Campbell (uses LIDFa only) | 1 or 2 |
 | **LIDFa** | LIDF parameter a: average leaf slope (TypeLidf=1, Verhoef) or mean leaf angle in degrees (TypeLidf=2, Campbell) | −1 to 1 (type 1) or −90 to 90° (type 2) |
 | **LIDFb** | LIDF parameter b — bimodality (type 1 only) | −1 to 1 |
-| **FractionBrown** | Fraction of brown leaves in canopy (4SAIL2 only) | 0 – 1 |
-| **Dissociation** | Degree of clumping between green and brown leaves (4SAIL2 only) | 0 – 1 |
+| **FractionBrown** | Fraction of leaf area attributed to the brown leaf class (4SAIL2 only) | 0 – 1 |
+| **Dissociation** | Layering vs. mixing of green and brown leaves (4SAIL2 only) | 0 – 1 |
 | **CrownCover** | Crown cover fraction (4SAIL2 only) | 0 – 1 |
 | **TreeShape** | Tree shape factor affecting gap fraction (4SAIL2 only) | > 0 |
 
