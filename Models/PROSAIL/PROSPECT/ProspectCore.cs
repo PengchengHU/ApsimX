@@ -5,6 +5,7 @@ using MathNet.Numerics.LinearAlgebra;
 using Newtonsoft.Json;
 using APSIM.Shared.Utilities;
 using System.Collections.Generic;
+using Models.PROSAIL;
 
 namespace Models.PROSAIL.PROSPECT
 {
@@ -66,13 +67,8 @@ namespace Models.PROSAIL.PROSPECT
             }
         }
 
-        // Relative path from APSIM bin directory to Models\PROSAIL\PROSPECT
-        private static string DefaultLeafOpticalDataPath => Path.Combine(
-            AppContext.BaseDirectory,
-            "PROSAIL",
-            "InputProperties",
-            "SpectralData",
-            "SpecPROSPECT_FullRange.json");
+        // Fully-qualified name of the embedded resource containing the default leaf optical constants.
+        private const string DefaultLeafOpticalDataResourceName = "Models.PROSAIL.InputProperties.SpectralData.SpecPROSPECT_FullRange.json";
 
         /// <summary>
         /// Gets cached leaf optical constants, loading them if necessary.
@@ -400,19 +396,15 @@ namespace Models.PROSAIL.PROSPECT
         /// </summary>
         public static LeafOpticalConsts LoadLocalLeafOpticalDataUncached()
         {
-            string path = DefaultLeafOpticalDataPath;
-            if (!File.Exists(path))
-            {
-                throw new FileNotFoundException($"Leaf optical data file not found at {path}. Please provide a valid LeafOpticalConstants or ensure the file exists.");
-            }
+            string resourceName = DefaultLeafOpticalDataResourceName;
 
             try
             {
-                string json = File.ReadAllText(path);
+                string json = EmbeddedResourceLoader.ReadText(resourceName);
                 var OpticalData = JsonConvert.DeserializeObject<LeafOpticalDataJason>(json);
                 if(OpticalData == null || OpticalData.Wavelength == null)
                 {
-                    throw new InvalidDataException($"Deserialized OpticalData or its Wavelength array is null from file: {path}");
+                    throw new InvalidDataException($"Deserialized OpticalData or its Wavelength array is null from embedded resource: {resourceName}");
                 }
 
                 // Create the wavelength-to-index mapping for speeding up the subset of the specified wavelengths
@@ -441,7 +433,7 @@ namespace Models.PROSAIL.PROSPECT
             }
             catch (Exception ex)
             {
-                throw new Exception($"Failed to load leaf optical data from {DefaultLeafOpticalDataPath}: {ex.Message}", ex);
+                throw new Exception($"Failed to load leaf optical data from embedded resource {resourceName}: {ex.Message}", ex);
             }
         }
 

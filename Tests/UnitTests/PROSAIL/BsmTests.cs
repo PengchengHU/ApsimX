@@ -16,8 +16,7 @@ namespace UnitTests.PROSAIL
         private static readonly string RelativeBsmTestInputPath = "..\\..\\..\\Tests\\UnitTests\\PROSAIL\\bsmTestInputs.json";
         private static string BsmTestInputPath => PathUtilities.GetAbsolutePath(RelativeBsmTestInputPath, AppDomain.CurrentDomain.BaseDirectory);
 
-        private static readonly string RelativeBsmDataPath = "..\\..\\..\\Models\\PROSAIL\\InputProperties\\SpectralData\\BSM_GSV.json";
-        private static string DefaultBsmDataPath => PathUtilities.GetAbsolutePath(RelativeBsmDataPath, AppDomain.CurrentDomain.BaseDirectory);
+        private const string BsmDataResourceName = "Models.PROSAIL.InputProperties.SpectralData.BSM_GSV.json";
 
         private readonly string RScriptPath = RScriptLocator.FindRscriptPath();
 
@@ -145,7 +144,7 @@ namespace UnitTests.PROSAIL
         public void BsmValidationTest()
         {
             var testInputs = LoadBsmTestInputs();
-            BsmSpectralData bsmData = BsmCore.LoadBsmData(DefaultBsmDataPath);
+            BsmSpectralData bsmData = BsmCore.LoadBsmDataFromResource(BsmDataResourceName);
 
             foreach (var input in testInputs)
             {

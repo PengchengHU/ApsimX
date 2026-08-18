@@ -404,8 +404,8 @@ namespace Models.PROSAIL
             }
             if (sensorFileMap.TryGetValue(SensorType, out var filePath))
             {
-                filePath = Path.Combine(AppContext.BaseDirectory, "PROSAIL", "InputProperties", "SpectralResponseFunctions", $"{filePath}.json");
-                SensorSRF = LoadSpectralResponseFunction(filePath);
+                string resourceName = $"Models.PROSAIL.InputProperties.SpectralResponseFunctions.{filePath}.json";
+                SensorSRF = LoadSpectralResponseFunction(resourceName);
             }
             else
             {
@@ -488,17 +488,10 @@ namespace Models.PROSAIL
         #endregion
 
         #region Private Fields and Cached Data
-        // Soil reflectance data
-        private static string DefaultSpecSoilDataPath => Path.Combine(
-            AppContext.BaseDirectory, "PROSAIL", "InputProperties", "SpectralData", "SpecSOIL.json");
-
-        // Atmospheric reflectance data
-        private static string DefaultSpecAtmDataPath => Path.Combine(
-            AppContext.BaseDirectory, "PROSAIL", "InputProperties", "SpectralData", "SpecATM.json");
-
-        // BSM spectral data
-        private static string DefaultBsmDataPath => Path.Combine(
-            AppContext.BaseDirectory, "PROSAIL", "InputProperties", "SpectralData", "BSM_GSV.json");
+        // Embedded resource names for the bundled default spectral data files
+        private const string SpecSoilResourceName = "Models.PROSAIL.InputProperties.SpectralData.SpecSOIL.json";
+        private const string SpecAtmResourceName = "Models.PROSAIL.InputProperties.SpectralData.SpecATM.json";
+        private const string BsmResourceName = "Models.PROSAIL.InputProperties.SpectralData.BSM_GSV.json";
 
         /// <summary>Path to the SQLite database file (relative to simulation directory)</summary>
         private string ProsailSQLiteDatabasePath;
@@ -989,7 +982,7 @@ namespace Models.PROSAIL
             {
                 try
                 {
-                    cachedBsmData = BsmCore.LoadBsmData(DefaultBsmDataPath);
+                    cachedBsmData = BsmCore.LoadBsmDataFromResource(BsmResourceName);
                     WriteMessage(LogLevel.Info, "ProsailModel: BSM spectral data loaded.");
                 }
                 catch (Exception ex)
@@ -1010,7 +1003,7 @@ namespace Models.PROSAIL
                     }
                     else
                     {
-                        cachedWetDrySoilReflectance = LoadWetDrySoilReflectanData(DefaultSpecSoilDataPath);
+                        cachedWetDrySoilReflectance = LoadWetDrySoilReflectanDataFromResource(SpecSoilResourceName);
                         WriteMessage(LogLevel.Info, "ProsailModel: Using default soil reflectance data.");
                     }
                 }
@@ -1028,8 +1021,8 @@ namespace Models.PROSAIL
             // Load atmospheric spectral data
             try
             {
-                cachedAtmosphericSpectralData = LoadAtmosphericSpectralData(DefaultSpecAtmDataPath);
-                WriteMessage(LogLevel.Info, $"ProsailModel: Atmospheric spectral data loaded from {DefaultSpecAtmDataPath}.");
+                cachedAtmosphericSpectralData = LoadAtmosphericSpectralDataFromResource(SpecAtmResourceName);
+                WriteMessage(LogLevel.Info, $"ProsailModel: Atmospheric spectral data loaded from {SpecAtmResourceName}.");
             }
             catch (Exception ex)
             {

@@ -7,6 +7,7 @@ using System.Linq;
 using static CanopyOptics;
 using static Models.Prosail.ProsailCore;
 using static Models.PROSAIL.PROSPECT.ProspectCore;
+using Models.PROSAIL;
 
 // Define the namespace for SAIL utilities
 namespace Models.PROSAIL.SAIL
@@ -1294,9 +1295,23 @@ namespace Models.PROSAIL.SAIL
                 throw new FileNotFoundException($"Soil optical data file not found at {WetDrySoilReflectanceDataPath}. Please provide a valid SoilOptics or ensure the file exists.");
             }
 
+            return ParseWetDrySoilReflectanceJson(File.ReadAllText(WetDrySoilReflectanceDataPath), WetDrySoilReflectanceDataPath);
+        }
+
+        /// <summary>
+        /// Load spectral data of wet and dry soil from an embedded resource.
+        /// </summary>
+        /// <param name="resourceName">Fully-qualified embedded resource name.</param>
+        /// <returns> WetDrySoilReflectance object containing wavelength and reflectance data</returns>
+        public static WetDrySoilReflectance LoadWetDrySoilReflectanDataFromResource(string resourceName)
+        {
+            return ParseWetDrySoilReflectanceJson(EmbeddedResourceLoader.ReadText(resourceName), resourceName);
+        }
+
+        private static WetDrySoilReflectance ParseWetDrySoilReflectanceJson(string json, string source)
+        {
             try
             {
-                string json = File.ReadAllText(WetDrySoilReflectanceDataPath);
                 var OpticalData = JsonConvert.DeserializeObject<WetDrySoilReflectanceDataJason>(json);
 
                 // Check if deserialization was successful
@@ -1345,11 +1360,11 @@ namespace Models.PROSAIL.SAIL
             }
             catch (JsonException jsonEx)
             {
-                throw new Exception($"JSON parsing error in {WetDrySoilReflectanceDataPath}: {jsonEx.Message}", jsonEx);
+                throw new Exception($"JSON parsing error in {source}: {jsonEx.Message}", jsonEx);
             }
             catch (Exception ex)
             {
-                throw new Exception($"Failed to load soil optical data from {WetDrySoilReflectanceDataPath}: {ex.Message}", ex);
+                throw new Exception($"Failed to load soil optical data from {source}: {ex.Message}", ex);
             }
         }
 
@@ -1389,15 +1404,29 @@ namespace Models.PROSAIL.SAIL
                 throw new FileNotFoundException($"Atmospheric spectral data file not found at {filePath}");
             }
 
+            return ParseAtmosphericSpectralDataJson(File.ReadAllText(filePath), filePath);
+        }
+
+        /// <summary>
+        /// Load atmospheric spectral data from an embedded resource.
+        /// </summary>
+        /// <param name="resourceName">Fully-qualified embedded resource name.</param>
+        /// <returns>AtmosphericSpectralData object containing the loaded data</returns>
+        public static AtmosphericSpectralData LoadAtmosphericSpectralDataFromResource(string resourceName)
+        {
+            return ParseAtmosphericSpectralDataJson(EmbeddedResourceLoader.ReadText(resourceName), resourceName);
+        }
+
+        private static AtmosphericSpectralData ParseAtmosphericSpectralDataJson(string json, string source)
+        {
             try
             {
-                string json = File.ReadAllText(filePath);
                 var atmData = JsonConvert.DeserializeObject<AtmosphericSpectralDataJason>(json);
 
                 if (atmData == null || atmData.Wavelength == null ||
                     atmData.DirectLight == null || atmData.DiffuseLight == null)
                 {
-                    throw new InvalidDataException($"Invalid or missing data in file: {filePath}");
+                    throw new InvalidDataException($"Invalid or missing data in: {source}");
                 }
 
                 // Validate array lengths match
@@ -1424,11 +1453,11 @@ namespace Models.PROSAIL.SAIL
             }
             catch (JsonException ex)
             {
-                throw new InvalidDataException($"Failed to parse JSON from {filePath}: {ex.Message}", ex);
+                throw new InvalidDataException($"Failed to parse JSON from {source}: {ex.Message}", ex);
             }
             catch (Exception ex)
             {
-                throw new Exception($"Failed to load atmospheric spectral data from {filePath}: {ex.Message}", ex);
+                throw new Exception($"Failed to load atmospheric spectral data from {source}: {ex.Message}", ex);
             }
         }
 
@@ -1664,16 +1693,13 @@ namespace Models.PROSAIL.SAIL
         }
 
         /// <summary>
-        /// Loads a sensor response response function (SRF) from a JSON file.
+        /// Loads a sensor response response function (SRF) from an embedded resource.
         /// </summary>
-        /// <param name="filePath">Path to the JSON file</param>
+        /// <param name="resourceName">Fully-qualified embedded resource name</param>
         /// <returns>SpectralResponseFunction object</returns>
-        public static SpectralResponseFunction LoadSpectralResponseFunction(string filePath)
+        public static SpectralResponseFunction LoadSpectralResponseFunction(string resourceName)
         {
-            if (!File.Exists(filePath))
-                throw new FileNotFoundException($"SRF JSON file not found: {filePath}");
-
-            string json = File.ReadAllText(filePath);
+            string json = EmbeddedResourceLoader.ReadText(resourceName);
 
             // Use an intermediate class for deserialization to handle jagged arrays
             var srfRaw = JsonConvert.DeserializeObject<SpectralResponseFunctionJsonData>(json);

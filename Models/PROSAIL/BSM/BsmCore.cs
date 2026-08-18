@@ -1,4 +1,5 @@
 using MathNet.Numerics.LinearAlgebra;
+using Models.PROSAIL;
 using Models.PROSAIL.PROSPECT;
 using Newtonsoft.Json;
 using System;
@@ -47,9 +48,23 @@ namespace Models.PROSAIL.BSM
             if (!File.Exists(path))
                 throw new FileNotFoundException($"BSM data file not found: {path}");
 
-            string json = File.ReadAllText(path);
+            return ParseBsmData(File.ReadAllText(path), path);
+        }
+
+        /// <summary>
+        /// Loads BSM spectral data from an embedded resource (400–2400 nm).
+        /// </summary>
+        /// <param name="resourceName">Fully-qualified embedded resource name.</param>
+        /// <returns>Populated <see cref="BsmSpectralData"/>.</returns>
+        public static BsmSpectralData LoadBsmDataFromResource(string resourceName)
+        {
+            return ParseBsmData(EmbeddedResourceLoader.ReadText(resourceName), resourceName);
+        }
+
+        private static BsmSpectralData ParseBsmData(string json, string source)
+        {
             var raw = JsonConvert.DeserializeObject<BsmSpectralDataJson>(json)
-                ?? throw new InvalidOperationException($"Failed to deserialize BSM data from {path}");
+                ?? throw new InvalidOperationException($"Failed to deserialize BSM data from {source}");
 
             if (raw.wavelength == null || raw.GSV_1 == null || raw.GSV_2 == null ||
                 raw.GSV_3 == null || raw.nw == null || raw.kw == null)

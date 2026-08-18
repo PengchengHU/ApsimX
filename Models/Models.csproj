@@ -47,9 +47,7 @@
     <EmbeddedResource Remove="Importer\**" />
 	<EmbeddedResource Include="Clock.cs" />
     <PackageReference Include="APSIM.Soils" Version="8.2.0" />
-    <Content Include="PROSAIL\InputProperties\**\*">
-      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
-    </Content>
+    <EmbeddedResource Include="PROSAIL\InputProperties\**\*" />
     <None Remove="PROSAIL\InputProperties\**\*" />
   </ItemGroup>
 
