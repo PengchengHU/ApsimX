@@ -155,7 +155,7 @@ namespace Models.PROSAIL
 
         /// <summary>The expression for N of the brown/senesced leaf class (4SAIL2 only).</summary>
         [Separator("Brown Leaf")]
-        [Description("NBrown - Leaf structure of the brown leaf class (unitless)")]
+        [Description("N - Leaf structure (unitless)")]
         [Tooltip("Leaf structure parameter for the brown/senesced leaf class. Only used when SailVersion=4SAIL2 " +
         "and FractionBrown > 0. Can be a literal value or an APSIM expression. Typical range: 1.0-2.6. " +
         "Evaluated daily only; does not support a per-observation-date list (see the Introduction node).")]
@@ -164,7 +164,7 @@ namespace Models.PROSAIL
         public string NBrown { get; set; } = "1.5";
 
         /// <summary>The expression for CAB of the brown/senesced leaf class (4SAIL2 only).</summary>
-        [Description("CABBrown - Chlorophyll a+b of the brown leaf class (\u03BCg/cm\u00B2)")]
+        [Description("CAB - Chlorophyll a+b (\u03BCg/cm\u00B2)")]
         [Tooltip("Chlorophyll a + b content for the brown/senesced leaf class. Only used when SailVersion=4SAIL2 " +
         "and FractionBrown > 0. Can be a literal or APSIM expression. Typical range: 10-80 \u03BCg/cm\u00B2. " +
         "Evaluated daily only; does not support a per-observation-date list (see the Introduction node).")]
@@ -173,7 +173,7 @@ namespace Models.PROSAIL
         public string CABBrown { get; set; } = "40.0";
 
         /// <summary>The expression for CAR of the brown/senesced leaf class (4SAIL2 only).</summary>
-        [Description("CARBrown - Carotenoid of the brown leaf class (\u03BCg/cm\u00B2)")]
+        [Description("CAR - Carotenoid (\u03BCg/cm\u00B2)")]
         [Tooltip("Carotenoid content for the brown/senesced leaf class. Only used when SailVersion=4SAIL2 " +
         "and FractionBrown > 0. Can be a literal or APSIM expression. Typical range: 1-24 \u03BCg/cm\u00B2. " +
         "Evaluated daily only; does not support a per-observation-date list (see the Introduction node).")]
@@ -182,7 +182,7 @@ namespace Models.PROSAIL
         public string CARBrown { get; set; } = "8.0";
 
         /// <summary>The expression for EWT of the brown/senesced leaf class (4SAIL2 only).</summary>
-        [Description("EWTBrown - Water thickness of the brown leaf class (cm)")]
+        [Description("EWT - Water thickness (cm)")]
         [Tooltip("Equivalent Water Thickness for the brown/senesced leaf class. Only used when SailVersion=4SAIL2 " +
         "and FractionBrown > 0. Can be a literal or APSIM expression. Typical range: 0.001-0.08 cm. " +
         "Evaluated daily only; does not support a per-observation-date list (see the Introduction node).")]
@@ -191,7 +191,7 @@ namespace Models.PROSAIL
         public string EWTBrown { get; set; } = "0.01";
 
         /// <summary>The expression for LMA of the brown/senesced leaf class (4SAIL2 only).</summary>
-        [Description("LMABrown - Dry matter of the brown leaf class (g/cm\u00B2)")]
+        [Description("LMA - Dry matter (g/cm\u00B2)")]
         [Tooltip("Leaf Mass per Area for the brown/senesced leaf class. Only used when SailVersion=4SAIL2 " +
         "and FractionBrown > 0. Can be a literal or APSIM expression. Typical range: 0.001-0.02 g/cm\u00B2. " +
         "Evaluated daily only; does not support a per-observation-date list (see the Introduction node).")]
@@ -200,7 +200,7 @@ namespace Models.PROSAIL
         public string LMABrown { get; set; } = "0.008";
 
         /// <summary>The expression for the brown pigment content of the brown/senesced leaf class itself (4SAIL2 only).</summary>
-        [Description("BROWNBrown - Brown pigment of the brown leaf class (unitless)")]
+        [Description("BROWN - Brown pigment (unitless)")]
         [Tooltip("Brown pigment content of the brown/senesced leaf class itself (a second, independent brown-pigment " +
         "loading on top of that leaf class already being the 'brown' one in the green/brown mix). Only used when " +
         "SailVersion=4SAIL2 and FractionBrown > 0. Can be a literal or APSIM expression. Typical range: 0-1. " +
@@ -210,7 +210,7 @@ namespace Models.PROSAIL
         public string BROWNBrown { get; set; } = "0.0";
 
         /// <summary>The expression for ANT of the brown/senesced leaf class (4SAIL2 only).</summary>
-        [Description("ANTBrown - Anthocyanin of the brown leaf class (\u03BCg/cm\u00B2)")]
+        [Description("ANT - Anthocyanin (\u03BCg/cm\u00B2)")]
         [Tooltip("Anthocyanin content for the brown/senesced leaf class. Only used when SailVersion=4SAIL2 " +
         "and FractionBrown > 0. Can be a literal or APSIM expression. Typical range: 0-10 \u03BCg/cm\u00B2. " +
         "Evaluated daily only; does not support a per-observation-date list (see the Introduction node).")]
@@ -219,7 +219,7 @@ namespace Models.PROSAIL
         public string ANTBrown { get; set; } = "0.0";
 
         /// <summary>The expression for PROT of the brown/senesced leaf class (4SAIL2 only).</summary>
-        [Description("PROTBrown - Protein of the brown leaf class (g/cm\u00B2)")]
+        [Description("PROT - Protein (g/cm\u00B2)")]
         [Tooltip("Protein content for the brown/senesced leaf class. Only used when SailVersion=4SAIL2 " +
         "and FractionBrown > 0. Can be a literal or APSIM expression. Typical range: 0-10 g/cm\u00B2. " +
         "Evaluated daily only; does not support a per-observation-date list (see the Introduction node).")]
@@ -228,7 +228,7 @@ namespace Models.PROSAIL
         public string PROTBrown { get; set; } = "0.0";
 
         /// <summary>The expression for CBC of the brown/senesced leaf class (4SAIL2 only).</summary>
-        [Description("CBCBrown - Carbon-based constituent of the brown leaf class (g/cm\u00B2)")]
+        [Description("CBC - Carbon-based constituent (g/cm\u00B2)")]
         [Tooltip("Non-protein carbon-based constituent content for the brown/senesced leaf class. Only used when " +
         "SailVersion=4SAIL2 and FractionBrown > 0. Can be a literal or APSIM expression. Typical range: 0-10 g/cm\u00B2. " +
         "Evaluated daily only; does not support a per-observation-date list (see the Introduction node).")]
@@ -237,7 +237,7 @@ namespace Models.PROSAIL
         public string CBCBrown { get; set; } = "0.0";
 
         /// <summary>The expression for alpha of the brown/senesced leaf class (4SAIL2 only).</summary>
-        [Description("AlphaBrown - Incidence angle of the brown leaf class (\u00B0)")]
+        [Description("Alpha - Incidence angle (\u00B0)")]
         [Tooltip("Incidence angle in degrees for the brown/senesced leaf class. Only used when SailVersion=4SAIL2 " +
         "and FractionBrown > 0. Can be a literal or APSIM expression. Typical range: 0-90\u00B0. " +
         "Evaluated daily only; does not support a per-observation-date list (see the Introduction node).")]
