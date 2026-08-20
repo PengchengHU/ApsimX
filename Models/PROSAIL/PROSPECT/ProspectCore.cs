@@ -157,8 +157,26 @@ namespace Models.PROSAIL.PROSPECT
             if (Alpha < 0 || Alpha > 90)
                 throw new ArgumentException("Incidence angle must be between 0 and 90 degrees");
 
-            // Handle custom wavelengths
-            if (Wavelengths != null && Wavelengths.Length > 0)
+            // Handle custom wavelengths. Skip the rebuild entirely when LeafConstants is already
+            // subset to exactly these wavelengths (the common case for a caller - like ProsailModel -
+            // that pre-subsets its cached LeafOpticalConsts once and then passes the same wavelengths
+            // array on every call): re-validating and rebuilding an identical LeafOpticalConsts would
+            // just waste 11 array/Vector allocations and a dictionary rebuild for no behavioural change.
+            bool wavelengthsAlreadyMatch = Wavelengths != null && Wavelengths.Length > 0
+                && LeafConstants.Wavelength.Count == Wavelengths.Length;
+            if (wavelengthsAlreadyMatch)
+            {
+                for (int i = 0; i < Wavelengths.Length; i++)
+                {
+                    if (LeafConstants.Wavelength[i] != Wavelengths[i])
+                    {
+                        wavelengthsAlreadyMatch = false;
+                        break;
+                    }
+                }
+            }
+
+            if (Wavelengths != null && Wavelengths.Length > 0 && !wavelengthsAlreadyMatch)
             {
                 // Validate that all specified wavelengths are in OpticalConstants.Wavelength
                 foreach (double w in Wavelengths)

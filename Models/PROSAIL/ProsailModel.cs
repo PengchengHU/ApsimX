@@ -879,9 +879,11 @@ namespace Models.PROSAIL
                 PROT: Convert.ToDouble(CurrentParameterValues["PROT"]),
                 CBC: Convert.ToDouble(CurrentParameterValues["CBC"]),
                 Alpha: Convert.ToDouble(CurrentParameterValues["Alpha"]),
-                // cachedLeafOpticalConstants is already subset to inputWavelengths (done once in
-                // OnCommencing), so passing null here avoids ProspectCore.Prospect redundantly
-                // rebuilding an identical wavelength subset from scratch every day.
+                // Unused: PRO4SAIL only falls back to this when inputProspectList is empty, which
+                // never happens here since inputProspectList is always built explicitly above. The
+                // wavelengths: inputWavelengths passed into each ProspectInputs above are what
+                // Prospect() actually validates against - it skips rebuilding its own LeafOpticalConsts
+                // subset when that already matches cachedLeafOpticalConstants (see ProspectCore.Prospect).
                 Wavelengths: null,
                 SailVersion: SailVersionValue,
                 LAI: Convert.ToDouble(CurrentParameterValues["LAI"]),

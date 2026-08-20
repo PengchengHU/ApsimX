@@ -718,5 +718,44 @@ namespace UnitTests.PROSAIL
                     File.Delete(dbPath);
             }
         }
+
+        /// <summary>
+        /// Verifies Prospect()'s "already subset to these wavelengths" short-circuit: (1) when the
+        /// wavelengths genuinely differ from what LeafOpticalConstants currently holds, the normal
+        /// rebuild still runs and correctly narrows the result to just the requested subset (guards
+        /// against the short-circuit's match check false-positiving and skipping a rebuild it
+        /// shouldn't); and (2) whether or not LeafOpticalConstants was already pre-subset to the exact
+        /// same wavelengths, the resulting LeafOptics is identical either way - the short-circuit is a
+        /// pure performance change with no effect on output.
+        /// </summary>
+        [Test]
+        public void Prospect_SkipsRedundantWavelengthRebuild_WithoutChangingOutput()
+        {
+            LeafOpticalConsts fullConstants = GetCachedLeafOpticalConstants();
+            double[] narrowWavelengths = { 500.0, 650.0, 800.0 };
+            var inputs = new ProspectInputs(n: 1.5, cab: 40.0, car: 8.0, wavelengths: narrowWavelengths);
+
+            // Genuinely differing wavelengths (LeafOpticalConstants still holds the full 400-2500 range):
+            // the rebuild path must still run and correctly narrow the result.
+            LeafOptics fromRebuild = Prospect(inputs, fullConstants);
+            Assert.That(fromRebuild.Wavelength.Length, Is.EqualTo(narrowWavelengths.Length),
+                "Requesting a genuine subset of a wider LeafOpticalConstants should still narrow the result - " +
+                "if this fails, the short-circuit is skipping a rebuild it shouldn't.");
+            Assert.That(fromRebuild.Wavelength, Is.EqualTo(narrowWavelengths));
+
+            // LeafOpticalConstants pre-subset to exactly narrowWavelengths (mirrors ProsailModel's usage:
+            // cachedLeafOpticalConstants is subset once in OnCommencing, then the same inputWavelengths
+            // array is passed on every daily ProspectInputs) - the short-circuit should take the fast
+            // path here, but the output must be identical to the rebuild path above regardless.
+            LeafOpticalConsts subsetConstants = fullConstants.SubsetByWavelengths(narrowWavelengths);
+            var inputsWithDifferentArrayInstance = new ProspectInputs(n: 1.5, cab: 40.0, car: 8.0,
+                wavelengths: narrowWavelengths.ToArray()); // same values, different array instance
+            LeafOptics fromShortCircuit = Prospect(inputsWithDifferentArrayInstance, subsetConstants);
+
+            Assert.That(fromShortCircuit.Wavelength, Is.EqualTo(fromRebuild.Wavelength));
+            Assert.That(fromShortCircuit.Reflectance, Is.EqualTo(fromRebuild.Reflectance).Within(1e-12),
+                "The short-circuit must produce output identical to the full rebuild - it's a pure performance change.");
+            Assert.That(fromShortCircuit.Transmittance, Is.EqualTo(fromRebuild.Transmittance).Within(1e-12));
+        }
     }
 }
