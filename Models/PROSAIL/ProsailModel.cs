@@ -527,6 +527,12 @@ namespace Models.PROSAIL
         /// <summary>Current simulation name for database records</summary>
         private string simulationName = null;
 
+        /// <summary>This simulation's compact ID in the database's _Simulations table</summary>
+        private int prosailSimulationID;
+
+        /// <summary>Wavelength-to-WavelengthID lookup for the database's _Wavelengths table</summary>
+        private Dictionary<double, int> wavelengthIdLookup;
+
         /// <summary>Current parameter values after expression evaluation</summary>
         private Dictionary<string, object> CurrentParameterValues { get; set; } = new Dictionary<string, object>();
 
@@ -1096,9 +1102,16 @@ namespace Models.PROSAIL
                 || OutputCanopyBRF || OutputReflectanceResampledToSensor;
             if (!anyOutput)
                 throw new InvalidOperationException("ProsailModel: At least one output table must be selected.");
-            dbConnection = ProsailDatabaseHelper.InitializeDatabase(dbPath, simulationName, Clock.StartDate, Clock.EndDate,
+            dbConnection = ProsailDatabaseHelper.InitializeDatabase(dbPath, simulationName,
                 OutputParameters, OutputCanopyOpticalVariable, OutputCanopyStateVariable,
-                OutputCanopyBRF, OutputReflectanceResampledToSensor, WriteMessage);
+                OutputCanopyBRF, OutputReflectanceResampledToSensor, out prosailSimulationID, WriteMessage);
+
+            IEnumerable<double> wavelengthsToRegister = Enumerable.Empty<double>();
+            if (OutputCanopyOpticalVariable || OutputCanopyBRF)
+                wavelengthsToRegister = wavelengthsToRegister.Concat(inputWavelengths);
+            if (OutputReflectanceResampledToSensor && SensorSRF?.CentralWavelength != null)
+                wavelengthsToRegister = wavelengthsToRegister.Concat(SensorSRF.CentralWavelength);
+            wavelengthIdLookup = ProsailDatabaseHelper.RegisterWavelengths(dbConnection, wavelengthsToRegister);
         }
 
         /// <summary>Called when [do management calculations].</summary>
@@ -1236,7 +1249,7 @@ namespace Models.PROSAIL
                         ? (SensorType == SensorTypes.Custom ? $"Custom:{CustomSRFPath}" : SensorType.ToString())
                         : string.Empty;
 
-                    ProsailDatabaseHelper.WriteToDatabase(dbConnection, simulationName, Clock.Today,
+                    ProsailDatabaseHelper.WriteToDatabase(dbConnection, prosailSimulationID, wavelengthIdLookup, Clock.Today,
                         CurrentParameterValues, WetDrySoilReflectancePath, SailVersionString, sensorTypeStr,
                         canopyOpticalVariables, canopyStateVariables ?? default, canopyBRF ?? default, resampledReflectance,
                         OutputParameters, OutputCanopyOpticalVariable, OutputCanopyStateVariable,

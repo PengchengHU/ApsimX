@@ -13,6 +13,7 @@ using Newtonsoft.Json;
 using NUnit.Framework;
 using System;
 using System.Collections.Generic;
+using System.Data;
 using System.Diagnostics;
 using System.IO;
 using System.Linq;
@@ -565,6 +566,157 @@ namespace UnitTests.PROSAIL
             Assert.That(maxDiff, Is.GreaterThan(1e-6),
                 "FractionBrown > 0 under 4SAIL2 should produce a different result than FractionBrown = 0 - " +
                 "if this fails, brown-leaf mixing has silently fallen back to a green-only result again.");
+        }
+
+        /// <summary>
+        /// Verifies the normalized PROSAIL database schema: (1) two simulations sharing one database
+        /// file both survive - InitializeDatabase no longer does an unconditional DROP TABLE that would
+        /// wipe a sibling simulation's rows - and (2) re-initializing the same simulation only clears
+        /// that simulation's own previous rows (via the scoped SimulationID DELETE), leaving the other
+        /// simulation untouched. Reads back through the compatibility views to also confirm the original
+        /// flat SimulationName/Wavelength column shape is preserved.
+        /// </summary>
+        [Test]
+        public void ProsailDatabaseHelper_MultipleSimulationsShareDatabase_DataSurvivesAndRerunOnlyClearsOwnRows()
+        {
+            string dbPath = Path.Combine(Path.GetTempPath(), $"ProsailDbTest_{Guid.NewGuid():N}.db");
+            void NoOpWriteMessage(LogLevel level, string message) { }
+
+            try
+            {
+                double[] wavelengths = { 500.0, 650.0, 800.0 };
+
+                Dictionary<string, object> MakeParameterValues() => new Dictionary<string, object>
+                {
+                    ["N"] = 1.5, ["CAB"] = 40.0, ["CAR"] = 8.0, ["EWT"] = 0.01, ["LMA"] = 0.008,
+                    ["ANT"] = 0.0, ["BROWN"] = 0.0, ["PROT"] = 0.0, ["CBC"] = 0.0, ["Alpha"] = 40.0,
+                    ["LAI"] = 3.0, ["HotSpot"] = 0.1, ["TypeLidf"] = 2.0, ["LIDFa"] = 60.0, ["LIDFb"] = -0.35,
+                    ["FractionBrown"] = 0.0, ["Dissociation"] = 0.0, ["CrownCover"] = 1.0, ["TreeShape"] = 1.0,
+                    ["Psoil"] = 0.5, ["SunZenithAngle"] = 30.0, ["ObserverZenithAngle"] = 0.0, ["RelativeAzimuthAngle"] = 0.0
+                };
+
+                CanopyOptics MakeCanopyOptics() => new CanopyOptics
+                {
+                    Wavelength = wavelengths,
+                    Rdot = wavelengths.Select(w => w / 1000.0).ToArray(),
+                    Rsot = wavelengths.Select(w => w / 1000.0).ToArray(),
+                    Rddt = wavelengths.Select(w => w / 1000.0).ToArray(),
+                    Rsdt = wavelengths.Select(w => w / 1000.0).ToArray(),
+                    FCover = wavelengths.Select(w => 0.8).ToArray(),
+                    Abs_dir = wavelengths.Select(w => 0.5).ToArray(),
+                    Abs_hem = wavelengths.Select(w => 0.5).ToArray(),
+                    Rsdstar = wavelengths.Select(w => 0.2).ToArray(),
+                    Rddstar = wavelengths.Select(w => 0.2).ToArray()
+                };
+
+                void RunOneDay(string simulationName, DateTime date)
+                {
+                    SQLite db = ProsailDatabaseHelper.InitializeDatabase(dbPath, simulationName.Replace("'", "''"),
+                        outputParameters: true, outputCanopyOpticalVariable: true, outputCanopyStateVariable: false,
+                        outputCanopyBRF: false, outputReflectanceResampledToSensor: false,
+                        out int simulationID, NoOpWriteMessage);
+                    try
+                    {
+                        Dictionary<double, int> wavelengthIdLookup = ProsailDatabaseHelper.RegisterWavelengths(db, wavelengths);
+                        ProsailDatabaseHelper.WriteToDatabase(db, simulationID, wavelengthIdLookup, date,
+                            MakeParameterValues(), wetDrySoilReflectancePath: null, sailVersionString: "4SAIL", sensorTypeString: "",
+                            MakeCanopyOptics(), default, default, spectralResamplingResult: null,
+                            outputParameters: true, outputCanopyOpticalVariable: true, outputCanopyStateVariable: false,
+                            outputCanopyBRF: false, outputReflectanceResampledToSensor: false, NoOpWriteMessage);
+                    }
+                    finally
+                    {
+                        db.CloseDatabase();
+                    }
+                }
+
+                // Two simulations, each opening its own connection to the same db file - exactly as
+                // happens when multiple Simulation nodes share one .apsimx file.
+                RunOneDay("SimA", new DateTime(2024, 1, 1));
+                RunOneDay("SimB", new DateTime(2024, 1, 1));
+
+                SQLite reader = new SQLite();
+                reader.OpenDatabase(dbPath, true);
+                DataTable simNames = reader.ExecuteQuery("SELECT DISTINCT SimulationName FROM Parameters ORDER BY SimulationName;");
+                reader.CloseDatabase();
+                var namesAfterBothRuns = simNames.Rows.Cast<DataRow>().Select(r => (string)r["SimulationName"]).ToList();
+                Assert.That(namesAfterBothRuns, Is.EquivalentTo(new[] { "SimA", "SimB" }),
+                    "Both simulations sharing one database file should have their Parameters rows survive - " +
+                    "if this fails, InitializeDatabase is wiping a sibling simulation's data again.");
+
+                // Re-run SimA on a different date. Only SimA's own rows should be replaced; SimB's row
+                // (and the compatibility view's flat SimulationName/Wavelength shape) should be untouched.
+                RunOneDay("SimA", new DateTime(2024, 1, 2));
+
+                reader = new SQLite();
+                reader.OpenDatabase(dbPath, true);
+                DataTable allRows = reader.ExecuteQuery("SELECT SimulationName, Date, Wavelength, Rdot FROM CanopyOpticalVariable ORDER BY SimulationName, Date;");
+                reader.CloseDatabase();
+
+                var simADates = allRows.Rows.Cast<DataRow>().Where(r => (string)r["SimulationName"] == "SimA").Select(r => (string)r["Date"]).Distinct().ToList();
+                var simBDates = allRows.Rows.Cast<DataRow>().Where(r => (string)r["SimulationName"] == "SimB").Select(r => (string)r["Date"]).Distinct().ToList();
+
+                Assert.That(simADates, Is.EquivalentTo(new[] { "2024-01-02" }),
+                    "Re-running SimA should replace its own previous-date rows, not accumulate them.");
+                Assert.That(simBDates, Is.EquivalentTo(new[] { "2024-01-01" }),
+                    "SimB's rows should be untouched by SimA's re-run - if this fails, the DELETE isn't scoped to SimulationID.");
+                Assert.That(allRows.Rows.Count, Is.EqualTo(wavelengths.Length * 2),
+                    "Expected exactly one wavelength-row set for SimA's current date plus one for SimB's, via the CanopyOpticalVariable compatibility view.");
+            }
+            finally
+            {
+                if (File.Exists(dbPath))
+                    File.Delete(dbPath);
+            }
+        }
+
+        /// <summary>
+        /// Verifies RegisterWavelengths only populates _Wavelengths with whatever is actually passed
+        /// in - the primitive that ProsailModel.OnCommencing now relies on to skip registering the
+        /// full simulation grid when no per-wavelength output (CanopyOpticalVariable/CanopyBRF) is
+        /// enabled, and to register only sensor band centers when just ReflectanceResampledToSensor is.
+        /// </summary>
+        [Test]
+        public void ProsailDatabaseHelper_RegisterWavelengths_OnlyPopulatesWhatIsPassedIn()
+        {
+            string dbPath = Path.Combine(Path.GetTempPath(), $"ProsailWavelengthTest_{Guid.NewGuid():N}.db");
+            void NoOpWriteMessage(LogLevel level, string message) { }
+
+            try
+            {
+                SQLite db = ProsailDatabaseHelper.InitializeDatabase(dbPath, "Simulation",
+                    outputParameters: true, outputCanopyOpticalVariable: false, outputCanopyStateVariable: true,
+                    outputCanopyBRF: false, outputReflectanceResampledToSensor: false,
+                    out int simulationID, NoOpWriteMessage);
+
+                // Mirrors OnCommencing when only Parameters/CanopyStateVariable are enabled: nothing
+                // needs a wavelength, so nothing should be registered.
+                Dictionary<double, int> emptyLookup = ProsailDatabaseHelper.RegisterWavelengths(db, Enumerable.Empty<double>());
+                Assert.That(emptyLookup, Is.Empty,
+                    "Registering an empty wavelength set should leave _Wavelengths empty - " +
+                    "if this fails, RegisterWavelengths is populating rows it wasn't asked for.");
+
+                // Mirrors OnCommencing when only ReflectanceResampledToSensor is enabled: only the
+                // (discontinuous, decimal) sensor band centers should be registered, not the full grid.
+                double[] bandCenters = { 490.5, 705.5, 865.3 };
+                Dictionary<double, int> bandLookup = ProsailDatabaseHelper.RegisterWavelengths(db, bandCenters);
+                db.CloseDatabase();
+
+                Assert.That(bandLookup.Keys, Is.EquivalentTo(bandCenters),
+                    "_Wavelengths should contain exactly the sensor band centers passed in, not the full simulation grid.");
+
+                SQLite reader = new SQLite();
+                reader.OpenDatabase(dbPath, true);
+                int rowCount = reader.ExecuteQueryReturnInt("SELECT COUNT(*) FROM _Wavelengths;", 0);
+                reader.CloseDatabase();
+                Assert.That(rowCount, Is.EqualTo(bandCenters.Length),
+                    "_Wavelengths row count should match only the registered band centers, confirming the full 400-2500 grid was never registered.");
+            }
+            finally
+            {
+                if (File.Exists(dbPath))
+                    File.Delete(dbPath);
+            }
         }
     }
 }
