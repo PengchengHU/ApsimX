@@ -16,10 +16,11 @@ Five parameters — **Psoil**, **SMp**, **SunZenithAngle**, **ObserverZenithAngl
 
 ### Model Configuration
 
-Two switches at the top of the property panel determine which of the other sections below actually apply — set these first:
+These settings at the top of the property panel apply globally, across every section below — set them first. **SailVersion** and **SoilReflectanceModel** additionally determine which of the other sections' properties are shown:
 
 - **SailVersion**: `4SAIL` (single-layer, most crops) or `4SAIL2` (two-layer green+brown canopy). Selecting `4SAIL2` reveals the brown-leaf properties in Step 1 and the `FractionBrown`/`Dissociation`/`CrownCover`/`TreeShape` properties in Step 2; under `4SAIL` those are all hidden.
 - **SoilReflectanceModel**: `WetDryMixing` or `BSM` — chooses the soil reflectance model used in Step 4. Selecting one reveals only that model's properties in Step 4; the other model's properties are hidden.
+- **InputWavelengthRange**: the wavelengths PROSAIL should compute, e.g. `400-2500` for the full range or `650,750,800` for specific bands. Leave empty to use all wavelengths (400–2500 nm). This is a global setting — it determines the spectral grid every other section (leaf optics, canopy reflectance, soil, sensor resampling) computes over, not just the leaf properties in Step 1. Narrowing this range reduces output size and computation time, but isn't automatically checked against other settings: if **OutputCanopyStateVariable** (Simulation and Output Control) is enabled, fAPAR/albedo integrate over fixed 400–700nm/400–2400nm ranges regardless of this setting — narrowing below those will silently truncate or zero that output. If resampling to a sensor, this range must cover each band's full spectral response support, not just its central wavelength, or the resampled reflectance will be biased.
 
 ### Step 1: PROSPECT leaf inputs
 
@@ -37,8 +38,6 @@ Set each leaf biochemical parameter either to a fixed value or to an APSIM expre
 | **PROT** | Protein content (g cm⁻²) | 0 – 10 |
 | **CBC** | Carbon-based constituents — cellulose + lignin (g cm⁻²) | 0 – 10 |
 | **Alpha** | Incidence angle for refractive index (°) | 40 (default) |
-
-Set **InputWavelengthRange** to the wavelengths PROSAIL should compute, e.g. `400-2500` for the full range or `650,750,800` for specific bands. Leave empty to use all wavelengths (400–2500 nm).
 
 **Brown leaf class (4SAIL2 only)**: each of the 10 parameters above has a `...Brown` counterpart
 (`NBrown`, `CABBrown`, `CARBrown`, `ANTBrown`, `BROWNBrown`, `EWTBrown`, `LMABrown`, `PROTBrown`,
@@ -133,13 +132,13 @@ Enable the tables you need:
 | **Rsdstar** | Canopy-layer reflectance for direct illumination (excludes soil contribution) |
 | **Rddstar** | Canopy-layer reflectance for diffuse illumination (excludes soil contribution) |
 
-**CanopyStateVariable columns** (broadband, integrated across the full simulated spectrum):
+**CanopyStateVariable columns** (broadband, each integrated over its own fixed wavelength range below — independent of **InputWavelengthRange**, so narrowing that range below these bounds will silently truncate or zero the corresponding output; see the note under **InputWavelengthRange** above):
 
 | Variable | Meaning |
 |----------|---------|
-| **fAPAR** | Fraction of Absorbed Photosynthetically Active Radiation (400–700 nm) |
+| **fAPAR** | Fraction of Absorbed Photosynthetically Active Radiation (fixed 400–700 nm) |
 | **fCover** | Fractional green canopy cover |
-| **albedo** | Broadband canopy albedo (400–2400 nm) |
+| **albedo** | Broadband canopy albedo (fixed 400–2400 nm) |
 
 **Direct vs. diffuse weighting**: `Rdot`/`Rddt`/`Abs_hem`/`Rddstar` describe the canopy under purely diffuse (sky) illumination, while `Rsot`/`Rsdt`/`Abs_dir`/`Rsdstar` describe it under purely direct (beam) illumination — a real sensor always sees a mix of both. `CanopyBRF`, `fAPAR`, and `albedo` combine the direct and diffuse components using a solar-elevation-dependent diffuse-fraction estimate (`skyl`, from Francois et al. 2002, implemented in `ComputeBRF`/`ComputeFAPAR`/`ComputeAlbedo`), so they already represent properly weighted, sensor-comparable values. This weighting currently depends only on solar zenith angle, not on the specific simulated day's actual cloudiness.
 

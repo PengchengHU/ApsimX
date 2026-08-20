@@ -84,7 +84,10 @@ namespace Models.PROSAIL
 
         /// <summary>Spectral range to simulate (start-end in nm)</summary>
         [Description("Spectral range (nm)")]
-        [Tooltip("Supports ranges (e.g., '400-500'), lists (e.g., '400, 500, 600'), and mixed formats (e.g., '400, 500-600, 700'). Default: 400-2500.")]
+        [Tooltip("Supports ranges (e.g., '400-500'), lists (e.g., '400, 500, 600'), and mixed formats (e.g., '400, 500-600, 700'). Default: 400-2500. " +
+        "Narrowing this range reduces output size and computation time, but isn't automatically checked against other settings: if 'Compute and save canopy state variable' " +
+        "is enabled, fAPAR/albedo integrate over fixed 400-700nm/400-2400nm ranges regardless of this setting - narrowing below those will silently truncate or zero that output. " +
+        "If resampling to a sensor, this range must cover each band's full spectral response support, not just its central wavelength, or resampled reflectance will be biased.")]
         public string InputWavelengthRange { get; set; } = "400-2500";
         #endregion
 
