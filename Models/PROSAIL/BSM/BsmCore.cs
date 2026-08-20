@@ -58,7 +58,8 @@ namespace Models.PROSAIL.BSM
         /// <returns>Populated <see cref="BsmSpectralData"/>.</returns>
         public static BsmSpectralData LoadBsmDataFromResource(string resourceName)
         {
-            return ParseBsmData(EmbeddedResourceLoader.ReadText(resourceName), resourceName);
+            return EmbeddedResourceLoader.GetOrLoad(resourceName,
+                () => ParseBsmData(EmbeddedResourceLoader.ReadText(resourceName), resourceName));
         }
 
         private static BsmSpectralData ParseBsmData(string json, string source)

@@ -6,6 +6,7 @@ using Models;
 using Models.PostSimulationTools;
 using Models.Prosail;
 using Models.PROSAIL;
+using Models.PROSAIL.BSM;
 using Models.PROSAIL.PROSPECT;
 using Models.PROSAIL.Sail;
 using Models.PROSAIL.SAIL;
@@ -756,6 +757,64 @@ namespace UnitTests.PROSAIL
             Assert.That(fromShortCircuit.Reflectance, Is.EqualTo(fromRebuild.Reflectance).Within(1e-12),
                 "The short-circuit must produce output identical to the full rebuild - it's a pure performance change.");
             Assert.That(fromShortCircuit.Transmittance, Is.EqualTo(fromRebuild.Transmittance).Within(1e-12));
+        }
+
+        /// <summary>
+        /// Verifies that LoadWetDrySoilReflectanDataFromResource, LoadAtmosphericSpectralDataFromResource,
+        /// and BsmCore.LoadBsmDataFromResource each parse a given embedded resource only once per process:
+        /// calling them twice with the same resource name must return data backed by the same underlying
+        /// array/Vector instances, not two independently-parsed copies. This is what actually reduces memory
+        /// when many ProsailModel instances share one process (e.g. an HPC run using --cpu-count).
+        /// </summary>
+        [Test]
+        public void EmbeddedResourceLoaders_ShareOneParsedCopy_AcrossRepeatedCalls()
+        {
+            WetDrySoilReflectance soil1 = LoadWetDrySoilReflectanDataFromResource("Models.PROSAIL.InputProperties.SpectralData.SpecSOIL.json");
+            WetDrySoilReflectance soil2 = LoadWetDrySoilReflectanDataFromResource("Models.PROSAIL.InputProperties.SpectralData.SpecSOIL.json");
+            Assert.That(ReferenceEquals(soil1.Wavelength, soil2.Wavelength), Is.True,
+                "Repeated loads of the same soil resource should share one parsed copy.");
+
+            AtmosphericSpectralData atm1 = LoadAtmosphericSpectralDataFromResource("Models.PROSAIL.InputProperties.SpectralData.SpecATM.json");
+            AtmosphericSpectralData atm2 = LoadAtmosphericSpectralDataFromResource("Models.PROSAIL.InputProperties.SpectralData.SpecATM.json");
+            Assert.That(ReferenceEquals(atm1.Wavelength, atm2.Wavelength), Is.True,
+                "Repeated loads of the same atmospheric resource should share one parsed copy.");
+
+            BsmSpectralData bsm1 = BsmCore.LoadBsmDataFromResource("Models.PROSAIL.InputProperties.SpectralData.BSM_GSV.json");
+            BsmSpectralData bsm2 = BsmCore.LoadBsmDataFromResource("Models.PROSAIL.InputProperties.SpectralData.BSM_GSV.json");
+            Assert.That(ReferenceEquals(bsm1.Wavelength, bsm2.Wavelength), Is.True,
+                "Repeated loads of the same BSM resource should share one parsed copy.");
+        }
+
+        /// <summary>
+        /// LoadSpectralResponseFunction shares the immutable raw SRF arrays across repeated loads of the
+        /// same resource (avoiding a re-parse per ProsailModel instance), but must still return a distinct
+        /// SpectralResponseFunction wrapper each time, because Preprocess() mutates
+        /// PrecomputedInputIndices/Weights/TotalWeights in place. Two simulations selecting the same sensor
+        /// but different InputWavelengthRange must not corrupt each other's precomputed lookups.
+        /// </summary>
+        [Test]
+        public void LoadSpectralResponseFunction_SharesRawArrays_ButKeepsPreprocessOutputPerInstance()
+        {
+            const string resourceName = "Models.PROSAIL.InputProperties.SpectralResponseFunctions.Sentinel_2.json";
+
+            SpectralResponseFunction srf1 = LoadSpectralResponseFunction(resourceName);
+            SpectralResponseFunction srf2 = LoadSpectralResponseFunction(resourceName);
+
+            Assert.That(ReferenceEquals(srf1, srf2), Is.False,
+                "Each caller must get its own SpectralResponseFunction wrapper.");
+            Assert.That(ReferenceEquals(srf1.OriginalBandWavelength, srf2.OriginalBandWavelength), Is.True,
+                "The immutable raw arrays should be shared, not re-parsed, across wrappers from the same resource.");
+
+            double[] wavelengthsA = srf1.OriginalBandWavelength.Take(5).ToArray();
+            double[] wavelengthsB = srf1.OriginalBandWavelength.Skip(5).Take(5).ToArray();
+
+            srf1.Preprocess(wavelengthsA);
+            srf2.Preprocess(wavelengthsB);
+
+            Assert.That(srf1.PrecomputedInputIndices, Is.Not.SameAs(srf2.PrecomputedInputIndices),
+                "Preprocessing one wrapper with a different wavelength range must not affect the other.");
+            Assert.That(srf1.OriginalBandWavelength, Is.SameAs(srf2.OriginalBandWavelength),
+                "The raw arrays remain shared even after each wrapper is preprocessed independently.");
         }
     }
 }

@@ -1305,7 +1305,8 @@ namespace Models.PROSAIL.SAIL
         /// <returns> WetDrySoilReflectance object containing wavelength and reflectance data</returns>
         public static WetDrySoilReflectance LoadWetDrySoilReflectanDataFromResource(string resourceName)
         {
-            return ParseWetDrySoilReflectanceJson(EmbeddedResourceLoader.ReadText(resourceName), resourceName);
+            return EmbeddedResourceLoader.GetOrLoad(resourceName,
+                () => ParseWetDrySoilReflectanceJson(EmbeddedResourceLoader.ReadText(resourceName), resourceName));
         }
 
         private static WetDrySoilReflectance ParseWetDrySoilReflectanceJson(string json, string source)
@@ -1414,7 +1415,8 @@ namespace Models.PROSAIL.SAIL
         /// <returns>AtmosphericSpectralData object containing the loaded data</returns>
         public static AtmosphericSpectralData LoadAtmosphericSpectralDataFromResource(string resourceName)
         {
-            return ParseAtmosphericSpectralDataJson(EmbeddedResourceLoader.ReadText(resourceName), resourceName);
+            return EmbeddedResourceLoader.GetOrLoad(resourceName,
+                () => ParseAtmosphericSpectralDataJson(EmbeddedResourceLoader.ReadText(resourceName), resourceName));
         }
 
         private static AtmosphericSpectralData ParseAtmosphericSpectralDataJson(string json, string source)
@@ -1699,6 +1701,26 @@ namespace Models.PROSAIL.SAIL
         /// <returns>SpectralResponseFunction object</returns>
         public static SpectralResponseFunction LoadSpectralResponseFunction(string resourceName)
         {
+            // The raw parsed arrays are immutable once built, so they're shared across every
+            // ProsailModel instance in the process (see EmbeddedResourceLoader.GetOrLoad). Each
+            // instance still gets its own SpectralResponseFunction wrapper below, because
+            // Preprocess() mutates PrecomputedInputIndices/Weights/TotalWeights in place and those
+            // must stay per-instance (different simulations can preprocess against different
+            // wavelength ranges).
+            SpectralResponseFunctionRaw raw = EmbeddedResourceLoader.GetOrLoad(resourceName,
+                () => ParseSpectralResponseFunctionRaw(resourceName));
+
+            return new SpectralResponseFunction
+            {
+                SpectralResponse = raw.SpectralResponse,
+                CentralWavelength = raw.CentralWavelength,
+                SpectralBandName = raw.SpectralBandName,
+                OriginalBandWavelength = raw.OriginalBandWavelength
+            };
+        }
+
+        private static SpectralResponseFunctionRaw ParseSpectralResponseFunctionRaw(string resourceName)
+        {
             string json = EmbeddedResourceLoader.ReadText(resourceName);
 
             // Use an intermediate class for deserialization to handle jagged arrays
@@ -1737,7 +1759,7 @@ namespace Models.PROSAIL.SAIL
             for (int i = 0; i < nBands; i++)
                 srfList.Add((double[])srfRaw.Spectral_Response[i].Clone());
 
-            return new SpectralResponseFunction
+            return new SpectralResponseFunctionRaw
             {
                 SpectralResponse = srfList,
                 CentralWavelength = srfRaw.Central_WL,
@@ -1753,6 +1775,16 @@ namespace Models.PROSAIL.SAIL
             public double[] Central_WL { get; set; } // Central wavelengths of sensor bands
             public object[] Spectral_Bands { get; set; } // Names or identifiers for sensor bands
             public double[] Original_Bands { get; set; } // Original wavelengths for SRF
+        }
+
+        /// <summary>Holds the immutable raw fields parsed from an SRF resource, shared across all
+        /// SpectralResponseFunction instances built from the same resource (see LoadSpectralResponseFunction).</summary>
+        private class SpectralResponseFunctionRaw
+        {
+            public List<double[]> SpectralResponse { get; set; }
+            public double[] CentralWavelength { get; set; }
+            public object[] SpectralBandName { get; set; }
+            public double[] OriginalBandWavelength { get; set; }
         }
 
         /// <summary>Hold the canopy state variables</summary>
